@@ -185,6 +185,7 @@ export class LiveSessionManager {
     } catch (error) {
       console.error("Failed to start Live Session:", error);
       this.stop();
+      throw error;
     }
   }
 

@@ -142,6 +142,17 @@ export default function App() {
       resetZoyaSession();
     } else {
       try {
+        // Do not show "Microphone Blocked" before actually requesting microphone permission.
+        // Call navigator.mediaDevices.getUserMedia() first.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Microphone access is not supported by your browser or secure context (ensure HTTPS).");
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Release the mic track immediately, as LiveSessionManager will request it
+        stream.getTracks().forEach(track => track.stop());
+
+        // Now that permission is granted, start the session immediately
         setIsSessionActive(true);
         resetZoyaSession();
         
@@ -164,9 +175,24 @@ export default function App() {
         };
 
         await session.start();
-      } catch (e) {
+      } catch (e: any) {
         console.error("Failed to start session", e);
-        setShowPermissionModal(true);
+        
+        // Show "Microphone Blocked" only if getUserMedia() throws NotAllowedError or PermissionDeniedError
+        const errorName = e?.name || "";
+        const errorMessage = e?.message || "";
+        const isPermissionError = 
+          errorName === "NotAllowedError" || 
+          errorName === "PermissionDeniedError" ||
+          errorMessage.toLowerCase().includes("permission denied") ||
+          errorMessage.toLowerCase().includes("notallowederror");
+
+        if (isPermissionError) {
+          setShowPermissionModal(true);
+        } else {
+          alert(`Could not start voice session: ${errorMessage || "Unknown error"}`);
+        }
+
         setIsSessionActive(false);
         setAppState("idle");
       }
