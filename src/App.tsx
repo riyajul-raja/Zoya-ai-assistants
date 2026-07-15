@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2 } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -51,7 +51,7 @@ export default function App() {
     }
   }, [isMuted]);
 
-  const [showTextInput, setShowTextInput] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -179,7 +179,6 @@ export default function App() {
     
     handleTextCommand(textInput);
     setTextInput("");
-    setShowTextInput(false);
   };
 
   return (
@@ -260,6 +259,60 @@ export default function App() {
           <Visualizer state={appState} />
         </div>
 
+        {/* Centered Scrollable Chat Messages Overlay */}
+        <AnimatePresence>
+          {showChat && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="absolute inset-x-4 top-24 bottom-36 max-w-2xl mx-auto flex flex-col justify-end pointer-events-none z-10"
+            >
+              {/* Close Button at top-right of the chat area */}
+              <div className="w-full flex justify-end mb-2 pointer-events-auto">
+                <button
+                  onClick={() => setShowChat(false)}
+                  className="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all shadow-lg backdrop-blur-md flex items-center justify-center hover:scale-105 active:scale-95 cursor-pointer"
+                  title="Close Chat"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Chat list */}
+              <div className="w-full max-h-[calc(100%-3rem)] overflow-y-auto scrollbar-hide flex flex-col gap-3 pointer-events-auto pr-2 pb-4">
+                <AnimatePresence initial={false}>
+                  {messages.map((msg) => (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className={`flex flex-col max-w-[85%] ${
+                        msg.sender === "user" ? "self-end items-end" : "self-start items-start"
+                      }`}
+                    >
+                      <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg ${
+                        msg.sender === "user" 
+                          ? "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
+                          : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
+                      }`}>
+                        {msg.text}
+                      </div>
+                      <span className="text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest">
+                        {msg.sender === "user" ? "Riyajul" : "Zoya"}
+                      </span>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                <div ref={messagesEndRef} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Right Column: User Status */}
         <div className="flex w-[30%] lg:w-[25%] h-full flex-col justify-center gap-4 z-10">
           <div className="h-6 flex justify-end">
@@ -284,13 +337,13 @@ export default function App() {
       {/* Controls */}
       <footer className="absolute bottom-0 left-0 w-full flex flex-col items-center justify-center pb-6 md:pb-8 z-20 shrink-0 gap-4">
         <AnimatePresence>
-          {showTextInput && (
+          {showChat && (
             <motion.form 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               onSubmit={handleTextSubmit}
-              className="w-full max-w-md flex items-center gap-2 bg-white/5 border border-white/10 rounded-full p-1 pl-4 backdrop-blur-md shadow-2xl"
+              className="w-full max-w-md flex items-center gap-2 bg-white/5 border border-white/10 rounded-full p-1 pl-4 backdrop-blur-md shadow-2xl pointer-events-auto"
             >
               <input 
                 type="text"
@@ -303,7 +356,7 @@ export default function App() {
               <button 
                 type="submit"
                 disabled={!textInput.trim()}
-                className="p-2 rounded-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:hover:bg-violet-500 transition-colors"
+                className="p-2 rounded-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:hover:bg-violet-500 transition-colors cursor-pointer"
               >
                 <Send size={16} />
               </button>
@@ -311,11 +364,11 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 pointer-events-auto">
           <button
             onClick={toggleListening}
             className={`
-              group relative flex items-center gap-3 px-8 py-4 rounded-full font-medium tracking-wide transition-all duration-300 shadow-2xl
+              group relative flex items-center gap-3 px-8 py-4 rounded-full font-medium tracking-wide transition-all duration-300 shadow-2xl cursor-pointer
               ${
                 isSessionActive
                   ? "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30"
@@ -336,15 +389,17 @@ export default function App() {
             )}
           </button>
           
-          {!isSessionActive && (
-            <button
-              onClick={() => setShowTextInput(!showTextInput)}
-              className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors shadow-2xl"
-              title="Type instead"
-            >
-              <Keyboard size={20} className="opacity-70" />
-            </button>
-          )}
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
+              showChat
+                ? "bg-violet-500/20 border-violet-500/50 text-violet-300"
+                : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
+            }`}
+            title="Toggle Chat View"
+          >
+            <Keyboard size={20} />
+          </button>
         </div>
       </footer>
     </div>
