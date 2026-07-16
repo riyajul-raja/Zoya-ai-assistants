@@ -1235,6 +1235,8 @@ In your very first response or greeting to the user, you MUST casually and natur
       return;
     }
 
+    let speechDetected = false;
+
     try {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
@@ -1243,6 +1245,8 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       recognition.onstart = () => {
         setIsInputMicActive(true);
+        setAppState("listening");
+        setIsSessionActive(true);
       };
 
       recognition.onresult = (event: any) => {
@@ -1251,6 +1255,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           : "";
         
         if (transcript && transcript.trim()) {
+          speechDetected = true;
           // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
           setTextInput((prev) => {
             const trimmedPrev = prev.trim();
@@ -1264,10 +1269,20 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
         setIsInputMicActive(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+        if (!speechDetected) {
+          setShowChat(false);
+        }
       };
 
       recognition.onend = () => {
         setIsInputMicActive(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+        if (!speechDetected) {
+          setShowChat(false);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -1275,6 +1290,11 @@ In your very first response or greeting to the user, you MUST casually and natur
     } catch (e) {
       console.error("Speech recognition initialization error:", e);
       setIsInputMicActive(false);
+      setAppState("idle");
+      setIsSessionActive(false);
+      if (!speechDetected) {
+        setShowChat(false);
+      }
     }
   };
 
@@ -1946,6 +1966,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           </button>
           
           <button
+            id="keyboard-toggle-btn"
             onClick={() => setShowChat(!showChat)}
             className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
               showChat
@@ -1958,7 +1979,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   ? "bg-white/5 border-white/10 hover:bg-red-500/10 text-white/70 hover:text-red-300"
                   : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
             }`}
-            title="Toggle Chat View"
+            title="Toggle Keyboard / Chat Input"
           >
             <Keyboard size={20} />
           </button>
