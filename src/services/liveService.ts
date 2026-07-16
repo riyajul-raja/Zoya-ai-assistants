@@ -44,6 +44,7 @@ export class LiveSessionManager {
             sampleRate: 16000,
             echoCancellation: true,
             noiseSuppression: true,
+            autoGainControl: true,
           } 
         });
 

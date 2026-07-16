@@ -405,7 +405,13 @@ export default function App() {
           throw new Error("Microphone access is not supported by your browser or secure context (ensure HTTPS).");
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          } 
+        });
         // Release the mic track immediately, as our centralized useEffect will start the live session and request it
         stream.getTracks().forEach(track => track.stop());
 
