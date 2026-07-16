@@ -48,8 +48,11 @@ export async function getZoyaResponse(
     }
     
     if (!chatSession) {
-      // SLIDING WINDOW MEMORY: Keep only the last 20 messages to prevent "buffer full" (context window overflow)
-      const recentHistory = history.slice(-20);
+      // SLIDING WINDOW MEMORY: Keep strictly only the last 6 messages to reduce token processing and payload size
+      const recentHistory = history.slice(-6).map((msg) => ({
+        ...msg,
+        image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
+      }));
       
       let formattedHistory: any[] = [];
       let currentRole = "";
@@ -58,15 +61,6 @@ export async function getZoyaResponse(
         const role = msg.sender === "user" ? "user" : "model";
         
         let parts: any[] = [];
-        if (msg.image) {
-          const base64Data = msg.image.includes("base64,") ? msg.image.split("base64,")[1] : msg.image;
-          parts.push({
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: base64Data,
-            }
-          });
-        }
         parts.push({ text: msg.text });
 
         if (role === currentRole && formattedHistory.length > 0) {
@@ -113,11 +107,32 @@ export async function getZoyaResponse(
       ];
     }
 
-    const response = await chatSession.sendMessage({ message: messageInput });
-    return response.text || "Ugh, fine. I have nothing to say.";
+    // Set up AbortController with a 20-second timeout
+    const originalFetch = window.fetch;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 20000);
+
+    try {
+      window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+        return originalFetch(input, { ...init, signal: controller.signal });
+      };
+
+      const response = await chatSession.sendMessage({ message: messageInput });
+      return response.text || "Ugh, fine. I have nothing to say.";
+    } catch (error: any) {
+      if (error?.name === "AbortError" || controller.signal.aborted) {
+        throw new Error("Timeout");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+      window.fetch = originalFetch;
+    }
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Uff, mera dimaag kharab ho gaya hai. Try again later, Riyajul.";
+    throw error;
   }
 }
 

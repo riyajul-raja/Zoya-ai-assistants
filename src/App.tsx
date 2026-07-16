@@ -15,6 +15,7 @@ interface ChatMessage {
   sender: "user" | "zoya";
   text: string;
   image?: string;
+  isError?: boolean;
 }
 
 declare global {
@@ -845,14 +846,38 @@ In your very first response or greeting to the user, you MUST casually and natur
       }, 1500);
     } else {
       // 2. General Chit-Chat via Gemini
-      responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64, isProfessionalMode, environmentContext);
-      setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", text: responseText }]);
-      
-      if (!isMuted) {
-        setAppState("speaking");
-        const audioBase64 = await getZoyaAudio(responseText);
-        if (audioBase64) {
-          await playPCM(audioBase64);
+      try {
+        responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64, isProfessionalMode, environmentContext);
+        setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", text: responseText }]);
+        
+        if (!isMuted) {
+          setAppState("speaking");
+          const audioBase64 = await getZoyaAudio(responseText);
+          if (audioBase64) {
+            await playPCM(audioBase64);
+          }
+        }
+      } catch (error: any) {
+        console.error("Chat Error:", error);
+        if (error?.message === "Timeout" || error?.name === "AbortError") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString() + "-err",
+              sender: "zoya",
+              text: "Network timeout. Payload too heavy or server is sleeping.",
+              isError: true,
+            },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString() + "-z",
+              sender: "zoya",
+              text: "Uff, mera dimaag kharab ho gaya hai. Try again later, Riyajul.",
+            },
+          ]);
         }
       }
       setAppState("idle");
@@ -1577,13 +1602,15 @@ In your very first response or greeting to the user, you MUST casually and natur
                           }`}
                         >
                           <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
-                            msg.sender === "user" 
-                              ? isGhostMode
-                                ? "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
-                                : "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
-                              : isGhostMode
-                                ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)]"
-                                : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
+                            msg.isError
+                              ? "bg-red-950/80 border-red-500/50 text-red-200 font-sans shadow-[0_0_12px_rgba(239,68,68,0.25)]"
+                              : msg.sender === "user" 
+                                ? isGhostMode
+                                  ? "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                                  : "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
+                                : isGhostMode
+                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                                  : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
                           }`}>
                             {(msg.image || (msg as any).imageUrl) && (
                               <img 
