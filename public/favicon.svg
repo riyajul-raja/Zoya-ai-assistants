@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="zoya-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="240" fill="url(#zoya-grad)" />
+  <text x="256" y="325" font-family="'Inter', sans-serif, system-ui" font-weight="900" font-size="220" fill="#ffffff" text-anchor="middle" letter-spacing="-0.05em">Z</text>
+</svg>
