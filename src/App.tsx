@@ -1560,7 +1560,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               ${isARMode 
                 ? "fixed inset-0 w-screen h-screen z-0 rounded-none border-none opacity-[0.72] pointer-events-none" 
                 : isCameraFullscreen 
-                ? "fixed inset-0 w-screen h-screen z-50 rounded-none border-none pointer-events-auto" 
+                ? "fixed top-[70px] left-0 w-screen h-[calc(100vh-70px)] z-40 rounded-none border-none pointer-events-auto" 
                 : "absolute top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-md aspect-video rounded-2xl z-30 pointer-events-auto shadow-2xl border border-white/10 bg-black/60 backdrop-blur-md"
               }
             `}
