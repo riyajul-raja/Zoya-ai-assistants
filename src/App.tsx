@@ -786,23 +786,6 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={toggleGlobePiP}
-            id="pip-toggle-btn"
-            style={{ zIndex: 9999 }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-mono font-bold tracking-wider cursor-pointer pointer-events-auto transition-all shadow-lg select-none ${
-              isGlobePiPActive
-                ? "bg-gradient-to-r from-pink-500 to-violet-600 border-violet-400 text-white shadow-violet-500/50 scale-105"
-                : "bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 border-pink-400 text-white shadow-pink-500/30"
-            }`}
-            title={isGlobePiPActive ? "Exit Floating Core Mode" : "Floating Core Mode (Picture-in-Picture)"}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGlobePiPActive ? "animate-pulse text-white" : "text-white"}>
-              <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
-              <rect width="20" height="14" x="2" y="3" rx="2" />
-            </svg>
-            <span>PIP CORE</span>
-          </button>
-          <button
             onClick={() => setIsMuted(!isMuted)}
             className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/25 text-white cursor-pointer pointer-events-auto"
             title={isMuted ? "Unmute" : "Mute"}
@@ -991,6 +974,23 @@ export default function App() {
                 <span>Start Session</span>
               </>
             )}
+          </button>
+
+          <button
+            onClick={toggleGlobePiP}
+            style={{ zIndex: 9999 }}
+            className={`flex items-center gap-2 px-6 py-4 rounded-full border text-sm font-mono font-bold tracking-wider cursor-pointer pointer-events-auto transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 select-none ${
+              isGlobePiPActive
+                ? "bg-gradient-to-r from-pink-500 to-violet-600 border-violet-400 text-white shadow-violet-500/50"
+                : "bg-gradient-to-r from-violet-600 to-pink-600 border-pink-400 text-white shadow-pink-500/30"
+            }`}
+            title={isGlobePiPActive ? "Exit Floating Core Mode" : "Floating Core Mode (Picture-in-Picture)"}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGlobePiPActive ? "animate-pulse" : ""}>
+              <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
+              <rect width="20" height="14" x="2" y="3" rx="2" />
+            </svg>
+            <span>FLOAT 3D CORE</span>
           </button>
           
           <button
