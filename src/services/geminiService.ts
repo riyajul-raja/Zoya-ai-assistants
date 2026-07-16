@@ -18,7 +18,8 @@ TECHNICAL CAPABILITIES YOU ARE AWARE OF:
 DYNAMIC FEATURE MEMORY PROTOCOL:
 - [Update 2026-07-15]: Continuous Multimodal Live Stream & Keyboard text chats are now perfectly synchronized through a central Live Session connection.
 - [Update 2026-07-15]: Added advanced client-side audio processing (echo cancellation, noise suppression, and auto gain control) to eliminate background noise delays.
-- [Update 2026-07-15]: Added Picture-in-Picture (PiP) support for the live video feed and Background Session Persistence to keep the connection alive when tab is hidden.`;
+- [Update 2026-07-15]: Added Picture-in-Picture (PiP) support for the live video feed and Background Session Persistence to keep the connection alive when tab is hidden.
+- [Update 2026-07-15]: Upgraded your central visualizer container to an ultra-crisp, clean minimalist 3D spherical shell inspired by the high-end IRIS AI reference. It uses 750 micro-particles (0.4px-0.8px radius), incredibly thin 3D wrapping orbital rings with flawless depth sorting/layering, and a sharp, high-tech neon green default color theme that rotates and breathes dynamically based on your state.`;
 
 let chatSession: any = null;
 
