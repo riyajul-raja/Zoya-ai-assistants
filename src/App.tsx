@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -54,6 +54,8 @@ function getTimeOfDayDescription(): { timeOfDay: string; timeStr: string } {
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>("idle");
+  const [isGhostMode, setIsGhostMode] = useState(false);
+  const [messagesBeforeGhost, setMessagesBeforeGhost] = useState<ChatMessage[] | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem("zoya_chat_history");
     if (saved) {
@@ -69,8 +71,10 @@ export default function App() {
 
   useEffect(() => {
     messagesRef.current = messages;
-    localStorage.setItem("zoya_chat_history", JSON.stringify(messages));
-  }, [messages]);
+    if (!isGhostMode) {
+      localStorage.setItem("zoya_chat_history", JSON.stringify(messages));
+    }
+  }, [messages, isGhostMode]);
 
   const [isMuted, setIsMuted] = useState(false);
 
@@ -184,6 +188,22 @@ export default function App() {
   const [isProfessionalMode, setIsProfessionalMode] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<any>(null);
+
+  // Ghost Mode (Stealth Protocol) handler
+  const toggleGhostMode = () => {
+    if (isGhostMode) {
+      setIsGhostMode(false);
+      if (messagesBeforeGhost !== null) {
+        setMessages(messagesBeforeGhost);
+        setMessagesBeforeGhost(null);
+      }
+      triggerToast("GHOST PROTOCOL DEACTIVATED");
+    } else {
+      setMessagesBeforeGhost(messages);
+      setIsGhostMode(true);
+      triggerToast("GHOST MODE ACTIVE: Traces will not be saved.");
+    }
+  };
 
   // AR Hologram Mode states
   const [isARMode, setIsARMode] = useState(false);
@@ -1270,8 +1290,12 @@ In your very first response or greeting to the user, you MUST casually and natur
         className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none transition-opacity duration-500"
         style={isARMode ? { opacity: 0.15 } : { opacity: 1 }}
       >
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-900/20 blur-[120px] rounded-full" />
+        <div className={`absolute top-[-20%] left-[-10%] w-[50%] h-[50%] blur-[120px] rounded-full transition-all duration-500 ${
+          isGhostMode ? "bg-red-950/30" : "bg-violet-900/20"
+        }`} />
+        <div className={`absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] blur-[120px] rounded-full transition-all duration-500 ${
+          isGhostMode ? "bg-rose-950/25" : "bg-pink-900/20"
+        }`} />
       </div>
 
       {/* Camera Video Feed (Upper Half / Fullscreen AR Backdrop) */}
@@ -1385,6 +1409,19 @@ In your very first response or greeting to the user, you MUST casually and natur
             </button>
           )}
           
+          {/* Ghost Mode Toggle Button */}
+          <button
+            onClick={toggleGhostMode}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              isGhostMode
+                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
+            }`}
+            title={isGhostMode ? "Ghost Mode: ACTIVE (Traces will not be saved)" : "Activate Ghost Mode (Stealth Protocol)"}
+          >
+            <Ghost size={18} className={isGhostMode ? "animate-bounce" : ""} />
+          </button>
+
           {/* Mood Switcher Toggle Button */}
           <button
             onClick={() => {
@@ -1474,7 +1511,9 @@ In your very first response or greeting to the user, you MUST casually and natur
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="flex items-center gap-2 text-cyan-300/80 text-sm md:text-base italic font-serif"
+                  className={`flex items-center gap-2 text-sm md:text-base italic font-serif transition-colors duration-300 ${
+                    isGhostMode ? "text-rose-400/80" : "text-cyan-300/80"
+                  }`}
                 >
                   <Loader2 size={16} className="animate-spin" />
                   Replying...
@@ -1492,6 +1531,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             isARMode={isARMode}
             arStatus={arStatus}
             trackingOffset={trackingOffset}
+            isGhostMode={isGhostMode}
           />
         </div>
 
@@ -1538,8 +1578,12 @@ In your very first response or greeting to the user, you MUST casually and natur
                         >
                           <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
                             msg.sender === "user" 
-                              ? "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
-                              : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
+                              ? isGhostMode
+                                ? "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                                : "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
+                              : isGhostMode
+                                ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                                : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
                           }`}>
                             {(msg.image || (msg as any).imageUrl) && (
                               <img 
@@ -1551,7 +1595,9 @@ In your very first response or greeting to the user, you MUST casually and natur
                             )}
                             {msg.text}
                           </div>
-                          <span className="text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest">
+                          <span className={`text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest ${
+                            isGhostMode ? "text-rose-400" : ""
+                          }`}>
                             {msg.sender === "user" ? "Riyajul" : "Zoya"}
                           </span>
                         </motion.div>
@@ -1574,9 +1620,13 @@ In your very first response or greeting to the user, you MUST casually and natur
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="flex items-center gap-2 text-violet-300/80 text-sm md:text-base italic"
+                  className={`flex items-center gap-2 text-sm md:text-base italic transition-colors duration-300 ${
+                    isGhostMode ? "text-rose-400/80" : "text-violet-300/80"
+                  }`}
                 >
-                  <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+                  <div className={`w-2 h-2 rounded-full animate-pulse transition-colors duration-300 ${
+                    isGhostMode ? "bg-rose-400" : "bg-violet-400"
+                  }`} />
                   Listening...
                 </motion.div>
               )}
@@ -1596,16 +1646,18 @@ In your very first response or greeting to the user, you MUST casually and natur
               exit={{ opacity: 0, y: 20 }}
               onSubmit={handleTextSubmit}
               className={`w-full max-w-md flex items-center gap-2 rounded-full p-1 pl-4 backdrop-blur-md shadow-2xl pointer-events-auto transition-all duration-300 ${
-                isARMode 
-                  ? "bg-black/35 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]" 
-                  : "bg-white/5 border border-white/10"
+                isGhostMode
+                  ? "bg-black/45 border border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                  : isARMode 
+                    ? "bg-black/35 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]" 
+                    : "bg-white/5 border border-white/10"
               }`}
             >
               <input 
                 type="text"
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                placeholder={isARMode ? "Send instruction to Hologram..." : "Type a message to Zoya..."}
+                placeholder={isGhostMode ? "Ghost Protocol active..." : isARMode ? "Send instruction to Hologram..." : "Type a message to Zoya..."}
                 className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm"
                 autoFocus
               />
@@ -1613,9 +1665,11 @@ In your very first response or greeting to the user, you MUST casually and natur
                 type="submit"
                 disabled={!textInput.trim()}
                 className={`p-2 rounded-full disabled:opacity-50 transition-all duration-300 cursor-pointer ${
-                  isARMode 
-                    ? "bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/30 disabled:text-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.4)] text-black" 
-                    : "bg-violet-500 hover:bg-violet-600 text-white"
+                  isGhostMode
+                    ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 disabled:text-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.4)] text-white"
+                    : isARMode 
+                      ? "bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/30 disabled:text-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.4)] text-black" 
+                      : "bg-violet-500 hover:bg-violet-600 text-white"
                 }`}
               >
                 <Send size={16} />
@@ -1629,10 +1683,14 @@ In your very first response or greeting to the user, you MUST casually and natur
             onClick={toggleCamera}
             className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
               isCameraActive
-                ? isARMode 
-                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                  : "bg-pink-500/20 border-pink-500/50 text-pink-300"
-                : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
+                ? isGhostMode
+                  ? "bg-red-500/20 border-red-500/50 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                  : isARMode 
+                    ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                    : "bg-pink-500/20 border-pink-500/50 text-pink-300"
+                : isGhostMode
+                  ? "bg-white/5 border-white/10 hover:bg-red-500/10 text-white/70 hover:text-red-300"
+                  : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
             }`}
             title={isCameraActive ? "Close Camera" : "Open Camera"}
           >
@@ -1646,6 +1704,8 @@ In your very first response or greeting to the user, you MUST casually and natur
               ${
                 isSessionActive
                   ? "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30"
+                  : isGhostMode
+                  ? "bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:scale-105"
                   : isARMode
                   ? "bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.15)] hover:scale-105"
                   : "bg-white/10 text-white border border-white/20 hover:bg-white/20 hover:scale-105"
@@ -1669,10 +1729,14 @@ In your very first response or greeting to the user, you MUST casually and natur
             onClick={() => setShowChat(!showChat)}
             className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
               showChat
-                ? isARMode
-                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                  : "bg-violet-500/20 border-violet-500/50 text-violet-300"
-                : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
+                ? isGhostMode
+                  ? "bg-red-500/10 border-red-500/50 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                  : isARMode
+                    ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                    : "bg-violet-500/20 border-violet-500/50 text-violet-300"
+                : isGhostMode
+                  ? "bg-white/5 border-white/10 hover:bg-red-500/10 text-white/70 hover:text-red-300"
+                  : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
             }`}
             title="Toggle Chat View"
           >

@@ -11,6 +11,7 @@ interface VisualizerProps {
   isARMode?: boolean;
   arStatus?: "calibrating" | "anchored" | "failed";
   trackingOffset?: { x: number; y: number; scale: number; rotationY: number; rotationX: number };
+  isGhostMode?: boolean;
 }
 
 export default function Visualizer({ 
@@ -18,7 +19,8 @@ export default function Visualizer({
   liveSessionRef,
   isARMode = false,
   arStatus = "calibrating",
-  trackingOffset
+  trackingOffset,
+  isGhostMode = false
 }: VisualizerProps) {
   // Synchronized color hue state matching Globe3D's 12-second color cycle perfectly
   const [hue, setHue] = useState(160);
@@ -31,14 +33,14 @@ export default function Visualizer({
       const now = performance.now();
       // 12 seconds per full 360-degree rainbow rotation
       const elapsed = (now - startTime) / 1000;
-      const currentHue = (elapsed * (360 / 12)) % 360;
+      const currentHue = isGhostMode ? 355 : ((elapsed * (360 / 12)) % 360);
       setHue(currentHue);
       frameId = requestAnimationFrame(tick);
     };
 
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
-  }, []);
+  }, [isGhostMode]);
 
   const getRingAnimation = (index: number, reverse: boolean = false) => {
     const baseSpeed = state === "listening" ? 3 : state === "processing" ? 1.5 : state === "speaking" ? 2 : 15;
@@ -157,6 +159,7 @@ export default function Visualizer({
           isARMode={isARMode}
           arStatus={arStatus}
           trackingOffset={trackingOffset}
+          isGhostMode={isGhostMode}
         />
       </div>
 

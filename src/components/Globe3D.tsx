@@ -9,6 +9,7 @@ interface Globe3DProps {
   isARMode?: boolean;
   arStatus?: "calibrating" | "anchored" | "failed";
   trackingOffset?: { x: number; y: number; scale: number; rotationY: number; rotationX: number };
+  isGhostMode?: boolean;
 }
 
 interface Point3D {
@@ -22,7 +23,7 @@ interface Renderable {
   draw: (ctx: CanvasRenderingContext2D) => void;
 }
 
-export default function Globe3D({ state, liveSessionRef, isARMode = false, arStatus = "calibrating", trackingOffset }: Globe3DProps) {
+export default function Globe3D({ state, liveSessionRef, isARMode = false, arStatus = "calibrating", trackingOffset, isGhostMode = false }: Globe3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dimensions, setDimensions] = useState({ width: 350, height: 350 });
@@ -31,6 +32,7 @@ export default function Globe3D({ state, liveSessionRef, isARMode = false, arSta
   const isARModeRef = useRef(isARMode);
   const arStatusRef = useRef(arStatus);
   const trackingOffsetRef = useRef(trackingOffset);
+  const isGhostModeRef = useRef(isGhostMode);
 
   useEffect(() => {
     isARModeRef.current = isARMode;
@@ -43,6 +45,10 @@ export default function Globe3D({ state, liveSessionRef, isARMode = false, arSta
   useEffect(() => {
     trackingOffsetRef.current = trackingOffset;
   }, [trackingOffset]);
+
+  useEffect(() => {
+    isGhostModeRef.current = isGhostMode;
+  }, [isGhostMode]);
 
   // High-density crisp particles forming the spherical shell
   const numPoints = 800; // Perfect density of glowing dots
@@ -166,7 +172,7 @@ export default function Globe3D({ state, liveSessionRef, isARMode = false, arSta
       const spinY = rotationAngleRef.current + trackingRotY;
 
       // Cycle HSL color hue continuously from 0 to 360 over 12 seconds
-      const colorHue = (elapsedSeconds * (360 / 12)) % 360;
+      const colorHue = isGhostModeRef.current ? 355 : ((elapsedSeconds * (360 / 12)) % 360);
 
       const w = dimensions.width;
       const h = dimensions.height;
