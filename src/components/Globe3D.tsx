@@ -257,7 +257,7 @@ export default function Globe3D({ state }: Globe3DProps) {
             depth: avgDepth,
             draw: (c) => {
               c.save();
-              c.lineWidth = 1.0; // Perfect 1px thin crisp line as requested
+              c.lineWidth = 2.0; // Thicker 2px crisp lines for better visibility matching the older version
               if (lineDash) {
                 c.setLineDash(lineDash);
               }
