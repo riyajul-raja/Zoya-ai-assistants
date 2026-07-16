@@ -8,7 +8,11 @@ export function resetZoyaSession() {
   chatSession = null;
 }
 
-export async function getZoyaResponse(prompt: string, history: { sender: "user" | "zoya", text: string }[] = []): Promise<string> {
+export async function getZoyaResponse(
+  prompt: string,
+  history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
+  imageFrame?: string
+): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
@@ -18,22 +22,28 @@ export async function getZoyaResponse(prompt: string, history: { sender: "user" 
       
       let formattedHistory: any[] = [];
       let currentRole = "";
-      let currentText = "";
 
       for (const msg of recentHistory) {
         const role = msg.sender === "user" ? "user" : "model";
-        if (role === currentRole) {
-          currentText += "\n" + msg.text;
-        } else {
-          if (currentRole !== "") {
-            formattedHistory.push({ role: currentRole, parts: [{ text: currentText }] });
-          }
-          currentRole = role;
-          currentText = msg.text;
+        
+        let parts: any[] = [];
+        if (msg.image) {
+          const base64Data = msg.image.includes("base64,") ? msg.image.split("base64,")[1] : msg.image;
+          parts.push({
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Data,
+            }
+          });
         }
-      }
-      if (currentRole !== "") {
-        formattedHistory.push({ role: currentRole, parts: [{ text: currentText }] });
+        parts.push({ text: msg.text });
+
+        if (role === currentRole && formattedHistory.length > 0) {
+          formattedHistory[formattedHistory.length - 1].parts.push(...parts);
+        } else {
+          formattedHistory.push({ role, parts });
+          currentRole = role;
+        }
       }
 
       if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
@@ -41,7 +51,7 @@ export async function getZoyaResponse(prompt: string, history: { sender: "user" 
       }
 
       chatSession = ai.chats.create({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3.5-flash",
         config: {
           systemInstruction,
         },
@@ -49,7 +59,22 @@ export async function getZoyaResponse(prompt: string, history: { sender: "user" 
       });
     }
 
-    const response = await chatSession.sendMessage({ message: prompt });
+    let messageInput: any = prompt;
+    if (imageFrame) {
+      messageInput = [
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: imageFrame,
+          }
+        },
+        {
+          text: prompt
+        }
+      ];
+    }
+
+    const response = await chatSession.sendMessage({ message: messageInput });
     return response.text || "Ugh, fine. I have nothing to say.";
   } catch (error) {
     console.error("Gemini Error:", error);

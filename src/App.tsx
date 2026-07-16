@@ -14,6 +14,7 @@ interface ChatMessage {
   id: string;
   sender: "user" | "zoya";
   text: string;
+  image?: string;
 }
 
 declare global {
@@ -136,7 +137,52 @@ export default function App() {
       return;
     }
 
-    setMessages((prev) => [...prev, { id: Date.now().toString(), sender: "user", text: finalTranscript }]);
+    let capturedImageBase64: string | undefined = undefined;
+    if (isCameraActive) {
+      const video = videoRef.current;
+      if (video && !video.paused && !video.ended) {
+        try {
+          const canvas = document.createElement("canvas");
+          const width = video.videoWidth || 320;
+          const height = video.videoHeight || 240;
+          
+          const maxDim = 480;
+          let w = width;
+          let h = height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          
+          canvas.width = w;
+          canvas.height = h;
+          
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+            capturedImageBase64 = dataUrl.split(",")[1];
+          }
+        } catch (err) {
+          console.error("Failed to capture image frame for chat payload:", err);
+        }
+      }
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: "user",
+        text: finalTranscript,
+        image: capturedImageBase64 ? `data:image/jpeg;base64,${capturedImageBase64}` : undefined,
+      },
+    ]);
     
     // If live session is active, send text through it
     if (isSessionActive && liveSessionRef.current) {
@@ -172,7 +218,7 @@ export default function App() {
       }, 1500);
     } else {
       // 2. General Chit-Chat via Gemini
-      responseText = await getZoyaResponse(finalTranscript, messagesRef.current);
+      responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64);
       setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", text: responseText }]);
       
       if (!isMuted) {
@@ -184,7 +230,7 @@ export default function App() {
       }
       setAppState("idle");
     }
-  }, [isMuted, isSessionActive]);
+  }, [isMuted, isSessionActive, isCameraActive]);
 
   useEffect(() => {
     return () => {
@@ -516,6 +562,14 @@ export default function App() {
                           ? "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
                           : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
                       }`}>
+                        {msg.image && (
+                          <img 
+                            src={msg.image} 
+                            alt="Camera snap" 
+                            className="max-w-[180px] max-h-[140px] rounded-lg mb-2 border border-white/20 object-cover shadow"
+                            referrerPolicy="no-referrer"
+                          />
+                        )}
                         {msg.text}
                       </div>
                       <span className="text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest">
