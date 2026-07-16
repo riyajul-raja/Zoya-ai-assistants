@@ -883,27 +883,17 @@ In your very first response or greeting to the user, you MUST casually and natur
         // Remove the empty/incomplete message on error
         setMessages((prev) => prev.filter((msg) => msg.id !== responseMessageId));
 
-        if (error?.message === "Timeout" || error?.name === "AbortError") {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString() + "-err",
-              sender: "zoya",
-              text: "Network timeout. Payload too heavy or server is sleeping.",
-              isError: true,
-            },
-          ]);
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString() + "-z",
-              sender: "zoya",
-              text: "SYSTEM UPDATE: Reconnecting to server...",
-              isError: true,
-            },
-          ]);
-        }
+        console.log(error);
+        const errMsg = error?.status ? `Status ${error.status}: ${error.message || ""}` : (error?.message || String(error));
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString() + "-z",
+            sender: "zoya",
+            text: `SYSTEM ERROR: ${errMsg}`,
+            isError: true,
+          },
+        ]);
       }
       setAppState("idle");
     }
