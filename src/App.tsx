@@ -91,6 +91,7 @@ export default function App() {
   }, [isMuted]);
 
   const [showChat, setShowChat] = useState(false);
+  const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [isInputMicActive, setIsInputMicActive] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -1755,97 +1756,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           />
         </div>
 
-        {/* Centered Scrollable Chat Messages Overlay */}
-        <AnimatePresence>
-          {showChat && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="absolute inset-x-4 top-24 bottom-36 max-w-2xl mx-auto flex flex-col justify-end pointer-events-none z-10"
-            >
-              {/* Close Button at top-right of the chat area */}
-              <div className="w-full flex justify-end mb-2 pointer-events-auto">
-                <button
-                  onClick={() => {
-                    // Stop voice dictation if active
-                    if (isInputMicActive && recognitionRef.current) {
-                      try {
-                        recognitionRef.current.stop();
-                      } catch (err) {}
-                      setIsInputMicActive(false);
-                    }
-                    setShowChat(false);
-                  }}
-                  className="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all shadow-lg backdrop-blur-md flex items-center justify-center hover:scale-105 active:scale-95 cursor-pointer"
-                  title="Close Chat"
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              {/* Chat list */}
-              <div className="w-full max-h-[calc(100%-3rem)] overflow-y-auto scrollbar-hide flex flex-col pointer-events-auto pr-2 pb-4 scroll-smooth">
-                <div className="flex flex-col gap-3 mt-auto w-full">
-                  <AnimatePresence initial={false}>
-                    {messages.map((msg) => {
-                      // Strict React condition: ONLY render a message bubble if it actually contains text, an image URL, or base64 image
-                      const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
-                      const hasImage = !!(msg.image || (msg as any).imageUrl);
-                      if (!hasText && !hasImage) return null;
-                      return (
-                        <motion.div
-                          key={msg.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ duration: 0.3, ease: "easeOut" }}
-                          className={`flex flex-col max-w-[85%] min-h-0 ${
-                            msg.sender === "user" ? "self-end items-end" : "self-start items-start"
-                          }`}
-                        >
-                          <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
-                            msg.isError
-                              ? "bg-red-950/80 border-red-500/50 text-red-200 font-sans shadow-[0_0_12px_rgba(239,68,68,0.25)]"
-                              : msg.sender === "user" 
-                                ? isGhostMode
-                                  ? "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
-                                  : "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
-                                : isGhostMode
-                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)]"
-                                  : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
-                          }`}>
-                            {(msg.image || (msg as any).imageUrl) && (
-                              <img 
-                                src={msg.image || (msg as any).imageUrl} 
-                                alt="Camera snap" 
-                                className="max-w-[180px] max-h-[140px] rounded-lg mb-2 border border-white/20 object-cover shadow h-fit w-fit min-h-0"
-                                referrerPolicy="no-referrer"
-                              />
-                            )}
-                            {msg.text}
-                          </div>
-                          <span className={`text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest ${
-                            isGhostMode ? "text-rose-400" : ""
-                          }`}>
-                            {msg.sender === "user" ? "Riyajul" : "Zoya"}
-                          </span>
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                  <AnimatePresence>
-                    {(isTyping || isLoading) && (
-                      <TypingIndicator isGhostMode={isGhostMode} />
-                    )}
-                  </AnimatePresence>
-                  <div ref={messagesEndRef} />
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Right Column: User Status */}
         <div className="flex w-[30%] lg:w-[25%] h-full flex-col justify-center gap-4 z-10">
@@ -1872,76 +1783,179 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       </main>
 
-      {/* Controls */}
-      <footer className="absolute bottom-0 left-0 w-full flex flex-col items-center justify-center pb-6 md:pb-8 z-20 shrink-0 gap-4">
-        <AnimatePresence>
-          {showChat && (
-            <motion.form 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              onSubmit={handleTextSubmit}
-              className="w-full md:w-[50%] max-w-[90vw] md:max-w-[50vw] self-end pr-6 md:pr-12 pointer-events-auto transition-all duration-300"
+      {/* Integrated Chat History & Input Panel */}
+      <AnimatePresence>
+        {showChat && (
+          <motion.form 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            onSubmit={handleTextSubmit}
+            style={{
+              zIndex: isChatMaximized ? 999 : 40,
+            }}
+            className={
+              isChatMaximized
+                ? "fixed inset-0 w-screen h-screen flex flex-col pointer-events-auto p-6 md:p-8 transition-all duration-300 ease-in-out"
+                : "fixed bottom-28 right-6 md:right-12 w-[calc(100%-3rem)] md:w-[45%] max-w-[90vw] md:max-w-[45vw] h-[400px] flex flex-col pointer-events-auto rounded-2xl p-4 transition-all duration-300 ease-in-out"
+            }
+          >
+            <div 
+              className={`relative w-full h-full rounded-2xl p-4 backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col min-h-0 ${
+                isGhostMode
+                  ? "bg-black/90 border border-red-500/90 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
+                  : isARMode 
+                    ? "bg-black/80 border border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.3)]" 
+                    : "bg-neutral-950/90 border border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+              }`}
             >
-              <div 
-                className={`relative w-full rounded-2xl p-3 backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col ${
-                  isGhostMode
-                    ? "bg-black/60 border border-red-500/90 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
-                    : isARMode 
-                      ? "bg-black/50 border border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.3)]" 
-                      : "bg-neutral-950/80 border border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
-                }`}
-              >
-                <textarea 
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder={isGhostMode ? "Ghost Protocol active..." : isARMode ? "Send instruction to Hologram..." : "Type a message to Zoya..."}
-                  className="w-full min-h-[100px] bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm focus:ring-0 leading-relaxed font-sans"
-                  autoFocus
-                  style={{
-                    resize: "both",
-                    overflow: "auto",
-                    maxWidth: "90vw",
-                    maxHeight: "85vh",
-                  }}
-                />
+              {/* Header section with toggle full-screen and close buttons */}
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 shrink-0">
+                <span className="text-xs font-mono text-red-500 font-bold tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block animate-ping"></span>
+                  {isChatMaximized ? "Zoya Console - Maximized" : "Zoya Console"}
+                </span>
                 
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10 shrink-0">
-                  <span className="text-[10px] text-red-400 font-mono tracking-widest uppercase animate-pulse">
-                    {isInputMicActive ? "● Voice Link Sync" : "Zoya Interactive Console"}
-                  </span>
+                <div className="flex items-center gap-2">
+                  {/* Full Screen Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsChatMaximized(!isChatMaximized)}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
+                    title={isChatMaximized ? "Restore Size" : "Maximize Chat"}
+                  >
+                    {isChatMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                  </button>
                   
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={toggleInputDictation}
-                      className={`p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center ${
-                        isInputMicActive
-                          ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105"
-                          : "text-white/60 hover:text-white hover:bg-white/10"
-                      }`}
-                      title="Dictate message (Speech to Text)"
-                    >
-                      <Mic size={16} />
-                    </button>
-                    <button 
-                      type="submit"
-                      disabled={!textInput.trim()}
-                      className={`p-2 rounded-full disabled:opacity-50 transition-all duration-300 cursor-pointer ${
-                        isGhostMode
-                          ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 shadow-[0_0_10px_rgba(239,68,68,0.4)] text-white"
-                          : "bg-red-600 hover:bg-red-500 disabled:bg-neutral-800 disabled:text-white/30 shadow-[0_0_10px_rgba(239,68,68,0.3)] text-white"
-                      }`}
-                    >
-                      <Send size={16} />
-                    </button>
-                  </div>
+                  {/* Close button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isInputMicActive && recognitionRef.current) {
+                        try {
+                          recognitionRef.current.stop();
+                        } catch (err) {}
+                        setIsInputMicActive(false);
+                      }
+                      setShowChat(false);
+                      setIsChatMaximized(false);
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
+                    title="Close Chat"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               </div>
-            </motion.form>
-          )}
-        </AnimatePresence>
 
+              {/* Chat History Display Area */}
+              <div className="flex-1 overflow-y-auto scrollbar-hide pr-1 pb-2 flex flex-col min-h-0">
+                <div className="flex flex-col gap-3 mt-auto w-full">
+                  <AnimatePresence initial={false}>
+                    {messages.map((msg) => {
+                      const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
+                      const hasImage = !!(msg.image || (msg as any).imageUrl);
+                      if (!hasText && !hasImage) return null;
+                      return (
+                        <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
+                          className={`flex flex-col max-w-[85%] min-h-0 ${
+                            msg.sender === "user" ? "self-end items-end" : "self-start items-start"
+                          }`}
+                        >
+                          <div className={`px-3 py-2 rounded-2xl text-xs md:text-sm border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
+                            msg.isError
+                              ? "bg-red-950/85 border-red-500/50 text-red-200 font-sans shadow-[0_0_12px_rgba(239,68,68,0.25)]"
+                              : msg.sender === "user" 
+                                ? isGhostMode
+                                  ? "bg-red-950/45 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                                  : "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans" 
+                                : isGhostMode
+                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                                  : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
+                          }`}>
+                            {(msg.image || (msg as any).imageUrl) && (
+                              <img 
+                                src={msg.image || (msg as any).imageUrl} 
+                                alt="Camera snap" 
+                                className="max-w-[140px] max-h-[100px] rounded-lg mb-2 border border-white/20 object-cover shadow h-fit w-fit min-h-0"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                            {msg.text}
+                          </div>
+                          <span className={`text-[9px] opacity-40 mt-0.5 px-2 font-mono uppercase tracking-widest ${
+                            isGhostMode ? "text-rose-400" : ""
+                          }`}>
+                            {msg.sender === "user" ? "Riyajul" : "Zoya"}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                  <AnimatePresence>
+                    {(isTyping || isLoading) && (
+                      <TypingIndicator isGhostMode={isGhostMode} />
+                    )}
+                  </AnimatePresence>
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+
+              {/* Compact Input Bar */}
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/10 shrink-0">
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleTextSubmit(e);
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50 resize-y min-h-[36px] max-h-[250px] overflow-y-auto leading-normal"
+                  rows={1}
+                />
+                
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={toggleInputDictation}
+                    className={`p-1.5 rounded-lg transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                      isInputMicActive
+                        ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105 animate-pulse"
+                        : "text-white/60 hover:text-white hover:bg-white/10"
+                    }`}
+                    title="Dictate message (Speech to Text)"
+                  >
+                    <Mic size={14} />
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={!textInput.trim()}
+                    className={`p-1.5 rounded-lg disabled:opacity-50 transition-all duration-300 cursor-pointer ${
+                      isGhostMode
+                        ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 text-white"
+                        : "bg-red-600 hover:bg-red-500 disabled:bg-neutral-800 disabled:text-white/30 text-white"
+                    }`}
+                  >
+                    <Send size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
+      {/* Controls */}
+      <footer className="absolute bottom-0 left-0 w-full flex flex-col items-center justify-center pb-6 md:pb-8 z-20 shrink-0 gap-4">
         <div className="flex items-center gap-4 pointer-events-auto">
           <button
             onClick={toggleCamera}
