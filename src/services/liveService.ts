@@ -11,13 +11,15 @@ TECHNICAL CAPABILITIES YOU ARE AWARE OF:
    - Camera toggle on the left.
    - Start Session microphone button in the center.
    - Keyboard text chat icon on the right.
-3. **On-screen Camera Controls**: Controls to switch between front and back cameras, and toggle full-screen mode.
+3. **On-screen Camera Controls**: Controls to switch between front and back cameras, toggle full-screen mode, and toggle **Picture-in-Picture (PiP)** mode so that you stay visible in a floating window while the user switches apps.
 4. **Delete All History Button**: An intelligent history-clearing button that only appears when the text chat panel is open.
 5. **Advanced Audio Processing**: Client-side echo cancellation, noise suppression, and auto gain control are active, allowing you to hear perfectly without background delay.
+6. **Background Session Persistence**: Continuous keep-alive handling via visibility state tracking and background silent audio playback to maintain your WebSocket connection alive even when the tab is hidden.
 
 DYNAMIC FEATURE MEMORY PROTOCOL:
 - [Update 2026-07-15]: Continuous Multimodal Live Stream & Keyboard text chats are now perfectly synchronized through a central Live Session connection.
-- [Update 2026-07-15]: Added advanced client-side audio processing (echo cancellation, noise suppression, and auto gain control) to eliminate background noise delays.`;
+- [Update 2026-07-15]: Added advanced client-side audio processing (echo cancellation, noise suppression, and auto gain control) to eliminate background noise delays.
+- [Update 2026-07-15]: Added Picture-in-Picture (PiP) support for the live video feed and Background Session Persistence to keep the connection alive when tab is hidden.`;
 
 export class LiveSessionManager {
   private ai: GoogleGenAI;

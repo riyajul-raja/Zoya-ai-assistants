@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2 } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -62,6 +62,7 @@ export default function App() {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [isCameraFullscreen, setIsCameraFullscreen] = useState(false);
+  const [isPiPActive, setIsPiPActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
 
@@ -71,6 +72,121 @@ export default function App() {
       videoRef.current.srcObject = cameraStream;
     }
   }, [cameraStream, isCameraActive]);
+
+  // Monitor PiP state changes (e.g. if the user closes the PiP window manually)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleEnterPiP = () => setIsPiPActive(true);
+    const handleLeavePiP = () => setIsPiPActive(false);
+
+    video.addEventListener("enterpictureinpicture", handleEnterPiP);
+    video.addEventListener("leavepictureinpicture", handleLeavePiP);
+
+    return () => {
+      video.removeEventListener("enterpictureinpicture", handleEnterPiP);
+      video.removeEventListener("leavepictureinpicture", handleLeavePiP);
+    };
+  }, [isCameraActive]);
+
+  const togglePiP = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        if (document.pictureInPictureEnabled && video.requestPictureInPicture) {
+          await video.requestPictureInPicture();
+        } else {
+          alert("Picture-in-Picture is not supported by your browser for this video feed.");
+        }
+      }
+    } catch (err: any) {
+      console.error("Picture-in-Picture failed:", err);
+      alert(`Could not toggle Picture-in-Picture: ${err?.message || "Unknown error"}`);
+    }
+  };
+
+  // Keep tab/Websocket alive when hidden
+  useEffect(() => {
+    let intervalId: any = null;
+    let silentOscillator: OscillatorNode | null = null;
+    let silentGain: GainNode | null = null;
+
+    const handleVisibilityChange = () => {
+      const isHidden = document.visibilityState === "hidden";
+      console.log(`[Persistence] Visibility changed: ${document.visibilityState}`);
+
+      if (isHidden) {
+        // Keep WebSocket active by playing a silent Web Audio stream
+        // This tricks the browser into not throttling or sleeping the tab because it is playing media
+        try {
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          const ctx = new AudioContextClass();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          
+          gain.gain.value = 0.001; // extremely silent, virtually unhearable but technically playing sound
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          
+          silentOscillator = osc;
+          silentGain = gain;
+          console.log("[Persistence] Background session keep-alive activated (Web Audio).");
+        } catch (e) {
+          console.error("[Persistence] Web Audio keep-alive failed to start:", e);
+        }
+
+        // Periodically ping the active session every 15 seconds to keep the WS connection active
+        intervalId = setInterval(() => {
+          if (liveSessionRef.current) {
+            console.log("[Persistence] Background keep-alive heartbeat ping sent.");
+            try {
+              liveSessionRef.current.sendText(" ");
+            } catch (err) {
+              console.error("[Persistence] Background heartbeat error:", err);
+            }
+          }
+        }, 15000);
+      } else {
+        // Clean up when visible again
+        if (silentOscillator) {
+          try {
+            silentOscillator.stop();
+          } catch (e) {}
+          silentOscillator = null;
+        }
+        if (silentGain) {
+          try {
+            silentGain.disconnect();
+          } catch (e) {}
+          silentGain = null;
+        }
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        console.log("[Persistence] App returned to foreground. Background persistence released.");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (silentOscillator) {
+        try {
+          silentOscillator.stop();
+        } catch (e) {}
+      }
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, []);
 
   // Capture video frame and send to Gemini Multimodal Live API
   useEffect(() => {
@@ -499,6 +615,19 @@ export default function App() {
                 title="Flip Camera"
               >
                 <RefreshCw size={16} />
+              </button>
+
+              {/* Picture-in-Picture toggle */}
+              <button
+                onClick={togglePiP}
+                className={`p-2 rounded-full border border-white/10 transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center pointer-events-auto ${
+                  isPiPActive 
+                    ? "bg-violet-600/90 text-white" 
+                    : "bg-black/60 hover:bg-black/80 text-white/90 hover:text-white"
+                }`}
+                title={isPiPActive ? "Exit Picture-in-Picture" : "Picture-in-Picture"}
+              >
+                <Tv size={16} />
               </button>
               
               {/* Expand/fullscreen control */}
