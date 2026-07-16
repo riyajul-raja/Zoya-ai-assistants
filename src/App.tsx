@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -55,6 +55,21 @@ export default function App() {
   const [textInput, setTextInput] = useState("");
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
+
+  // Camera states
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [isCameraFullscreen, setIsCameraFullscreen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    cameraStreamRef.current = cameraStream;
+    if (videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraStream, isCameraActive]);
 
   const liveSessionRef = useRef<LiveSessionManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -128,8 +143,60 @@ export default function App() {
       if (liveSessionRef.current) {
         liveSessionRef.current.stop();
       }
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
     };
   }, []);
+
+  const stopCamera = useCallback(() => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    setCameraStream(null);
+    setIsCameraActive(false);
+    setIsCameraFullscreen(false);
+  }, []);
+
+  const toggleCamera = async () => {
+    if (isCameraActive) {
+      stopCamera();
+    } else {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Camera access is not supported by your browser or secure context (ensure HTTPS).");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingMode }
+        });
+        setCameraStream(stream);
+        setIsCameraActive(true);
+      } catch (err: any) {
+        console.error("Camera access error:", err);
+        alert(`Could not start camera: ${err.message || "Permission denied or unavailable"}`);
+        setIsCameraActive(false);
+      }
+    }
+  };
+
+  const toggleFacingMode = async () => {
+    const nextMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextMode);
+    if (isCameraActive) {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: nextMode }
+        });
+        setCameraStream(stream);
+      } catch (err: any) {
+        console.error("Failed to switch camera:", err);
+        alert(`Could not switch camera: ${err.message || "Unavailable"}`);
+      }
+    }
+  };
 
   const toggleListening = async () => {
     if (isSessionActive) {
@@ -221,6 +288,65 @@ export default function App() {
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-900/20 blur-[120px] rounded-full" />
       </div>
 
+      {/* Camera Video Feed (Upper Half) */}
+      <AnimatePresence>
+        {isCameraActive && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className={`
+              overflow-hidden shadow-2xl border border-white/10 bg-black/60 backdrop-blur-md pointer-events-auto
+              ${isCameraFullscreen 
+                ? "fixed inset-0 w-screen h-screen z-50 rounded-none border-none" 
+                : "absolute top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-md aspect-video rounded-2xl z-30"
+              }
+            `}
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Floating Camera Controls overlaid on top right of video */}
+            <div className={`absolute top-4 flex items-center gap-2 z-50 pointer-events-auto ${
+              isCameraFullscreen ? "right-16 md:right-24" : "right-3"
+            }`}>
+              {/* Flip camera control */}
+              <button
+                onClick={toggleFacingMode}
+                className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white/90 hover:text-white border border-white/10 transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center pointer-events-auto"
+                title="Flip Camera"
+              >
+                <RefreshCw size={16} />
+              </button>
+              
+              {/* Expand/fullscreen control */}
+              <button
+                onClick={() => setIsCameraFullscreen(!isCameraFullscreen)}
+                className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white/90 hover:text-white border border-white/10 transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center pointer-events-auto"
+                title={isCameraFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              >
+                {isCameraFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+
+              {/* Close/Stop camera control near the feed */}
+              <button
+                onClick={stopCamera}
+                className="p-2 rounded-full bg-red-500/80 hover:bg-red-600 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center pointer-events-auto"
+                title="Close Camera"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="absolute top-0 left-0 w-full flex justify-between items-center z-20 shrink-0 px-6 py-4 md:px-12 md:py-6">
         <div className="flex items-center gap-3">
@@ -230,18 +356,19 @@ export default function App() {
           <h1 className="text-xl font-serif font-medium tracking-wide opacity-90">Zoya</h1>
         </div>
         <div className="flex items-center gap-2">
-          {messages.length > 0 && (
+          {showChat && messages.length > 0 && (
             <button
               onClick={() => {
-                if (confirm("Are you sure you want to clear the chat history?")) {
+                if (confirm("Are you sure you want to clear all chat history?")) {
                   setMessages([]);
                   resetZoyaSession();
                 }
               }}
-              className="p-2 rounded-full bg-white/5 hover:bg-red-500/20 hover:text-red-400 transition-colors border border-white/10"
-              title="Clear Chat History"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-red-500/20 hover:text-red-400 transition-all border border-white/10 cursor-pointer"
+              title="Delete all history"
             >
-              <Trash2 size={18} className="opacity-70" />
+              <Trash2 size={16} className="opacity-80" />
+              <span className="text-xs font-mono tracking-wide">Delete all history</span>
             </button>
           )}
           <button
@@ -391,6 +518,18 @@ export default function App() {
         </AnimatePresence>
 
         <div className="flex items-center gap-4 pointer-events-auto">
+          <button
+            onClick={toggleCamera}
+            className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
+              isCameraActive
+                ? "bg-pink-500/20 border-pink-500/50 text-pink-300"
+                : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
+            }`}
+            title={isCameraActive ? "Close Camera" : "Open Camera"}
+          >
+            {isCameraActive ? <CameraOff size={20} /> : <Camera size={20} />}
+          </button>
+
           <button
             onClick={toggleListening}
             className={`
