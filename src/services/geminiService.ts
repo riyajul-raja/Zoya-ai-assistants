@@ -51,8 +51,25 @@ export async function getZoyaResponseStream(
     }
     
     if (!chatSession) {
+      // Filter out any local error messages, UI alerts, or system fallbacks from history
+      const cleanHistory = history.filter((msg) => {
+        if (!msg || !msg.text) return false;
+        if ((msg as any).isError) return false;
+        const txt = msg.text.toLowerCase();
+        if (
+          txt.includes("system update") ||
+          txt.includes("dimaag kharab") ||
+          txt.includes("reconnecting") ||
+          txt.includes("network timeout") ||
+          txt.includes("payload too heavy")
+        ) {
+          return false;
+        }
+        return true;
+      });
+
       // SLIDING WINDOW MEMORY: Keep strictly only the last 2 messages to reduce token processing and payload size
-      const recentHistory = history.slice(-2).map((msg) => ({
+      const recentHistory = cleanHistory.slice(-2).map((msg) => ({
         ...msg,
         image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
       }));
@@ -169,8 +186,25 @@ export async function getZoyaResponse(
     }
     
     if (!chatSession) {
+      // Filter out any local error messages, UI alerts, or system fallbacks from history
+      const cleanHistory = history.filter((msg) => {
+        if (!msg || !msg.text) return false;
+        if ((msg as any).isError) return false;
+        const txt = msg.text.toLowerCase();
+        if (
+          txt.includes("system update") ||
+          txt.includes("dimaag kharab") ||
+          txt.includes("reconnecting") ||
+          txt.includes("network timeout") ||
+          txt.includes("payload too heavy")
+        ) {
+          return false;
+        }
+        return true;
+      });
+
       // SLIDING WINDOW MEMORY: Keep strictly only the last 2 messages to reduce token processing and payload size
-      const recentHistory = history.slice(-2).map((msg) => ({
+      const recentHistory = cleanHistory.slice(-2).map((msg) => ({
         ...msg,
         image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
       }));

@@ -73,7 +73,8 @@ export default function App() {
   useEffect(() => {
     messagesRef.current = messages;
     if (!isGhostMode) {
-      localStorage.setItem("zoya_chat_history", JSON.stringify(messages));
+      const cleanMessages = messages.filter((msg) => !msg.isError);
+      localStorage.setItem("zoya_chat_history", JSON.stringify(cleanMessages));
     }
   }, [messages, isGhostMode]);
 
@@ -899,6 +900,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               id: Date.now().toString() + "-z",
               sender: "zoya",
               text: "SYSTEM UPDATE: Reconnecting to server...",
+              isError: true,
             },
           ]);
         }
@@ -1446,6 +1448,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               onClick={() => {
                 if (confirm("Are you sure you want to clear all chat history?")) {
                   setMessages([]);
+                  localStorage.removeItem("zoya_chat_history");
                   resetZoyaSession();
                 }
               }}
