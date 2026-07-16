@@ -91,6 +91,7 @@ export default function App() {
   }, [isMuted]);
 
   const [showChat, setShowChat] = useState(false);
+  const [showYellowOverlay, setShowYellowOverlay] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [isInputMicActive, setIsInputMicActive] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -1226,6 +1227,20 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
+  const closeYellowOverlay = () => {
+    setShowYellowOverlay(false);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (err) {
+        console.error("Error aborting recognition:", err);
+      }
+    }
+    setIsInputMicActive(false);
+    setAppState("idle");
+    setIsSessionActive(false);
+  };
+
   const toggleInputDictation = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -1255,6 +1270,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsInputMicActive(true);
         setAppState("listening");
         setIsSessionActive(true);
+        setShowYellowOverlay(true);
       };
 
       recognition.onresult = (event: any) => {
@@ -1279,6 +1295,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsInputMicActive(false);
         setAppState("idle");
         setIsSessionActive(false);
+        setShowYellowOverlay(false);
         if (!speechDetected) {
           setShowChat(false);
         }
@@ -1288,6 +1305,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsInputMicActive(false);
         setAppState("idle");
         setIsSessionActive(false);
+        setShowYellowOverlay(false);
         if (!speechDetected) {
           setShowChat(false);
         }
@@ -1300,6 +1318,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsInputMicActive(false);
       setAppState("idle");
       setIsSessionActive(false);
+      setShowYellowOverlay(false);
       if (!speechDetected) {
         setShowChat(false);
       }
@@ -1496,7 +1515,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-between"
+            className={`absolute inset-0 w-full h-full flex flex-col items-center justify-between transition-all duration-500 ${showYellowOverlay ? "pointer-events-none select-none opacity-20 filter blur-sm" : ""}`}
           >
             {showPermissionModal && (
               <PermissionModal 
@@ -2041,6 +2060,86 @@ In your very first response or greeting to the user, you MUST casually and natur
           >
             <Shield size={14} className="text-violet-400 animate-pulse" />
             <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Full-Screen Yellow Overlay for Dictation/Speech Recognition */}
+      <AnimatePresence>
+        {showYellowOverlay && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="fixed inset-0 z-[9999] bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-300 text-neutral-950 flex flex-col items-center justify-center p-6 md:p-12 shadow-2xl backdrop-blur-xl pointer-events-auto select-none"
+          >
+            {/* Force Close Button (Red Cross Icon) */}
+            <button
+              onClick={closeYellowOverlay}
+              className="absolute top-6 right-6 p-4 rounded-full bg-red-500 hover:bg-red-600 border border-red-400/30 text-white shadow-xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center cursor-pointer text-xl font-bold"
+              title="Cancel & Abort Speech Recognition"
+            >
+              ❌
+            </button>
+
+            {/* Central Panel */}
+            <div className="w-full max-w-2xl flex flex-col items-center gap-8 text-center pointer-events-auto">
+              
+              {/* Pulsing Visual Wave Rings */}
+              <div className="relative flex items-center justify-center">
+                <motion.div
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  className="absolute w-28 h-28 rounded-full bg-neutral-950/10"
+                />
+                <motion.div
+                  animate={{ scale: [1, 1.5, 1], opacity: [0.15, 0.4, 0.15] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 0.4 }}
+                  className="absolute w-28 h-28 rounded-full bg-neutral-950/5"
+                />
+                <div className="w-16 h-16 rounded-full bg-neutral-950 text-yellow-400 flex items-center justify-center shadow-2xl relative z-10">
+                  <Mic size={28} className="animate-pulse text-amber-400" />
+                </div>
+              </div>
+
+              {/* Header Texts */}
+              <div className="space-y-2">
+                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 font-sans uppercase">
+                  Listening to Riyajul...
+                </h2>
+                <p className="text-sm md:text-base font-semibold tracking-wider text-neutral-900/60 font-mono uppercase">
+                  Zoya Voice Assistant Sync
+                </p>
+              </div>
+
+              {/* Centered Input Box Area */}
+              <div className="w-full bg-neutral-950/5 border border-neutral-950/10 rounded-3xl p-6 md:p-8 shadow-inner backdrop-blur-sm transition-all duration-300">
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="Your voice will appear here. Speak now..."
+                  className="w-full bg-transparent border-none outline-none resize-none text-center text-xl md:text-3xl font-extrabold text-neutral-900 placeholder:text-neutral-900/30 font-sans min-h-[140px] focus:ring-0"
+                  autoFocus
+                />
+              </div>
+
+              {/* Control Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mt-2">
+                <button
+                  onClick={() => {
+                    // Close the overlay and keep the text inside the box for manual sending
+                    setShowYellowOverlay(false);
+                    setIsInputMicActive(false);
+                    setAppState("idle");
+                    setIsSessionActive(false);
+                  }}
+                  className="w-full sm:w-auto px-8 py-3.5 bg-neutral-950 text-amber-400 hover:bg-neutral-900 hover:text-white rounded-full font-bold shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer text-sm tracking-widest uppercase"
+                >
+                  Confirm Text & Hide
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
