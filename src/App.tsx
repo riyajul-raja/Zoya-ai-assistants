@@ -1255,6 +1255,8 @@ In your very first response or greeting to the user, you MUST casually and natur
             const trimmedPrev = prev.trim();
             return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
           });
+          // Auto-reveal the text input field when voice is transcribed
+          setShowChat(true);
         }
       };
 
