@@ -71,6 +71,54 @@ export default function App() {
     }
   }, [cameraStream, isCameraActive]);
 
+  // Capture video frame and send to Gemini Multimodal Live API
+  useEffect(() => {
+    if (!isCameraActive || !isSessionActive || !cameraStream) return;
+
+    const intervalId = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.paused || video.ended) return;
+
+      try {
+        const canvas = document.createElement("canvas");
+        const width = video.videoWidth || 320;
+        const height = video.videoHeight || 240;
+        
+        // Downscale to avoid sending too much data (max 480px width or height is perfect for Gemini Live)
+        const maxDim = 480;
+        let w = width;
+        let h = height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        
+        canvas.width = w;
+        canvas.height = h;
+        
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          const base64Data = dataUrl.split(",")[1];
+          
+          if (base64Data && liveSessionRef.current) {
+            liveSessionRef.current.sendVideoFrame(base64Data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to capture and send camera frame:", err);
+      }
+    }, 1000); // Send 1 frame per second (1 FPS) as recommended to prevent model overload
+
+    return () => clearInterval(intervalId);
+  }, [isCameraActive, isSessionActive, cameraStream]);
+
   const liveSessionRef = useRef<LiveSessionManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -169,6 +217,14 @@ export default function App() {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: facingMode }
         });
+        
+        // Listen for stream track termination from hardware / system
+        stream.getVideoTracks().forEach((track) => {
+          track.onended = () => {
+            stopCamera();
+          };
+        });
+
         setCameraStream(stream);
         setIsCameraActive(true);
       } catch (err: any) {
@@ -190,6 +246,14 @@ export default function App() {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: nextMode }
         });
+
+        // Listen for stream track termination from hardware / system
+        stream.getVideoTracks().forEach((track) => {
+          track.onended = () => {
+            stopCamera();
+          };
+        });
+
         setCameraStream(stream);
       } catch (err: any) {
         console.error("Failed to switch camera:", err);

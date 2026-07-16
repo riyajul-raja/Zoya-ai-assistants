@@ -274,4 +274,14 @@ export class LiveSessionManager {
       });
     }
   }
+
+  sendVideoFrame(base64Data: string) {
+    if (this.sessionPromise) {
+      this.sessionPromise.then(session => {
+        session.sendRealtimeInput({
+          video: { data: base64Data, mimeType: "image/jpeg" }
+        });
+      }).catch(err => console.error("Error sending video frame to Live API:", err));
+    }
+  }
 }
