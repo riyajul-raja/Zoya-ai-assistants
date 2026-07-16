@@ -1173,7 +1173,15 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (isSessionActive) {
       setIsSessionActive(false);
       resetZoyaSession();
+      if (isInputMicActive && recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (err) {}
+        setIsInputMicActive(false);
+      }
     } else {
+      setShowChat(true);
+      toggleInputDictation();
       try {
         // Do not show "Microphone Blocked" before actually requesting microphone permission.
         // Call navigator.mediaDevices.getUserMedia() first.
