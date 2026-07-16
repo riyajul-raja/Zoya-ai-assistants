@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -184,6 +184,49 @@ export default function App() {
   const [isProfessionalMode, setIsProfessionalMode] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<any>(null);
+
+  // AR Hologram Mode states
+  const [isARMode, setIsARMode] = useState(false);
+  const [arStatus, setArStatus] = useState<"calibrating" | "anchored" | "failed">("calibrating");
+  const [xrSession, setXrSession] = useState<any>(null);
+  const wasCameraActivatedByAR = useRef(false);
+
+  // Device orientation angles for physical tracking
+  const [arOrientation, setArOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
+  const [baselineOrientation, setBaselineOrientation] = useState<{ alpha: number; beta: number; gamma: number } | null>(null);
+
+  // Normalized cursor coordinates for desktop fallback tracking
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Listen for mouse moves for desktop tracking fallback
+  useEffect(() => {
+    if (!isARMode) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const nx = (e.clientX / window.innerWidth) * 2 - 1;
+      const ny = (e.clientY / window.innerHeight) * 2 - 1;
+      setMousePosition({ x: nx, y: ny });
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [isARMode]);
+
+  // Listen for device orientation for mobile physical tracking
+  useEffect(() => {
+    if (!isARMode) return;
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
+        setArOrientation({ alpha: e.alpha, beta: e.beta, gamma: e.gamma });
+        setBaselineOrientation((prev) => {
+          if (!prev) {
+            return { alpha: e.alpha || 0, beta: e.beta || 0, gamma: e.gamma || 0 };
+          }
+          return prev;
+        });
+      }
+    };
+    window.addEventListener("deviceorientation", handleOrientation);
+    return () => window.removeEventListener("deviceorientation", handleOrientation);
+  }, [isARMode]);
 
   const triggerToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -845,6 +888,97 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
+  const toggleAR = async () => {
+    if (isARMode) {
+      // Deactivating AR Mode
+      setIsARMode(false);
+      setArStatus("calibrating");
+      setBaselineOrientation(null);
+      if (wasCameraActivatedByAR.current) {
+        stopCamera();
+        wasCameraActivatedByAR.current = false;
+      }
+      if (xrSession) {
+        try {
+          await xrSession.end();
+        } catch (e) {
+          console.error("Failed to end XR Session:", e);
+        }
+        setXrSession(null);
+      }
+      triggerToast("AR Hologram Mode deactivated");
+    } else {
+      // Activating AR Mode
+      setIsARMode(true);
+      setArStatus("calibrating");
+      setBaselineOrientation(null);
+      
+      // Try to trigger WebXR immersive-ar session if supported
+      const navAny = navigator as any;
+      if (navAny.xr) {
+        try {
+          const isArSupported = await navAny.xr.isSessionSupported("immersive-ar");
+          if (isArSupported) {
+            const session = await navAny.xr.requestSession("immersive-ar", {
+              requiredFeatures: ["local-floor"]
+            });
+            setXrSession(session);
+            session.addEventListener("end", () => {
+              setXrSession(null);
+              setIsARMode(false);
+            });
+            console.log("WebXR session active:", session);
+          }
+        } catch (err) {
+          console.warn("WebXR immersive-ar request not granted/supported:", err);
+        }
+      }
+      
+      // Auto-start camera if not already active
+      if (!isCameraActive) {
+        wasCameraActivatedByAR.current = true;
+        // Try starting with "environment" (back camera) for AR
+        setFacingMode("environment");
+        try {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: "environment" }
+            });
+            stream.getVideoTracks().forEach((track) => {
+              track.onended = () => {
+                stopCamera();
+              };
+            });
+            setCameraStream(stream);
+            setIsCameraActive(true);
+          }
+        } catch (err: any) {
+          console.warn("Failed to start environment camera, falling back to user camera:", err);
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getVideoTracks().forEach((track) => {
+              track.onended = () => {
+                stopCamera();
+              };
+            });
+            setCameraStream(stream);
+            setIsCameraActive(true);
+          } catch (fallbackErr) {
+            console.error("All camera initialization failed:", fallbackErr);
+          }
+        }
+      }
+      
+      triggerToast("Initializing AR Hologram HUD...");
+      
+      // Simulate flat surface tracking search progress
+      setTimeout(() => {
+        setArStatus("anchored");
+        triggerToast("Flat Surface Detected. Hologram Anchored.");
+      }, 2500);
+    }
+  };
+
   const toggleFacingMode = async () => {
     const nextMode = facingMode === "user" ? "environment" : "user";
     setFacingMode(nextMode);
@@ -928,6 +1062,44 @@ In your very first response or greeting to the user, you MUST casually and natur
     handleTextCommand(textInput);
     setTextInput("");
   };
+
+  // Calculate spatial tracking offset for AR holographic anchor
+  const trackingOffset = (() => {
+    let offset = { x: 0, y: 0, scale: 1, rotationY: 0, rotationX: 0 };
+    if (isARMode) {
+      if (arStatus === "calibrating") {
+        offset.scale = 0.5 + Math.sin(Date.now() / 150) * 0.05;
+      } else if (arStatus === "anchored") {
+        if (baselineOrientation) {
+          // Gyroscope delta-based offsets
+          let deltaYaw = arOrientation.alpha - baselineOrientation.alpha;
+          let deltaPitch = arOrientation.beta - baselineOrientation.beta;
+
+          // Wrap around 360 degrees safely
+          if (deltaYaw > 180) deltaYaw -= 360;
+          if (deltaYaw < -180) deltaYaw += 360;
+
+          // Gyro sensitivity parameters
+          const multiplierX = 14; 
+          const multiplierY = 14;
+
+          offset.x = deltaYaw * multiplierX;
+          offset.y = -deltaPitch * multiplierY;
+
+          // Apply reverse physical rotational perspective
+          offset.rotationY = -(deltaYaw * Math.PI / 180);
+          offset.rotationX = -(deltaPitch * Math.PI / 180);
+        } else {
+          // Desktop fallbacks: Mouse cursor triggers panning
+          offset.x = -mousePosition.x * 250;
+          offset.y = -mousePosition.y * 250;
+          offset.rotationY = -mousePosition.x * 0.6;
+          offset.rotationX = mousePosition.y * 0.4;
+        }
+      }
+    }
+    return offset;
+  })();
 
   return (
     <div className="h-[100dvh] w-screen bg-[#050505] text-white flex flex-col items-center justify-between font-sans relative overflow-hidden m-0 p-0">
@@ -1074,24 +1246,29 @@ In your very first response or greeting to the user, you MUST casually and natur
             )}
 
       {/* Cinematic Background Gradients */}
-      <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
+      <div 
+        className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none transition-opacity duration-500"
+        style={isARMode ? { opacity: 0.15 } : { opacity: 1 }}
+      >
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-900/20 blur-[120px] rounded-full" />
       </div>
 
-      {/* Camera Video Feed (Upper Half) */}
+      {/* Camera Video Feed (Upper Half / Fullscreen AR Backdrop) */}
       <AnimatePresence>
         {isCameraActive && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
             className={`
-              overflow-hidden shadow-2xl border border-white/10 bg-black/60 backdrop-blur-md pointer-events-auto
-              ${isCameraFullscreen 
-                ? "fixed inset-0 w-screen h-screen z-50 rounded-none border-none" 
-                : "absolute top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-md aspect-video rounded-2xl z-30"
+              overflow-hidden transition-all duration-500
+              ${isARMode 
+                ? "fixed inset-0 w-screen h-screen z-0 rounded-none border-none opacity-[0.72] pointer-events-none" 
+                : isCameraFullscreen 
+                ? "fixed inset-0 w-screen h-screen z-50 rounded-none border-none pointer-events-auto" 
+                : "absolute top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-md aspect-video rounded-2xl z-30 pointer-events-auto shadow-2xl border border-white/10 bg-black/60 backdrop-blur-md"
               }
             `}
           >
@@ -1103,10 +1280,11 @@ In your very first response or greeting to the user, you MUST casually and natur
               className="w-full h-full object-cover"
             />
             
-            {/* Floating Camera Controls overlaid on top right of video */}
-            <div className={`absolute top-4 flex items-center gap-2 z-50 pointer-events-auto ${
-              isCameraFullscreen ? "right-16 md:right-24" : "right-3"
-            }`}>
+            {/* Floating Camera Controls overlaid on top right of video - completely hidden in AR Mode */}
+            {!isARMode && (
+              <div className={`absolute top-4 flex items-center gap-2 z-50 pointer-events-auto ${
+                isCameraFullscreen ? "right-16 md:right-24" : "right-3"
+              }`}>
               {/* Flip camera control */}
               <button
                 onClick={toggleFacingMode}
@@ -1147,6 +1325,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                 <X size={16} />
               </button>
             </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1207,6 +1386,19 @@ In your very first response or greeting to the user, you MUST casually and natur
             <Shield size={18} className={isProfessionalMode ? "animate-pulse" : ""} />
           </button>
 
+          {/* AR Hologram Button */}
+          <button
+            onClick={toggleAR}
+            className={`p-2 rounded-full border transition-all cursor-pointer pointer-events-auto flex items-center justify-center ${
+              isARMode
+                ? "bg-gradient-to-r from-cyan-500 to-teal-500 border-cyan-400/50 text-white shadow-lg shadow-cyan-500/35 animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
+            }`}
+            title={isARMode ? "Deactivate AR Mode" : "Activate AR Hologram Mode"}
+          >
+            <Box size={18} className={isARMode ? "animate-spin" : ""} style={{ animationDuration: isARMode ? "8s" : undefined }} />
+          </button>
+
           {/* PiP Elegant Icon Button */}
           <button
             onClick={handlePiP}
@@ -1262,7 +1454,13 @@ In your very first response or greeting to the user, you MUST casually and natur
 
         {/* Center Visualizer (Fixed Full Screen Background) */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-          <Visualizer state={appState} liveSessionRef={liveSessionRef} />
+          <Visualizer 
+            state={appState} 
+            liveSessionRef={liveSessionRef} 
+            isARMode={isARMode}
+            arStatus={arStatus}
+            trackingOffset={trackingOffset}
+          />
         </div>
 
         {/* Centered Scrollable Chat Messages Overlay */}
@@ -1365,20 +1563,28 @@ In your very first response or greeting to the user, you MUST casually and natur
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               onSubmit={handleTextSubmit}
-              className="w-full max-w-md flex items-center gap-2 bg-white/5 border border-white/10 rounded-full p-1 pl-4 backdrop-blur-md shadow-2xl pointer-events-auto"
+              className={`w-full max-w-md flex items-center gap-2 rounded-full p-1 pl-4 backdrop-blur-md shadow-2xl pointer-events-auto transition-all duration-300 ${
+                isARMode 
+                  ? "bg-black/35 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]" 
+                  : "bg-white/5 border border-white/10"
+              }`}
             >
               <input 
                 type="text"
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                placeholder="Type a message to Zoya..."
+                placeholder={isARMode ? "Send instruction to Hologram..." : "Type a message to Zoya..."}
                 className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm"
                 autoFocus
               />
               <button 
                 type="submit"
                 disabled={!textInput.trim()}
-                className="p-2 rounded-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:hover:bg-violet-500 transition-colors cursor-pointer"
+                className={`p-2 rounded-full disabled:opacity-50 transition-all duration-300 cursor-pointer ${
+                  isARMode 
+                    ? "bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/30 disabled:text-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.4)] text-black" 
+                    : "bg-violet-500 hover:bg-violet-600 text-white"
+                }`}
               >
                 <Send size={16} />
               </button>
@@ -1391,7 +1597,9 @@ In your very first response or greeting to the user, you MUST casually and natur
             onClick={toggleCamera}
             className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
               isCameraActive
-                ? "bg-pink-500/20 border-pink-500/50 text-pink-300"
+                ? isARMode 
+                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                  : "bg-pink-500/20 border-pink-500/50 text-pink-300"
                 : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
             }`}
             title={isCameraActive ? "Close Camera" : "Open Camera"}
@@ -1406,6 +1614,8 @@ In your very first response or greeting to the user, you MUST casually and natur
               ${
                 isSessionActive
                   ? "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30"
+                  : isARMode
+                  ? "bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.15)] hover:scale-105"
                   : "bg-white/10 text-white border border-white/20 hover:bg-white/20 hover:scale-105"
               }
             `}
@@ -1427,7 +1637,9 @@ In your very first response or greeting to the user, you MUST casually and natur
             onClick={() => setShowChat(!showChat)}
             className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
               showChat
-                ? "bg-violet-500/20 border-violet-500/50 text-violet-300"
+                ? isARMode
+                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                  : "bg-violet-500/20 border-violet-500/50 text-violet-300"
                 : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
             }`}
             title="Toggle Chat View"

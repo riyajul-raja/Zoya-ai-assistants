@@ -6,6 +6,9 @@ type VisualizerState = "idle" | "listening" | "processing" | "speaking";
 interface Globe3DProps {
   state: VisualizerState;
   liveSessionRef: React.MutableRefObject<LiveSessionManager | null>;
+  isARMode?: boolean;
+  arStatus?: "calibrating" | "anchored" | "failed";
+  trackingOffset?: { x: number; y: number; scale: number; rotationY: number; rotationX: number };
 }
 
 interface Point3D {
@@ -19,10 +22,27 @@ interface Renderable {
   draw: (ctx: CanvasRenderingContext2D) => void;
 }
 
-export default function Globe3D({ state, liveSessionRef }: Globe3DProps) {
+export default function Globe3D({ state, liveSessionRef, isARMode = false, arStatus = "calibrating", trackingOffset }: Globe3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dimensions, setDimensions] = useState({ width: 350, height: 350 });
+
+  // Refs to allow high performance rendering loop without recreation
+  const isARModeRef = useRef(isARMode);
+  const arStatusRef = useRef(arStatus);
+  const trackingOffsetRef = useRef(trackingOffset);
+
+  useEffect(() => {
+    isARModeRef.current = isARMode;
+  }, [isARMode]);
+
+  useEffect(() => {
+    arStatusRef.current = arStatus;
+  }, [arStatus]);
+
+  useEffect(() => {
+    trackingOffsetRef.current = trackingOffset;
+  }, [trackingOffset]);
 
   // High-density crisp particles forming the spherical shell
   const numPoints = 800; // Perfect density of glowing dots
@@ -131,8 +151,19 @@ export default function Globe3D({ state, liveSessionRef }: Globe3DProps) {
       // Accumulate bead movement with matching speed boost
       beadAccumulatorRef.current += 0.5 * rotationBoost * deltaTimeSeconds;
 
+      const isAR = isARModeRef.current;
+      const arStat = arStatusRef.current;
+      const trackingOffsetVal = trackingOffsetRef.current;
+
+      // Spatial tracking variables
+      const trackingX = isAR && trackingOffsetVal ? trackingOffsetVal.x : 0;
+      const trackingY = isAR && trackingOffsetVal ? trackingOffsetVal.y : 0;
+      const trackingScale = isAR && trackingOffsetVal ? trackingOffsetVal.scale : 1;
+      const trackingRotY = isAR && trackingOffsetVal ? trackingOffsetVal.rotationY : 0;
+      const trackingRotX = isAR && trackingOffsetVal ? trackingOffsetVal.rotationX : 0;
+
       // Smooth continuous Y-rotation angle for both the sphere and the rings
-      const spinY = rotationAngleRef.current;
+      const spinY = rotationAngleRef.current + trackingRotY;
 
       // Cycle HSL color hue continuously from 0 to 360 over 12 seconds
       const colorHue = (elapsedSeconds * (360 / 12)) % 360;
@@ -148,15 +179,15 @@ export default function Globe3D({ state, liveSessionRef }: Globe3DProps) {
       // Clean with pristine transparency for maximum crispness
       ctx.clearRect(0, 0, w, h);
 
-      const centerX = w / 2;
-      const centerY = h / 2;
+      const centerX = (w / 2) + trackingX;
+      const centerY = (h / 2) + trackingY;
       
       // Scaled down slightly for elegant, high-end minimalist presentation
       const baseRadius = Math.min(w, h) * 0.28;
       
       // Map audio amplitude to the 3D particle system's radius: radius scales up slightly during speaks
       const audioScaleBonus = smoothedVolumeRef.current * 0.25;
-      const sphereRadius = baseRadius * (scalePulseRef.current + audioScaleBonus);
+      const sphereRadius = baseRadius * (scalePulseRef.current + audioScaleBonus) * trackingScale;
 
       // Shifting RGB Color definitions based on HSL color wheel
       const ringColor = `hsla(${colorHue}, 90%, 60%, `;
@@ -166,7 +197,7 @@ export default function Globe3D({ state, liveSessionRef }: Globe3DProps) {
       const renderables: Renderable[] = [];
 
       // Global aesthetic tilts
-      const globalTiltX = 0.22; // 12.6 degrees X tilt so poles are visible
+      const globalTiltX = 0.22 + trackingRotX; // 12.6 degrees X tilt so poles are visible
       const globalTiltZ = 0.12; // 6.8 degrees Z tilt
 
       // 2. Project and add 800 high-density crisp micro-particles (sphere shell)
@@ -374,6 +405,69 @@ export default function Globe3D({ state, liveSessionRef }: Globe3DProps) {
       // 5. Render everything with crisp, thin lines and no blurry shadow lags
       for (let i = 0; i < renderables.length; i++) {
         renderables[i].draw(ctx);
+      }
+
+      // 6. Optional HUD target finder when calibrating AR space
+      if (isAR && arStat === "calibrating") {
+        ctx.save();
+        ctx.strokeStyle = `hsla(${colorHue}, 95%, 65%, 0.45)`;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 12]);
+        
+        // Spin slowly
+        const scanAngle = (elapsedSeconds * Math.PI) / 3;
+        ctx.translate(w / 2, h / 2);
+        ctx.rotate(scanAngle);
+        
+        ctx.beginPath();
+        ctx.arc(0, 0, baseRadius * 1.3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        
+        // Non-rotated overlay details
+        ctx.save();
+        ctx.strokeStyle = `hsla(${colorHue}, 95%, 65%, 0.65)`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        // Top-left corner
+        ctx.moveTo(w / 2 - baseRadius * 1.3, h / 2 - baseRadius * 1.0);
+        ctx.lineTo(w / 2 - baseRadius * 1.3 + 15, h / 2 - baseRadius * 1.0);
+        ctx.moveTo(w / 2 - baseRadius * 1.3, h / 2 - baseRadius * 1.0);
+        ctx.lineTo(w / 2 - baseRadius * 1.3, h / 2 - baseRadius * 1.0 + 15);
+        
+        // Top-right corner
+        ctx.moveTo(w / 2 + baseRadius * 1.3, h / 2 - baseRadius * 1.0);
+        ctx.lineTo(w / 2 + baseRadius * 1.3 - 15, h / 2 - baseRadius * 1.0);
+        ctx.moveTo(w / 2 + baseRadius * 1.3, h / 2 - baseRadius * 1.0);
+        ctx.lineTo(w / 2 + baseRadius * 1.3, h / 2 - baseRadius * 1.0 + 15);
+        
+        // Bottom-left corner
+        ctx.moveTo(w / 2 - baseRadius * 1.3, h / 2 + baseRadius * 1.0);
+        ctx.lineTo(w / 2 - baseRadius * 1.3 + 15, h / 2 + baseRadius * 1.0);
+        ctx.moveTo(w / 2 - baseRadius * 1.3, h / 2 + baseRadius * 1.0);
+        ctx.lineTo(w / 2 - baseRadius * 1.3, h / 2 + baseRadius * 1.0 - 15);
+        
+        // Bottom-right corner
+        ctx.moveTo(w / 2 + baseRadius * 1.3, h / 2 + baseRadius * 1.0);
+        ctx.lineTo(w / 2 + baseRadius * 1.3 - 15, h / 2 + baseRadius * 1.0);
+        ctx.moveTo(w / 2 + baseRadius * 1.3, h / 2 + baseRadius * 1.0);
+        ctx.lineTo(w / 2 + baseRadius * 1.3, h / 2 + baseRadius * 1.0 - 15);
+        ctx.stroke();
+        
+        // Draw crosshair at center
+        ctx.strokeStyle = `hsla(${colorHue}, 95%, 65%, 0.4)`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(w / 2 - 12, h / 2); ctx.lineTo(w / 2 + 12, h / 2);
+        ctx.moveTo(w / 2, h / 2 - 12); ctx.lineTo(w / 2, h / 2 + 12);
+        ctx.stroke();
+
+        ctx.fillStyle = `hsla(${colorHue}, 95%, 65%, 0.85)`;
+        ctx.font = "bold 9px monospace";
+        ctx.textAlign = "center";
+        ctx.letterSpacing = "3px";
+        ctx.fillText("SCANNING FOR SURFACE...", w / 2, h / 2 + baseRadius * 1.5);
+        ctx.restore();
       }
 
       if (animationFrameIdRef.current) {

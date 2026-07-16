@@ -8,9 +8,18 @@ type VisualizerState = "idle" | "listening" | "processing" | "speaking";
 interface VisualizerProps {
   state: VisualizerState;
   liveSessionRef: React.MutableRefObject<LiveSessionManager | null>;
+  isARMode?: boolean;
+  arStatus?: "calibrating" | "anchored" | "failed";
+  trackingOffset?: { x: number; y: number; scale: number; rotationY: number; rotationX: number };
 }
 
-export default function Visualizer({ state, liveSessionRef }: VisualizerProps) {
+export default function Visualizer({ 
+  state, 
+  liveSessionRef,
+  isARMode = false,
+  arStatus = "calibrating",
+  trackingOffset
+}: VisualizerProps) {
   // Synchronized color hue state matching Globe3D's 12-second color cycle perfectly
   const [hue, setHue] = useState(160);
 
@@ -68,6 +77,10 @@ export default function Visualizer({ state, liveSessionRef }: VisualizerProps) {
     };
   };
 
+  const trackingStyle = isARMode && trackingOffset 
+    ? { transform: `translate3d(${trackingOffset.x}px, ${trackingOffset.y}px, 0) scale(${trackingOffset.scale})` } 
+    : {};
+
   return (
     <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
       {/* Enhanced Multi-Layered Ambient RGB Glow */}
@@ -75,19 +88,28 @@ export default function Visualizer({ state, liveSessionRef }: VisualizerProps) {
       <motion.div
         animate={getPulseAnimation()}
         className="absolute w-[85%] h-[85%] rounded-full blur-[140px]"
-        style={{ backgroundColor: `hsla(${hue}, 95%, 55%, 0.15)` }}
+        style={{ 
+          backgroundColor: `hsla(${hue}, 95%, 55%, 0.15)`,
+          ...trackingStyle
+        }}
       />
       {/* Medium High-Vibrancy Glow */}
       <motion.div
         animate={getPulseAnimation()}
         className="absolute w-[60%] h-[60%] rounded-full blur-[90px]"
-        style={{ backgroundColor: `hsla(${hue}, 100%, 60%, 0.22)` }}
+        style={{ 
+          backgroundColor: `hsla(${hue}, 100%, 60%, 0.22)`,
+          ...trackingStyle
+        }}
       />
       {/* Central High-Intensity Accent Glow */}
       <motion.div
         animate={getPulseAnimation()}
         className="absolute w-[35%] h-[35%] rounded-full blur-[45px]"
-        style={{ backgroundColor: `hsla(${hue}, 100%, 65%, 0.28)` }}
+        style={{ 
+          backgroundColor: `hsla(${hue}, 100%, 65%, 0.28)`,
+          ...trackingStyle
+        }}
       />
 
       {/* Background Dotted & Dashed Orbital Tracks - distinctly behind the central 3D globe */}
@@ -97,7 +119,8 @@ export default function Visualizer({ state, liveSessionRef }: VisualizerProps) {
         className="absolute w-[100%] h-[100%] rounded-full border-[1px] border-dashed pointer-events-none"
         style={{ 
           borderColor: `hsla(${hue}, 95%, 65%, 0.22)`,
-          filter: `drop-shadow(0 0 3px hsla(${hue}, 95%, 65%, 0.2))`
+          filter: `drop-shadow(0 0 3px hsla(${hue}, 95%, 65%, 0.2))`,
+          ...trackingStyle
         }}
       />
 
@@ -107,7 +130,8 @@ export default function Visualizer({ state, liveSessionRef }: VisualizerProps) {
         className="absolute w-[85%] h-[85%] rounded-full border-[2px] border-dotted pointer-events-none"
         style={{ 
           borderColor: `hsla(${hue}, 95%, 65%, 0.32)`,
-          filter: `drop-shadow(0 0 4px hsla(${hue}, 95%, 65%, 0.3))`
+          filter: `drop-shadow(0 0 4px hsla(${hue}, 95%, 65%, 0.3))`,
+          ...trackingStyle
         }}
       />
 
@@ -117,20 +141,34 @@ export default function Visualizer({ state, liveSessionRef }: VisualizerProps) {
         className="absolute w-[70%] h-[70%] rounded-full border-[1.5px] border-dashed pointer-events-none"
         style={{ 
           borderColor: `hsla(${hue}, 95%, 65%, 0.25)`,
-          filter: `drop-shadow(0 0 3px hsla(${hue}, 95%, 65%, 0.25))`
+          filter: `drop-shadow(0 0 3px hsla(${hue}, 95%, 65%, 0.25))`,
+          ...trackingStyle
         }}
       />
 
       {/* Holographic 3D Rotating Globe - now massive, unclipped and layered behind the Core Circle */}
-      <div className="absolute w-[65%] h-[65%] md:w-[60%] md:h-[60%] flex items-center justify-center pointer-events-none z-0">
-        <Globe3D state={state} liveSessionRef={liveSessionRef} />
+      <div 
+        className="absolute w-[65%] h-[65%] md:w-[60%] md:h-[60%] flex items-center justify-center pointer-events-none z-0 transition-opacity duration-500"
+        style={isARMode && arStatus === "calibrating" ? { opacity: 0.1 } : { opacity: 1 }}
+      >
+        <Globe3D 
+          state={state} 
+          liveSessionRef={liveSessionRef} 
+          isARMode={isARMode}
+          arStatus={arStatus}
+          trackingOffset={trackingOffset}
+        />
       </div>
 
       {/* Center Text floating cleanly with matching synchronized text shadow and breathing pulse animation */}
       <motion.div
         animate={getPulseAnimation()}
-        className="absolute pointer-events-none z-10 font-bold tracking-[0.3em] text-xl md:text-3xl lg:text-4xl text-white select-none"
-        style={{ textShadow: `0 0 15px hsla(${hue}, 90%, 65%, 0.8), 0 0 30px hsla(${hue}, 90%, 65%, 0.5)` }}
+        className="absolute pointer-events-none z-10 font-bold tracking-[0.3em] text-xl md:text-3xl lg:text-4xl text-white select-none transition-all duration-300"
+        style={{ 
+          textShadow: `0 0 15px hsla(${hue}, 90%, 65%, 0.8), 0 0 30px hsla(${hue}, 90%, 65%, 0.5)`,
+          ...trackingStyle,
+          opacity: isARMode && arStatus === "calibrating" ? 0.3 : 1
+        }}
       >
         ZOYA
       </motion.div>
