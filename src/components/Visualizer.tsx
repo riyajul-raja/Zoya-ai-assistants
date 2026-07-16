@@ -68,41 +68,54 @@ export default function Visualizer({ state }: VisualizerProps) {
 
   return (
     <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-      {/* Ambient RGB Glow */}
+      {/* Enhanced Multi-Layered Ambient RGB Glow */}
+      {/* Deep Background Wide Glow */}
       <motion.div
         animate={getPulseAnimation()}
-        className="absolute w-[70%] h-[70%] rounded-full blur-[100px]"
-        style={{ backgroundColor: `hsla(${hue}, 90%, 60%, 0.28)` }}
+        className="absolute w-[85%] h-[85%] rounded-full blur-[140px]"
+        style={{ backgroundColor: `hsla(${hue}, 95%, 55%, 0.15)` }}
+      />
+      {/* Medium High-Vibrancy Glow */}
+      <motion.div
+        animate={getPulseAnimation()}
+        className="absolute w-[60%] h-[60%] rounded-full blur-[90px]"
+        style={{ backgroundColor: `hsla(${hue}, 100%, 60%, 0.22)` }}
+      />
+      {/* Central High-Intensity Accent Glow */}
+      <motion.div
+        animate={getPulseAnimation()}
+        className="absolute w-[35%] h-[35%] rounded-full blur-[45px]"
+        style={{ backgroundColor: `hsla(${hue}, 100%, 65%, 0.28)` }}
       />
 
       {/* Background Dotted & Dashed Orbital Tracks - distinctly behind the central 3D globe */}
       {/* Outer Ring 1: Massive Outer Dashed */}
       <motion.div
         animate={getRingAnimation(4, false)}
-        className="absolute w-[100%] h-[100%] rounded-full border-[1.5px] border-dashed pointer-events-none"
+        className="absolute w-[100%] h-[100%] rounded-full border-[1px] border-dashed pointer-events-none"
         style={{ 
-          borderColor: `hsla(${hue}, 95%, 65%, 0.35)`,
-          filter: `drop-shadow(0 0 8px hsla(${hue}, 95%, 65%, 0.4))`
+          borderColor: `hsla(${hue}, 95%, 65%, 0.22)`,
+          filter: `drop-shadow(0 0 3px hsla(${hue}, 95%, 65%, 0.2))`
         }}
       />
 
       {/* Middle Ring 2: Original, thicker dotted background orbital track */}
       <motion.div
         animate={getRingAnimation(3, true)}
-        className="absolute w-[85%] h-[85%] rounded-full border-[3px] border-dotted pointer-events-none"
+        className="absolute w-[85%] h-[85%] rounded-full border-[2px] border-dotted pointer-events-none"
         style={{ 
-          borderColor: `hsla(${hue}, 95%, 65%, 0.45)`,
-          filter: `drop-shadow(0 0 12px hsla(${hue}, 95%, 65%, 0.5))`
+          borderColor: `hsla(${hue}, 95%, 65%, 0.32)`,
+          filter: `drop-shadow(0 0 4px hsla(${hue}, 95%, 65%, 0.3))`
         }}
       />
 
       {/* Inner Ring 3: Original inner dashed background track */}
       <motion.div
         animate={getRingAnimation(1, false)}
-        className="absolute w-[70%] h-[70%] rounded-full border-[2px] border-dashed pointer-events-none"
+        className="absolute w-[70%] h-[70%] rounded-full border-[1.5px] border-dashed pointer-events-none"
         style={{ 
-          borderColor: `hsla(${hue}, 95%, 65%, 0.38)`,
-          filter: `drop-shadow(0 0 10px hsla(${hue}, 95%, 65%, 0.45))`
+          borderColor: `hsla(${hue}, 95%, 65%, 0.25)`,
+          filter: `drop-shadow(0 0 3px hsla(${hue}, 95%, 65%, 0.25))`
         }}
       />
 
