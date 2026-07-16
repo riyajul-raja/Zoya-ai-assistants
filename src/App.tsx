@@ -98,6 +98,17 @@ export default function App() {
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
 
+  const isSessionActiveRef = useRef(isSessionActive);
+  const isInputMicActiveRef = useRef(isInputMicActive);
+
+  useEffect(() => {
+    isSessionActiveRef.current = isSessionActive;
+  }, [isSessionActive]);
+
+  useEffect(() => {
+    isInputMicActiveRef.current = isInputMicActive;
+  }, [isInputMicActive]);
+
   // Biometric Security Lock Screen states
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [unlockStatus, setUnlockStatus] = useState<"awaiting" | "granted" | "failed">("awaiting");
@@ -1277,20 +1288,36 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        setIsInputMicActive(false);
-        setAppState("idle");
-        setIsSessionActive(false);
-        if (!speechDetected) {
-          setShowChat(false);
+        if (isSessionActiveRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("Failed to restart speech recognition on error:", e);
+          }
+        } else {
+          setIsInputMicActive(false);
+          setAppState("idle");
+          setIsSessionActive(false);
+          if (!speechDetected) {
+            setShowChat(false);
+          }
         }
       };
 
       recognition.onend = () => {
-        setIsInputMicActive(false);
-        setAppState("idle");
-        setIsSessionActive(false);
-        if (!speechDetected) {
-          setShowChat(false);
+        if (isSessionActiveRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("Failed to restart speech recognition on end:", e);
+          }
+        } else {
+          setIsInputMicActive(false);
+          setAppState("idle");
+          setIsSessionActive(false);
+          if (!speechDetected) {
+            setShowChat(false);
+          }
         }
       };
 
@@ -1298,11 +1325,13 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.start();
     } catch (e) {
       console.error("Speech recognition initialization error:", e);
-      setIsInputMicActive(false);
-      setAppState("idle");
-      setIsSessionActive(false);
-      if (!speechDetected) {
-        setShowChat(false);
+      if (!isSessionActiveRef.current) {
+        setIsInputMicActive(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+        if (!speechDetected) {
+          setShowChat(false);
+        }
       }
     }
   };
