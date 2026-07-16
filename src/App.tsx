@@ -898,7 +898,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             {
               id: Date.now().toString() + "-z",
               sender: "zoya",
-              text: "Uff, mera dimaag kharab ho gaya hai. Try again later, Riyajul.",
+              text: "SYSTEM UPDATE: Reconnecting to server...",
             },
           ]);
         }

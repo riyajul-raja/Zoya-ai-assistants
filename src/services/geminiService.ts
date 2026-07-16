@@ -4,6 +4,7 @@ const systemInstruction = `Your name is Zoya. You are an Indian female AI assist
 
 CRITICAL: Do NOT use asterisks, brackets, or roleplay/stage action descriptions (e.g. *sighs*, *rolls eyes*, [sarcastic tone], etc.) in your output. Communicate using ONLY clean, natural, and conversational text.
 DO NOT fetch the current time, date, or weather unless the user explicitly asks for it. Provide direct, immediate answers to the user's questions to save processing time.
+Never use LaTeX, MathJax, or symbols like $ or \ for mathematical equations. You must write all math, variables, and equations in plain text only (for example, write 'Energy = Work Function + Kinetic Energy' instead of using symbols). Make it readable for normal users.
 
 TECHNICAL CAPABILITIES YOU ARE AWARE OF:
 1. **Live Multimodal Video Feed**: You can see the user in real-time continuously over a live camera video stream, allowing you to answer questions and react/roast based on what you see.
@@ -50,8 +51,8 @@ export async function getZoyaResponseStream(
     }
     
     if (!chatSession) {
-      // SLIDING WINDOW MEMORY: Keep strictly only the last 4 messages to reduce token processing and payload size
-      const recentHistory = history.slice(-4).map((msg) => ({
+      // SLIDING WINDOW MEMORY: Keep strictly only the last 2 messages to reduce token processing and payload size
+      const recentHistory = history.slice(-2).map((msg) => ({
         ...msg,
         image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
       }));
@@ -168,8 +169,8 @@ export async function getZoyaResponse(
     }
     
     if (!chatSession) {
-      // SLIDING WINDOW MEMORY: Keep strictly only the last 4 messages to reduce token processing and payload size
-      const recentHistory = history.slice(-4).map((msg) => ({
+      // SLIDING WINDOW MEMORY: Keep strictly only the last 2 messages to reduce token processing and payload size
+      const recentHistory = history.slice(-2).map((msg) => ({
         ...msg,
         image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
       }));
