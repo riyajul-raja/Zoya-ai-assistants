@@ -71,8 +71,8 @@ export async function getZoyaResponseStream(
         return true;
       });
 
-      // SLIDING WINDOW MEMORY: Keep strictly only the last 2 messages to reduce token processing and payload size
-      const recentHistory = cleanHistory.slice(-2).map((msg) => ({
+      // SLIDING WINDOW MEMORY: Keep strictly only the last 3 pairs (6 messages) of user/model messages to reduce token processing and payload size
+      const recentHistory = cleanHistory.slice(-6).map((msg) => ({
         ...msg,
         image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
       }));
@@ -113,6 +113,7 @@ export async function getZoyaResponseStream(
         model: "gemini-3.5-flash",
         config: {
           systemInstruction: activeSystemInstruction,
+          maxOutputTokens: 150,
         },
         history: formattedHistory,
       });
@@ -134,12 +135,12 @@ export async function getZoyaResponseStream(
       ];
     }
  
-    // Set up AbortController with a 20-second timeout
+    // Set up AbortController with a strict 5-second timeout goal for high-speed response
     const originalFetch = window.fetch;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-    }, 20000);
+    }, 5000);
  
     try {
       window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
@@ -212,8 +213,8 @@ export async function getZoyaResponse(
         return true;
       });
 
-      // SLIDING WINDOW MEMORY: Keep strictly only the last 2 messages to reduce token processing and payload size
-      const recentHistory = cleanHistory.slice(-2).map((msg) => ({
+      // SLIDING WINDOW MEMORY: Keep strictly only the last 3 pairs (6 messages) of user/model messages to reduce token processing and payload size
+      const recentHistory = cleanHistory.slice(-6).map((msg) => ({
         ...msg,
         image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
       }));
@@ -254,6 +255,7 @@ export async function getZoyaResponse(
         model: "gemini-3.5-flash",
         config: {
           systemInstruction: activeSystemInstruction,
+          maxOutputTokens: 150,
         },
         history: formattedHistory,
       });
@@ -275,12 +277,12 @@ export async function getZoyaResponse(
       ];
     }
 
-    // Set up AbortController with a 20-second timeout
+    // Set up AbortController with a strict 5-second timeout goal for high-speed response
     const originalFetch = window.fetch;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-    }, 20000);
+    }, 5000);
 
     try {
       window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
