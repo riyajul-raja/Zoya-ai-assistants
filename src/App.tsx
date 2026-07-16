@@ -91,20 +91,22 @@ export default function App() {
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimerRef = useRef<any>(null);
 
-  const handleUnlockSuccess = () => {
-    setUnlockStatus("granted");
-    if (holdTimerRef.current) {
-      clearInterval(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    setHoldProgress(100);
-    setTimeout(() => {
-      setIsUnlocked(true);
-    }, 1000);
-  };
-
   const triggerBiometrics = async () => {
     if (unlockStatus === "granted") return;
+    
+    // Start scanning progress simulation
+    setUnlockStatus("awaiting");
+    setHoldProgress(0);
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+    }
+    
+    let currentProgress = 0;
+    holdTimerRef.current = setInterval(() => {
+      currentProgress = Math.min(currentProgress + 3, 90);
+      setHoldProgress(currentProgress);
+    }, 100);
+
     if (navigator.credentials && navigator.credentials.create) {
       try {
         const challenge = new Uint8Array(32);
@@ -126,7 +128,7 @@ export default function App() {
               { type: "public-key", alg: -7 },
               { type: "public-key", alg: -257 }
             ],
-            timeout: 10000,
+            timeout: 15000,
             authenticatorSelection: {
               authenticatorAttachment: "platform",
               userVerification: "required"
@@ -136,49 +138,37 @@ export default function App() {
         
         console.log("Requesting Biometrics credential...");
         await navigator.credentials.create(options);
-        handleUnlockSuccess();
+        
+        // Success
+        if (holdTimerRef.current) {
+          clearInterval(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        setHoldProgress(100);
+        setUnlockStatus("granted");
+        setTimeout(() => {
+          setIsUnlocked(true);
+        }, 1000);
       } catch (err: any) {
         console.warn("Biometrics error / Not supported / Cancelled:", err);
+        if (holdTimerRef.current) {
+          clearInterval(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        setHoldProgress(0);
         setUnlockStatus("failed");
         setTimeout(() => setUnlockStatus("awaiting"), 2000);
       }
     } else {
       console.warn("navigator.credentials is not supported.");
+      if (holdTimerRef.current) {
+        clearInterval(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      setHoldProgress(0);
       setUnlockStatus("failed");
       setTimeout(() => setUnlockStatus("awaiting"), 2000);
     }
-  };
-
-  const startHold = () => {
-    if (unlockStatus === "granted") return;
-    setUnlockStatus("awaiting");
-    setHoldProgress(0);
-    
-    if (holdTimerRef.current) {
-      clearInterval(holdTimerRef.current);
-    }
-    
-    const startTime = Date.now();
-    holdTimerRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min((elapsed / 2000) * 100, 100);
-      setHoldProgress(progress);
-      
-      if (progress >= 100) {
-        clearInterval(holdTimerRef.current);
-        holdTimerRef.current = null;
-        handleUnlockSuccess();
-      }
-    }, 50);
-  };
-
-  const endHold = () => {
-    if (unlockStatus === "granted") return;
-    if (holdTimerRef.current) {
-      clearInterval(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    setHoldProgress(0);
   };
 
   // Clean up timer on unmount
@@ -1004,11 +994,6 @@ In your very first response or greeting to the user, you MUST casually and natur
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onMouseDown={startHold}
-                  onMouseUp={endHold}
-                  onMouseLeave={endHold}
-                  onTouchStart={(e) => { e.preventDefault(); startHold(); }}
-                  onTouchEnd={endHold}
                   onClick={triggerBiometrics}
                   className={`w-40 h-40 rounded-full flex flex-col items-center justify-center relative cursor-pointer select-none transition-all duration-500 shadow-2xl ${
                     unlockStatus === "granted"
@@ -1034,7 +1019,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
                   {/* Hold Helper text overlaid inside the button */}
                   <span className="absolute bottom-6 text-[9px] font-mono tracking-widest text-white/40 uppercase pointer-events-none select-none">
-                    {holdProgress > 0 ? `${Math.round(holdProgress)}%` : "TAP / HOLD"}
+                    {holdProgress > 0 ? `${Math.round(holdProgress)}%` : "TAP TO SCAN"}
                   </span>
                 </motion.button>
               </div>
@@ -1068,8 +1053,8 @@ In your very first response or greeting to the user, you MUST casually and natur
                   {unlockStatus === "granted"
                     ? "Syncing core subroutines and loading Zoya neural link..."
                     : unlockStatus === "failed"
-                    ? "Verification timeout. Try again or hold fingerprint for 2 seconds."
-                    : "Tap icon to trigger system credentials, or press and hold for 2s to authorize manually."}
+                    ? "Verification failed. Tap icon to authenticate using native device security."
+                    : "Tap icon to authenticate using native device security."}
                 </p>
               </div>
             </div>
