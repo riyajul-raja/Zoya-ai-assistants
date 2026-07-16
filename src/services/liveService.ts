@@ -25,61 +25,64 @@ export class LiveSessionManager {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
-  async start() {
+  async start(useMic: boolean = true) {
     try {
       this.onStateChange("processing");
       
       // Initialize Audio Contexts
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      this.audioContext = new AudioContextClass({ sampleRate: 16000 });
       this.playbackContext = new AudioContextClass({ sampleRate: 24000 });
       this.nextPlayTime = this.playbackContext.currentTime;
 
-      // Get Microphone
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-        } 
-      });
+      if (useMic) {
+        this.audioContext = new AudioContextClass({ sampleRate: 16000 });
 
-      this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
-      this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+        // Get Microphone
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+          } 
+        });
 
-      this.processor.onaudioprocess = (e) => {
-        if (!this.sessionPromise) return;
-        const inputData = e.inputBuffer.getChannelData(0);
-        const pcm16 = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          let s = Math.max(-1, Math.min(1, inputData[i]));
-          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        
-        // Convert to base64
-        const buffer = new ArrayBuffer(pcm16.length * 2);
-        const view = new DataView(buffer);
-        for (let i = 0; i < pcm16.length; i++) {
-          view.setInt16(i * 2, pcm16[i], true);
-        }
-        
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const base64Data = btoa(binary);
+        this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
+        this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
-        this.sessionPromise.then(session => {
-          session.sendRealtimeInput({
-            audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-          });
-        }).catch(err => console.error("Error sending audio", err));
-      };
+        this.processor.onaudioprocess = (e) => {
+          if (!this.sessionPromise) return;
+          const inputData = e.inputBuffer.getChannelData(0);
+          const pcm16 = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            let s = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+          
+          // Convert to base64
+          const buffer = new ArrayBuffer(pcm16.length * 2);
+          const view = new DataView(buffer);
+          for (let i = 0; i < pcm16.length; i++) {
+            view.setInt16(i * 2, pcm16[i], true);
+          }
+          
+          let binary = '';
+          const bytes = new Uint8Array(buffer);
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64Data = btoa(binary);
 
-      this.source.connect(this.processor);
-      this.processor.connect(this.audioContext.destination);
+          this.sessionPromise.then(session => {
+            session.sendRealtimeInput({
+              audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+            });
+          }).catch(err => console.error("Error sending audio", err));
+        };
+
+        this.source.connect(this.processor);
+        this.processor.connect(this.audioContext.destination);
+      }
 
       // Connect to Live API
       this.sessionPromise = this.ai.live.connect({

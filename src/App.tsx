@@ -74,7 +74,7 @@ export default function App() {
 
   // Capture video frame and send to Gemini Multimodal Live API
   useEffect(() => {
-    if (!isCameraActive || !isSessionActive || !cameraStream) return;
+    if (!isCameraActive || !cameraStream) return;
 
     const intervalId = setInterval(() => {
       const video = videoRef.current;
@@ -118,7 +118,92 @@ export default function App() {
     }, 1000); // Send 1 frame per second (1 FPS) as recommended to prevent model overload
 
     return () => clearInterval(intervalId);
-  }, [isCameraActive, isSessionActive, cameraStream]);
+  }, [isCameraActive, cameraStream]);
+
+  // Synchronize Live Session Lifecycle with isCameraActive, isSessionActive, and isMuted
+  useEffect(() => {
+    const shouldBeRunning = isCameraActive || isSessionActive;
+    const requiredMic = !!isSessionActive;
+
+    const manageSession = async () => {
+      const currentSession = liveSessionRef.current;
+
+      if (!shouldBeRunning) {
+        if (currentSession) {
+          currentSession.stop();
+          liveSessionRef.current = null;
+          setAppState("idle");
+        }
+        return;
+      }
+
+      // If already running, check if mic requirements match
+      if (currentSession) {
+        currentSession.isMuted = isMuted;
+        const currentMic = (currentSession as any)._useMic;
+        if (currentMic === requiredMic) {
+          // All good, no need to recreate
+          return;
+        }
+        // Restart session because mic requirement changed
+        currentSession.stop();
+        liveSessionRef.current = null;
+      }
+
+      // Start new session
+      try {
+        const session = new LiveSessionManager();
+        session.isMuted = isMuted;
+        (session as any)._useMic = requiredMic;
+        liveSessionRef.current = session;
+
+        session.onStateChange = (state) => {
+          setAppState(state);
+        };
+        
+        let currentZoyaMessageId: string | null = null;
+        session.onMessage = (sender, text) => {
+          if (sender === "zoya") {
+            setMessages((prev) => {
+              if (
+                prev.length > 0 && 
+                prev[prev.length - 1].sender === "zoya" && 
+                currentZoyaMessageId === prev[prev.length - 1].id
+              ) {
+                const updated = [...prev];
+                const lastMsg = updated[updated.length - 1];
+                updated[updated.length - 1] = {
+                  ...lastMsg,
+                  text: lastMsg.text + text
+                };
+                return updated;
+              } else {
+                const newId = Date.now().toString() + "-zoya";
+                currentZoyaMessageId = newId;
+                return [...prev, { id: newId, sender: "zoya", text }];
+              }
+            });
+          } else {
+            setMessages((prev) => [...prev, { id: Date.now().toString() + "-user", sender: "user", text }]);
+          }
+        };
+        
+        session.onCommand = (url) => {
+          setTimeout(() => {
+            window.open(url, "_blank");
+          }, 1000);
+        };
+
+        await session.start(requiredMic);
+      } catch (err) {
+        console.error("Failed to start synchronized live session:", err);
+        liveSessionRef.current = null;
+        setAppState("idle");
+      }
+    };
+
+    manageSession();
+  }, [isCameraActive, isSessionActive, isMuted]);
 
   const liveSessionRef = useRef<LiveSessionManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -184,8 +269,8 @@ export default function App() {
       },
     ]);
     
-    // If live session is active, send text through it
-    if (isSessionActive && liveSessionRef.current) {
+    // If live session is active (either because voice is active or camera is ON), send text through it
+    if (liveSessionRef.current) {
       liveSessionRef.current.sendText(finalTranscript);
       return;
     }
@@ -311,11 +396,6 @@ export default function App() {
   const toggleListening = async () => {
     if (isSessionActive) {
       setIsSessionActive(false);
-      if (liveSessionRef.current) {
-        liveSessionRef.current.stop();
-        liveSessionRef.current = null;
-      }
-      setAppState("idle");
       resetZoyaSession();
     } else {
       try {
@@ -326,32 +406,12 @@ export default function App() {
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Release the mic track immediately, as LiveSessionManager will request it
+        // Release the mic track immediately, as our centralized useEffect will start the live session and request it
         stream.getTracks().forEach(track => track.stop());
 
-        // Now that permission is granted, start the session immediately
+        // Now that permission is granted, toggle state to trigger our centralized Live Session manager
         setIsSessionActive(true);
         resetZoyaSession();
-        
-        const session = new LiveSessionManager();
-        session.isMuted = isMuted;
-        liveSessionRef.current = session;
-        
-        session.onStateChange = (state) => {
-          setAppState(state);
-        };
-        
-        session.onMessage = (sender, text) => {
-          setMessages((prev) => [...prev, { id: Date.now().toString() + "-" + sender, sender, text }]);
-        };
-        
-        session.onCommand = (url) => {
-          setTimeout(() => {
-            window.open(url, "_blank");
-          }, 1000);
-        };
-
-        await session.start();
       } catch (e: any) {
         console.error("Failed to start session", e);
         
