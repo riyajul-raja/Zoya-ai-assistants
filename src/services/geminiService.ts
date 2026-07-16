@@ -23,24 +23,28 @@ DYNAMIC FEATURE MEMORY PROTOCOL:
 
 let chatSession: any = null;
 let lastSessionIsProfessional: boolean | null = null;
+let lastSessionEnvironmentContext: string = "";
 
 export function resetZoyaSession() {
   chatSession = null;
   lastSessionIsProfessional = null;
+  lastSessionEnvironmentContext = "";
 }
 
 export async function getZoyaResponse(
   prompt: string,
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
   imageFrame?: string,
-  isProfessionalMode: boolean = false
+  isProfessionalMode: boolean = false,
+  environmentContext: string = ""
 ): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
-    if (isProfessionalMode !== lastSessionIsProfessional) {
+    if (isProfessionalMode !== lastSessionIsProfessional || environmentContext !== lastSessionEnvironmentContext) {
       chatSession = null;
       lastSessionIsProfessional = isProfessionalMode;
+      lastSessionEnvironmentContext = environmentContext;
     }
     
     if (!chatSession) {
@@ -77,9 +81,13 @@ export async function getZoyaResponse(
         formattedHistory.shift();
       }
 
-      const activeSystemInstruction = isProfessionalMode
+      let activeSystemInstruction = isProfessionalMode
         ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
         : systemInstruction;
+
+      if (environmentContext) {
+        activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
+      }
 
       chatSession = ai.chats.create({
         model: "gemini-3.5-flash",

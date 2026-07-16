@@ -46,7 +46,7 @@ export class LiveSessionManager {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
-  async start(useMic: boolean = true, isProfessionalMode: boolean = false) {
+  async start(useMic: boolean = true, isProfessionalMode: boolean = false, environmentContext: string = "") {
     try {
       this.onStateChange("processing");
       
@@ -112,9 +112,13 @@ export class LiveSessionManager {
         this.processor.connect(this.audioContext.destination);
       }
 
-      const activeSystemInstruction = isProfessionalMode
+      let activeSystemInstruction = isProfessionalMode
         ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
         : systemInstruction;
+
+      if (environmentContext) {
+        activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
+      }
 
       // Connect to Live API
       this.sessionPromise = this.ai.live.connect({

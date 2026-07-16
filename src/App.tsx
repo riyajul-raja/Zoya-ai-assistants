@@ -24,6 +24,34 @@ declare global {
   }
 }
 
+function getWeatherDescription(code: number): string {
+  if (code === 0) return "clear sky";
+  if (code >= 1 && code <= 3) return "mainly clear, partly cloudy, or overcast";
+  if (code === 45 || code === 48) return "foggy";
+  if (code >= 51 && code <= 55) return "drizzling";
+  if (code >= 61 && code <= 65) return "rainy";
+  if (code >= 71 && code <= 77) return "snowy";
+  if (code >= 80 && code <= 82) return "rain showers";
+  if (code >= 95 && code <= 99) return "thunderstorm";
+  return "pleasant";
+}
+
+function getTimeOfDayDescription(): { timeOfDay: string; timeStr: string } {
+  const now = new Date();
+  const hrs = now.getHours();
+  const minutesStr = now.getMinutes().toString().padStart(2, "0");
+  const timeStr = `${hrs % 12 || 12}:${minutesStr} ${hrs >= 12 ? "PM" : "AM"}`;
+  let timeOfDay = "night";
+  if (hrs >= 5 && hrs < 12) {
+    timeOfDay = "morning";
+  } else if (hrs >= 12 && hrs < 17) {
+    timeOfDay = "afternoon";
+  } else if (hrs >= 17 && hrs < 21) {
+    timeOfDay = "evening";
+  }
+  return { timeOfDay, timeStr };
+}
+
 export default function App() {
   const [appState, setAppState] = useState<AppState>("idle");
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -71,6 +99,66 @@ export default function App() {
       setToastMessage(null);
     }, 3000);
   }, []);
+
+  // Geolocation & Weather Environment Context state
+  const [environmentContext, setEnvironmentContext] = useState<string>("");
+
+  const fetchEnvironmentAwareness = useCallback(async () => {
+    const { timeOfDay, timeStr } = getTimeOfDayDescription();
+    
+    const setFallbackContext = () => {
+      const fallbackCtx = `ENVIRONMENT CONTEXT:
+- Current Local Time: ${timeStr} (It is currently ${timeOfDay}).
+- Current Weather: Unknown (Location permission not granted or weather request failed).
+
+INSTRUCTION FOR FIRST GREETING:
+In your very first response or greeting to the user, you MUST casually and naturally mention this current time of day (and playfully comment that the weather is a mystery because they didn't share their location, but greet them anyway). Keep it short, witty, and perfectly fitting your Zoya persona.`;
+      setEnvironmentContext(fallbackCtx);
+    };
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const res = await fetch(
+              `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`
+            );
+            if (!res.ok) throw new Error("Weather fetch failed");
+            const data = await res.json();
+            const current = data?.current_weather;
+            if (current) {
+              const temp = current.temperature;
+              const cond = getWeatherDescription(current.weathercode || 0);
+              const fullCtx = `ENVIRONMENT CONTEXT:
+- Current Local Time: ${timeStr} (It is currently ${timeOfDay}).
+- Current Weather: ${temp}°C, ${cond}.
+
+INSTRUCTION FOR FIRST GREETING:
+In your very first response or greeting to the user, you MUST casually and naturally mention this current time of day and the current weather temperature/conditions (e.g., "Good morning Boss, it's 25 degrees outside..." or similar natural, sassy/professional greeting depending on your active mode). Keep it short, witty, and perfectly fitting your Zoya persona.`;
+              setEnvironmentContext(fullCtx);
+            } else {
+              setFallbackContext();
+            }
+          } catch (err) {
+            console.error("Error fetching weather data:", err);
+            setFallbackContext();
+          }
+        },
+        (error) => {
+          console.log("Geolocation permission denied or error:", error);
+          setFallbackContext();
+        },
+        { timeout: 10000 }
+      );
+    } else {
+      setFallbackContext();
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEnvironmentAwareness();
+  }, [fetchEnvironmentAwareness]);
 
   // Camera states
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -371,16 +459,21 @@ export default function App() {
         return;
       }
 
-      // If already running, check if mic requirements and professional mode match
+      // If already running, check if mic requirements, professional mode, and environment context match
       if (currentSession) {
         currentSession.isMuted = isMuted;
         const currentMic = (currentSession as any)._useMic;
         const currentProfessional = (currentSession as any)._isProfessionalMode;
-        if (currentMic === requiredMic && currentProfessional === isProfessionalMode) {
+        const currentEnvironment = (currentSession as any)._environmentContext;
+        if (
+          currentMic === requiredMic && 
+          currentProfessional === isProfessionalMode && 
+          currentEnvironment === environmentContext
+        ) {
           // All good, no need to recreate
           return;
         }
-        // Restart session because mic requirement or mood changed
+        // Restart session because mic requirement, mood, or environment context changed
         currentSession.stop();
         liveSessionRef.current = null;
       }
@@ -391,6 +484,7 @@ export default function App() {
         session.isMuted = isMuted;
         (session as any)._useMic = requiredMic;
         (session as any)._isProfessionalMode = isProfessionalMode;
+        (session as any)._environmentContext = environmentContext;
         liveSessionRef.current = session;
 
         session.onStateChange = (state) => {
@@ -430,7 +524,7 @@ export default function App() {
           }, 1000);
         };
 
-        await session.start(requiredMic, isProfessionalMode);
+        await session.start(requiredMic, isProfessionalMode, environmentContext);
       } catch (err) {
         console.error("Failed to start synchronized live session:", err);
         liveSessionRef.current = null;
@@ -439,7 +533,7 @@ export default function App() {
     };
 
     manageSession();
-  }, [isCameraActive, isSessionActive, isMuted, isProfessionalMode]);
+  }, [isCameraActive, isSessionActive, isMuted, isProfessionalMode, environmentContext]);
 
   const liveSessionRef = useRef<LiveSessionManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -541,7 +635,7 @@ export default function App() {
       }, 1500);
     } else {
       // 2. General Chit-Chat via Gemini
-      responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64, isProfessionalMode);
+      responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64, isProfessionalMode, environmentContext);
       setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", text: responseText }]);
       
       if (!isMuted) {
@@ -553,7 +647,7 @@ export default function App() {
       }
       setAppState("idle");
     }
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext]);
 
   useEffect(() => {
     return () => {
