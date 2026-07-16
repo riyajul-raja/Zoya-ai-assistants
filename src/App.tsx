@@ -894,10 +894,30 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsARMode(false);
       setArStatus("calibrating");
       setBaselineOrientation(null);
-      if (wasCameraActivatedByAR.current) {
-        stopCamera();
-        wasCameraActivatedByAR.current = false;
+      
+      // Explicitly stop all camera tracks on both state and ref streams to completely free up camera hardware
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (e) {
+            console.error("Error stopping track from state:", e);
+          }
+        });
       }
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (e) {
+            console.error("Error stopping track from ref:", e);
+          }
+        });
+      }
+
+      stopCamera();
+      wasCameraActivatedByAR.current = false;
+
       if (xrSession) {
         try {
           await xrSession.end();
@@ -1389,14 +1409,26 @@ In your very first response or greeting to the user, you MUST casually and natur
           {/* AR Hologram Button */}
           <button
             onClick={toggleAR}
-            className={`p-2 rounded-full border transition-all cursor-pointer pointer-events-auto flex items-center justify-center ${
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
               isARMode
-                ? "bg-gradient-to-r from-cyan-500 to-teal-500 border-cyan-400/50 text-white shadow-lg shadow-cyan-500/35 animate-pulse"
+                ? isCameraActive
+                  ? "bg-gradient-to-r from-cyan-500 to-teal-500 border-cyan-400/50 text-white shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse"
+                  : "bg-cyan-950/80 border-cyan-700/50 text-cyan-500 shadow-none"
                 : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
             }`}
             title={isARMode ? "Deactivate AR Mode" : "Activate AR Hologram Mode"}
           >
-            <Box size={18} className={isARMode ? "animate-spin" : ""} style={{ animationDuration: isARMode ? "8s" : undefined }} />
+            <Box 
+              size={18} 
+              className={`transition-all duration-300 ${
+                isARMode 
+                  ? isCameraActive 
+                    ? "animate-spin text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" 
+                    : "text-cyan-600 opacity-60" 
+                  : ""
+              }`} 
+              style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
+            />
           </button>
 
           {/* PiP Elegant Icon Button */}
