@@ -1794,15 +1794,18 @@ In your very first response or greeting to the user, you MUST casually and natur
             onSubmit={handleTextSubmit}
             style={{
               zIndex: isChatMaximized ? 999 : 40,
+              transform: isChatMaximized ? "none" : undefined,
             }}
             className={
               isChatMaximized
                 ? "fixed inset-0 w-screen h-screen flex flex-col pointer-events-auto p-6 md:p-8 transition-all duration-300 ease-in-out"
-                : "fixed bottom-28 right-6 md:right-12 w-[calc(100%-3rem)] md:w-[45%] max-w-[90vw] md:max-w-[45vw] h-[400px] flex flex-col pointer-events-auto rounded-2xl p-4 transition-all duration-300 ease-in-out"
+                : "fixed bottom-32 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] md:w-[45%] max-w-[90vw] md:max-w-[45vw] h-[150px] flex flex-col pointer-events-auto rounded-2xl p-2.5 transition-all duration-300 ease-in-out"
             }
           >
             <div 
-              className={`relative w-full h-full rounded-2xl p-4 backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col min-h-0 ${
+              className={`relative w-full h-full rounded-2xl backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col min-h-0 ${
+                isChatMaximized ? "p-4" : "p-2.5"
+              } ${
                 isGhostMode
                   ? "bg-black/90 border border-red-500/90 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                   : isARMode 
@@ -1811,9 +1814,9 @@ In your very first response or greeting to the user, you MUST casually and natur
               }`}
             >
               {/* Header section with toggle full-screen and close buttons */}
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 shrink-0">
-                <span className="text-xs font-mono text-red-500 font-bold tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block animate-ping"></span>
+              <div className="flex items-center justify-between pb-1 mb-1 border-b border-white/10 shrink-0">
+                <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
+                  <span className="w-1 h-1 rounded-full bg-red-500 inline-block animate-ping"></span>
                   {isChatMaximized ? "Zoya Console - Maximized" : "Zoya Console"}
                 </span>
                 
@@ -1822,10 +1825,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => setIsChatMaximized(!isChatMaximized)}
-                    className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
+                    className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
                     title={isChatMaximized ? "Restore Size" : "Maximize Chat"}
                   >
-                    {isChatMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    {isChatMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
                   </button>
                   
                   {/* Close button */}
@@ -1841,17 +1844,17 @@ In your very first response or greeting to the user, you MUST casually and natur
                       setShowChat(false);
                       setIsChatMaximized(false);
                     }}
-                    className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
+                    className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
                     title="Close Chat"
                   >
-                    <X size={14} />
+                    <X size={13} />
                   </button>
                 </div>
               </div>
 
               {/* Chat History Display Area */}
-              <div className="flex-1 overflow-y-auto scrollbar-hide pr-1 pb-2 flex flex-col min-h-0">
-                <div className="flex flex-col gap-3 mt-auto w-full">
+              <div className="flex-1 overflow-y-auto scrollbar-hide pr-1 pb-1 flex flex-col min-h-0">
+                <div className="flex flex-col gap-2 mt-auto w-full">
                   <AnimatePresence initial={false}>
                     {messages.map((msg) => {
                       const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
@@ -1860,15 +1863,15 @@ In your very first response or greeting to the user, you MUST casually and natur
                       return (
                         <motion.div
                           key={msg.id}
-                          initial={{ opacity: 0, y: 15 }}
+                          initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ duration: 0.2, ease: "easeOut" }}
+                          transition={{ duration: 0.15, ease: "easeOut" }}
                           className={`flex flex-col max-w-[85%] min-h-0 ${
                             msg.sender === "user" ? "self-end items-end" : "self-start items-start"
                           }`}
                         >
-                          <div className={`px-3 py-2 rounded-2xl text-xs md:text-sm border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
+                          <div className={`px-2.5 py-1.5 rounded-xl text-[11px] md:text-xs border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
                             msg.isError
                               ? "bg-red-950/85 border-red-500/50 text-red-200 font-sans shadow-[0_0_12px_rgba(239,68,68,0.25)]"
                               : msg.sender === "user" 
@@ -1883,13 +1886,13 @@ In your very first response or greeting to the user, you MUST casually and natur
                               <img 
                                 src={msg.image || (msg as any).imageUrl} 
                                 alt="Camera snap" 
-                                className="max-w-[140px] max-h-[100px] rounded-lg mb-2 border border-white/20 object-cover shadow h-fit w-fit min-h-0"
+                                className="max-w-[120px] max-h-[80px] rounded-lg mb-1 border border-white/20 object-cover shadow h-fit w-fit min-h-0"
                                 referrerPolicy="no-referrer"
                               />
                             )}
                             {msg.text}
                           </div>
-                          <span className={`text-[9px] opacity-40 mt-0.5 px-2 font-mono uppercase tracking-widest ${
+                          <span className={`text-[8px] opacity-40 mt-0.5 px-1.5 font-mono uppercase tracking-widest ${
                             isGhostMode ? "text-rose-400" : ""
                           }`}>
                             {msg.sender === "user" ? "Riyajul" : "Zoya"}
@@ -1908,7 +1911,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               </div>
 
               {/* Compact Input Bar */}
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/10 shrink-0">
+              <div className="flex items-center gap-1.5 mt-1 pt-1.5 border-t border-white/10 shrink-0">
                 <textarea
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
@@ -1919,33 +1922,33 @@ In your very first response or greeting to the user, you MUST casually and natur
                     }
                   }}
                   placeholder="Type a message..."
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50 resize-y min-h-[36px] max-h-[250px] overflow-y-auto leading-normal"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-[11px] text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50 resize-none min-h-[28px] max-h-[120px] overflow-y-auto leading-normal"
                   rows={1}
                 />
                 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={toggleInputDictation}
-                    className={`p-1.5 rounded-lg transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                    className={`p-1.5 rounded-md transition-all duration-300 cursor-pointer flex items-center justify-center ${
                       isInputMicActive
                         ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105 animate-pulse"
                         : "text-white/60 hover:text-white hover:bg-white/10"
                     }`}
                     title="Dictate message (Speech to Text)"
                   >
-                    <Mic size={14} />
+                    <Mic size={13} />
                   </button>
                   <button 
                     type="submit"
                     disabled={!textInput.trim()}
-                    className={`p-1.5 rounded-lg disabled:opacity-50 transition-all duration-300 cursor-pointer ${
+                    className={`p-1.5 rounded-md disabled:opacity-50 transition-all duration-300 cursor-pointer ${
                       isGhostMode
                         ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 text-white"
                         : "bg-red-600 hover:bg-red-500 disabled:bg-neutral-800 disabled:text-white/30 text-white"
                     }`}
                   >
-                    <Send size={14} />
+                    <Send size={13} />
                   </button>
                 </div>
               </div>
