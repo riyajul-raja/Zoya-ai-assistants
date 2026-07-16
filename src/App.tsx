@@ -787,14 +787,20 @@ export default function App() {
           )}
           <button
             onClick={toggleGlobePiP}
-            className={`p-2 rounded-full border transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer pointer-events-auto flex items-center justify-center ${
+            id="pip-toggle-btn"
+            style={{ zIndex: 9999 }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-mono font-bold tracking-wider cursor-pointer pointer-events-auto transition-all shadow-lg select-none ${
               isGlobePiPActive
-                ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-violet-500/20"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
+                ? "bg-gradient-to-r from-pink-500 to-violet-600 border-violet-400 text-white shadow-violet-500/50 scale-105"
+                : "bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 border-pink-400 text-white shadow-pink-500/30"
             }`}
             title={isGlobePiPActive ? "Exit Floating Core Mode" : "Floating Core Mode (Picture-in-Picture)"}
           >
-            <PictureInPicture size={18} className={isGlobePiPActive ? "animate-pulse" : ""} />
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGlobePiPActive ? "animate-pulse text-white" : "text-white"}>
+              <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
+              <rect width="20" height="14" x="2" y="3" rx="2" />
+            </svg>
+            <span>PIP CORE</span>
           </button>
           <button
             onClick={() => setIsMuted(!isMuted)}
