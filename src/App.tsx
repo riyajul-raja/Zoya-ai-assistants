@@ -789,6 +789,24 @@ export default function App() {
               <span className="text-xs font-mono tracking-wide">Delete all history</span>
             </button>
           )}
+          
+          {/* PiP Elegant Icon Button */}
+          <button
+            onClick={handlePiP}
+            style={{ zIndex: 9999 }}
+            className={`p-2 rounded-full border transition-all cursor-pointer pointer-events-auto flex items-center justify-center ${
+              isGlobePiPActive
+                ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-lg shadow-violet-500/20"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
+            }`}
+            title={isGlobePiPActive ? "Exit Floating Core Mode" : "Floating Core Mode (Picture-in-Picture)"}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGlobePiPActive ? "animate-pulse" : ""}>
+              <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
+              <rect width="20" height="14" x="2" y="3" rx="2" />
+            </svg>
+          </button>
+
           <button
             onClick={() => setIsMuted(!isMuted)}
             className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/25 text-white cursor-pointer pointer-events-auto"
@@ -994,38 +1012,21 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Floating Action Button for 3D Globe Picture-in-Picture */}
-      <button
-        onClick={handlePiP}
-        id="pip-fab-btn"
-        style={{
-          position: "fixed",
-          bottom: "20vh",
-          right: "5vw",
-          zIndex: 999999,
-          backgroundColor: "#ff0055",
-          color: "white",
-          padding: "15px 30px",
-          fontSize: "18px",
-          borderRadius: "10px",
-          border: "3px solid white",
-          boxShadow: "0px 0px 20px #ff0055",
-        }}
-        className="cursor-pointer pointer-events-auto hover:scale-105 active:scale-95 transition-all font-bold tracking-wider select-none flex items-center justify-center gap-2"
-        title="Floating Core Mode (Picture-in-Picture)"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGlobePiPActive ? "animate-pulse" : ""}>
-          <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
-          <rect width="20" height="14" x="2" y="3" rx="2" />
-        </svg>
-        <span>FLOAT 3D</span>
-      </button>
-
       {/* Hidden video element for 3D Globe Picture-in-Picture */}
       <video
         ref={globePiPVideoRef}
         id="zoya-globe-pip-video"
-        className="hidden"
+        style={{
+          position: "fixed",
+          pointerEvents: "none",
+          width: "1px",
+          height: "1px",
+          opacity: 0,
+          background: "transparent",
+          backgroundColor: "transparent",
+          border: "none",
+          outline: "none",
+        }}
         muted
         playsInline
       />

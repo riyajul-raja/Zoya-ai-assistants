@@ -340,15 +340,27 @@ export default function Globe3D({ state }: Globe3DProps) {
         renderables[i].draw(ctx);
       }
 
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
       animationFrameIdRef.current = requestAnimationFrame(render);
     };
 
     render();
 
+    // Fallback interval to ensure constant rendering even when the window is in the background
+    // or when Picture-in-Picture is active (as requestAnimationFrame is throttled or paused by the browser when hidden)
+    const fallbackIntervalId = setInterval(() => {
+      if (document.visibilityState === "hidden" || document.pictureInPictureElement) {
+        render();
+      }
+    }, 33);
+
     return () => {
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
+      clearInterval(fallbackIntervalId);
     };
   }, [dimensions, state]);
 
