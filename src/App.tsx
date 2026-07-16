@@ -1250,6 +1250,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           .join("");
         
         if (transcript.trim()) {
+          // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
           setTextInput((prev) => {
             const trimmedPrev = prev.trim();
             return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
