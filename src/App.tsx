@@ -14,6 +14,7 @@ type AppState = "idle" | "listening" | "processing" | "speaking";
 interface ChatMessage {
   id: string;
   sender: "user" | "zoya";
+  role?: "user" | "model";
   text: string;
   image?: string;
   isError?: boolean;
@@ -727,11 +728,11 @@ In your very first response or greeting to the user, you MUST casually and natur
               } else {
                 const newId = Date.now().toString() + "-zoya";
                 currentZoyaMessageId = newId;
-                return [...prev, { id: newId, sender: "zoya", text }];
+                return [...prev, { id: newId, sender: "zoya", role: "model", text }];
               }
             });
           } else {
-            setMessages((prev) => [...prev, { id: Date.now().toString() + "-user", sender: "user", text }]);
+            setMessages((prev) => [...prev, { id: Date.now().toString() + "-user", sender: "user", role: "user", text }]);
           }
         };
         
@@ -813,6 +814,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       {
         id: Date.now().toString(),
         sender: "user",
+        role: "user",
         text: finalTranscript,
         image: capturedImageBase64 ? `data:image/jpeg;base64,${capturedImageBase64}` : undefined,
       },
@@ -833,7 +835,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
     if (commandResult.isBrowserAction) {
       responseText = commandResult.action;
-      setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", text: responseText }]);
+      setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", role: "model", text: responseText }]);
       
       if (!isMuted) {
         setAppState("speaking");
@@ -860,7 +862,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       // Append an initial message for Zoya with empty text so that the UI updates in real-time
       setMessages((prev) => [
         ...prev,
-        { id: responseMessageId, sender: "zoya", text: "" }
+        { id: responseMessageId, sender: "zoya", role: "model", text: "" }
       ]);
 
       try {
