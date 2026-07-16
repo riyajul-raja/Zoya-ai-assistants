@@ -91,6 +91,8 @@ export default function App() {
 
   const [showChat, setShowChat] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [isInputMicActive, setIsInputMicActive] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
 
@@ -1214,10 +1216,76 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
+  const toggleInputDictation = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
+      return;
+    }
+
+    if (isInputMicActive) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (err) {}
+      }
+      setIsInputMicActive(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN";
+
+      recognition.onstart = () => {
+        setIsInputMicActive(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0])
+          .map((result) => result.transcript)
+          .join("");
+        
+        if (transcript.trim()) {
+          setTextInput((prev) => {
+            const trimmedPrev = prev.trim();
+            return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
+          });
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsInputMicActive(false);
+      };
+
+      recognition.onend = () => {
+        setIsInputMicActive(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.error("Speech recognition initialization error:", e);
+      setIsInputMicActive(false);
+    }
+  };
+
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!textInput.trim()) return;
     
+    // Stop voice dictation if active
+    if (isInputMicActive && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {}
+      setIsInputMicActive(false);
+    }
+
     handleTextCommand(textInput);
     setTextInput("");
   };
@@ -1668,7 +1736,16 @@ In your very first response or greeting to the user, you MUST casually and natur
               {/* Close Button at top-right of the chat area */}
               <div className="w-full flex justify-end mb-2 pointer-events-auto">
                 <button
-                  onClick={() => setShowChat(false)}
+                  onClick={() => {
+                    // Stop voice dictation if active
+                    if (isInputMicActive && recognitionRef.current) {
+                      try {
+                        recognitionRef.current.stop();
+                      } catch (err) {}
+                      setIsInputMicActive(false);
+                    }
+                    setShowChat(false);
+                  }}
                   className="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all shadow-lg backdrop-blur-md flex items-center justify-center hover:scale-105 active:scale-95 cursor-pointer"
                   title="Close Chat"
                 >
@@ -1788,6 +1865,18 @@ In your very first response or greeting to the user, you MUST casually and natur
                 className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm"
                 autoFocus
               />
+              <button
+                type="button"
+                onClick={toggleInputDictation}
+                className={`p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                  isInputMicActive
+                    ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 animate-pulse scale-105"
+                    : "text-white/60 hover:text-white hover:bg-white/10"
+                }`}
+                title="Dictate message (Speech to Text)"
+              >
+                <Mic size={16} />
+              </button>
               <button 
                 type="submit"
                 disabled={!textInput.trim()}
