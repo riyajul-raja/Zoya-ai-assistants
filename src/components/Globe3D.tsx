@@ -359,6 +359,7 @@ export default function Globe3D({ state }: Globe3DProps) {
     >
       <canvas 
         ref={canvasRef} 
+        id="zoya-globe-canvas"
         style={{
           width: `${dimensions.width}px`,
           height: `${dimensions.height}px`,

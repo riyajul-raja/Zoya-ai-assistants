@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -138,6 +138,74 @@ export default function App() {
     } catch (err: any) {
       console.error("Picture-in-Picture failed:", err);
       alert(`Could not toggle Picture-in-Picture: ${err?.message || "Unknown error"}`);
+    }
+  };
+
+  // 3D Globe Visualizer Picture-in-Picture states
+  const [isGlobePiPActive, setIsGlobePiPActive] = useState(false);
+  const globePiPVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = globePiPVideoRef.current;
+    if (!video) return;
+
+    const handleEnterPiP = () => setIsGlobePiPActive(true);
+    const handleLeavePiP = () => {
+      setIsGlobePiPActive(false);
+      // Stop the stream tracks to save resources
+      const stream = video.srcObject as MediaStream;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      video.srcObject = null;
+    };
+
+    video.addEventListener("enterpictureinpicture", handleEnterPiP);
+    video.addEventListener("leavepictureinpicture", handleLeavePiP);
+
+    return () => {
+      video.removeEventListener("enterpictureinpicture", handleEnterPiP);
+      video.removeEventListener("leavepictureinpicture", handleLeavePiP);
+    };
+  }, []);
+
+  const toggleGlobePiP = async () => {
+    const video = globePiPVideoRef.current;
+    if (!video) return;
+
+    try {
+      if (document.pictureInPictureElement) {
+        // Exit active Picture-in-Picture mode
+        await document.exitPictureInPicture();
+      } else {
+        const canvas = document.getElementById("zoya-globe-canvas") as HTMLCanvasElement;
+        if (!canvas) {
+          alert("3D visualizer canvas not found yet.");
+          return;
+        }
+
+        // Capture canvas stream at 30fps
+        const captureStreamFn = canvas.captureStream || (canvas as any).mozCaptureStream;
+        if (!captureStreamFn) {
+          alert("Your browser does not support canvas stream capture for Picture-in-Picture.");
+          return;
+        }
+
+        const stream = captureStreamFn.call(canvas, 30);
+        video.srcObject = stream;
+
+        // Play the video stream first
+        await video.play();
+
+        if (document.pictureInPictureEnabled && video.requestPictureInPicture) {
+          await video.requestPictureInPicture();
+        } else {
+          alert("Picture-in-Picture is not supported by your browser.");
+        }
+      }
+    } catch (err: any) {
+      console.error("3D Globe Picture-in-Picture failed:", err);
+      alert(`Could not toggle Floating Mode: ${err?.message || "Unknown error"}`);
     }
   };
 
@@ -684,7 +752,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="absolute top-0 left-0 w-full flex justify-between items-center z-20 shrink-0 px-6 py-4 md:px-12 md:py-6">
+      <header className="absolute top-0 left-0 w-full flex justify-between items-center z-50 shrink-0 px-6 py-4 md:px-12 md:py-6 pointer-events-auto">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-sm">
             Z
@@ -718,14 +786,25 @@ export default function App() {
             </button>
           )}
           <button
+            onClick={toggleGlobePiP}
+            className={`p-2 rounded-full border transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              isGlobePiPActive
+                ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-violet-500/20"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
+            }`}
+            title={isGlobePiPActive ? "Exit Floating Core Mode" : "Floating Core Mode (Picture-in-Picture)"}
+          >
+            <PictureInPicture size={18} className={isGlobePiPActive ? "animate-pulse" : ""} />
+          </button>
+          <button
             onClick={() => setIsMuted(!isMuted)}
-            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/25 text-white cursor-pointer pointer-events-auto"
             title={isMuted ? "Unmute" : "Mute"}
           >
             {isMuted ? (
-              <VolumeX size={18} className="opacity-70" />
+              <VolumeX size={18} className="opacity-95" />
             ) : (
-              <Volume2 size={18} className="opacity-70" />
+              <Volume2 size={18} className="opacity-95" />
             )}
           </button>
         </div>
@@ -921,6 +1000,15 @@ export default function App() {
           </button>
         </div>
       </footer>
+
+      {/* Hidden video element for 3D Globe Picture-in-Picture */}
+      <video
+        ref={globePiPVideoRef}
+        id="zoya-globe-pip-video"
+        className="hidden"
+        muted
+        playsInline
+      />
     </div>
   );
 }
