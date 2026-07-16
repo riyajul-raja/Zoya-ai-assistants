@@ -449,8 +449,9 @@ export default function App() {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, appState]);
+    const timer = setTimeout(scrollToBottom, 80);
+    return () => clearTimeout(timer);
+  }, [messages, appState, showChat]);
 
   const handleTextCommand = useCallback(async (finalTranscript: string) => {
     if (!finalTranscript.trim()) {
@@ -908,41 +909,43 @@ export default function App() {
               </div>
 
               {/* Chat list */}
-              <div className="w-full max-h-[calc(100%-3rem)] overflow-y-auto scrollbar-hide flex flex-col gap-3 pointer-events-auto pr-2 pb-4">
-                <AnimatePresence initial={false}>
-                  {messages.map((msg) => (
-                    <motion.div
-                      key={msg.id}
-                      initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                      className={`flex flex-col max-w-[85%] ${
-                        msg.sender === "user" ? "self-end items-end" : "self-start items-start"
-                      }`}
-                    >
-                      <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg ${
-                        msg.sender === "user" 
-                          ? "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
-                          : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
-                      }`}>
-                        {msg.image && (
-                          <img 
-                            src={msg.image} 
-                            alt="Camera snap" 
-                            className="max-w-[180px] max-h-[140px] rounded-lg mb-2 border border-white/20 object-cover shadow"
-                            referrerPolicy="no-referrer"
-                          />
-                        )}
-                        {msg.text}
-                      </div>
-                      <span className="text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest">
-                        {msg.sender === "user" ? "Riyajul" : "Zoya"}
-                      </span>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                <div ref={messagesEndRef} />
+              <div className="w-full max-h-[calc(100%-3rem)] overflow-y-auto scrollbar-hide flex flex-col pointer-events-auto pr-2 pb-4 scroll-smooth">
+                <div className="flex flex-col gap-3 mt-auto w-full">
+                  <AnimatePresence initial={false}>
+                    {messages.map((msg) => (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className={`flex flex-col max-w-[85%] ${
+                          msg.sender === "user" ? "self-end items-end" : "self-start items-start"
+                        }`}
+                      >
+                        <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit ${
+                          msg.sender === "user" 
+                            ? "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
+                            : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
+                        }`}>
+                          {msg.image && (
+                            <img 
+                              src={msg.image} 
+                              alt="Camera snap" 
+                              className="max-w-[180px] max-h-[140px] rounded-lg mb-2 border border-white/20 object-cover shadow h-fit w-fit"
+                              referrerPolicy="no-referrer"
+                            />
+                          )}
+                          {msg.text}
+                        </div>
+                        <span className="text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest">
+                          {msg.sender === "user" ? "Riyajul" : "Zoya"}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
             </motion.div>
           )}
