@@ -160,6 +160,58 @@ In your very first response or greeting to the user, you MUST casually and natur
     fetchEnvironmentAwareness();
   }, [fetchEnvironmentAwareness]);
 
+  // Screen Wake Lock API lifecycle
+  const wakeLockRef = useRef<any>(null);
+
+  useEffect(() => {
+    async function requestWakeLock() {
+      if (!("wakeLock" in navigator)) {
+        console.warn("Screen Wake Lock API is not supported in this browser.");
+        return;
+      }
+      try {
+        if (wakeLockRef.current) {
+          return;
+        }
+        const lock = await (navigator as any).wakeLock.request("screen");
+        wakeLockRef.current = lock;
+        console.log("Screen Wake Lock acquired.");
+        
+        lock.addEventListener("release", () => {
+          console.log("Screen Wake Lock released by system/browser.");
+          wakeLockRef.current = null;
+        });
+      } catch (err) {
+        console.warn("Failed to acquire Screen Wake Lock:", err);
+      }
+    }
+
+    async function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        await requestWakeLock();
+      }
+    }
+
+    // Request wake lock initially
+    requestWakeLock();
+
+    // Re-acquire lock when app becomes visible again (returned from background)
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release()
+          .then(() => {
+            console.log("Screen Wake Lock released in component cleanup.");
+          })
+          .catch((err: any) => {
+            console.warn("Error releasing Screen Wake Lock during cleanup:", err);
+          });
+      }
+    };
+  }, []);
+
   // Camera states
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
