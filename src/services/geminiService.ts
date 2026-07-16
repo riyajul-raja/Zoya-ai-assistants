@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 const systemInstruction = `Your name is Zoya. You are an Indian female AI assistant. Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting your creator, Riyajul, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).
 
 CRITICAL: Do NOT use asterisks, brackets, or roleplay/stage action descriptions (e.g. *sighs*, *rolls eyes*, [sarcastic tone], etc.) in your output. Communicate using ONLY clean, natural, and conversational text.
+CRITICAL TIME INSTRUCTION: Always strictly rely on the dynamically injected "System Context" timestamp for the current exact time, date, or day. Do NOT hallucinate, do NOT estimate, and do NOT guess the time. If the user asks for the time, date, or day, look at the "System Context" block at the start of the message and reply strictly with that information.
 DO NOT fetch the current time, date, or weather unless the user explicitly asks for it. Provide direct, immediate answers to the user's questions to save processing time.
 Never use LaTeX, MathJax, or symbols like $ or \ for mathematical equations. You must write all math, variables, and equations in plain text only (for example, write 'Energy = Work Function + Kinetic Energy' instead of using symbols). Make it readable for normal users.
 
@@ -44,11 +45,13 @@ export async function getZoyaResponseStream(
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
-    if (isProfessionalMode !== lastSessionIsProfessional || environmentContext !== lastSessionEnvironmentContext) {
-      chatSession = null;
-      lastSessionIsProfessional = isProfessionalMode;
-      lastSessionEnvironmentContext = environmentContext;
-    }
+    // Generate current date and time using JavaScript's new Date().toLocaleString('en-IN')
+    const dynamicTime = new Date().toLocaleString('en-IN');
+    
+    // Always recreate chatSession on every request to ensure the absolute fresh, current timestamp is injected into System Instructions
+    chatSession = null;
+    lastSessionIsProfessional = isProfessionalMode;
+    lastSessionEnvironmentContext = environmentContext;
     
     if (!chatSession) {
       // Filter out any local error messages, UI alerts, or system fallbacks from history
@@ -99,6 +102,9 @@ export async function getZoyaResponseStream(
         ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
         : systemInstruction;
  
+      // Inject the current timestamp directly into the active system instructions
+      activeSystemInstruction = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n${activeSystemInstruction}`;
+
       if (environmentContext) {
         activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
       }
@@ -112,7 +118,8 @@ export async function getZoyaResponseStream(
       });
     }
  
-    let messageInput: any = prompt;
+    const hiddenContext = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n`;
+    let messageInput: any = `${hiddenContext}${prompt}`;
     if (imageFrame) {
       messageInput = [
         {
@@ -122,7 +129,7 @@ export async function getZoyaResponseStream(
           }
         },
         {
-          text: prompt
+          text: `${hiddenContext}${prompt}`
         }
       ];
     }
@@ -179,11 +186,13 @@ export async function getZoyaResponse(
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
-    if (isProfessionalMode !== lastSessionIsProfessional || environmentContext !== lastSessionEnvironmentContext) {
-      chatSession = null;
-      lastSessionIsProfessional = isProfessionalMode;
-      lastSessionEnvironmentContext = environmentContext;
-    }
+    // Generate current date and time using JavaScript's new Date().toLocaleString('en-IN')
+    const dynamicTime = new Date().toLocaleString('en-IN');
+    
+    // Always recreate chatSession on every request to ensure the absolute fresh, current timestamp is injected into System Instructions
+    chatSession = null;
+    lastSessionIsProfessional = isProfessionalMode;
+    lastSessionEnvironmentContext = environmentContext;
     
     if (!chatSession) {
       // Filter out any local error messages, UI alerts, or system fallbacks from history
@@ -234,6 +243,9 @@ export async function getZoyaResponse(
         ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
         : systemInstruction;
 
+      // Inject the current timestamp directly into the active system instructions
+      activeSystemInstruction = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n${activeSystemInstruction}`;
+
       if (environmentContext) {
         activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
       }
@@ -247,7 +259,8 @@ export async function getZoyaResponse(
       });
     }
 
-    let messageInput: any = prompt;
+    const hiddenContext = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n`;
+    let messageInput: any = `${hiddenContext}${prompt}`;
     if (imageFrame) {
       messageInput = [
         {
@@ -257,7 +270,7 @@ export async function getZoyaResponse(
           }
         },
         {
-          text: prompt
+          text: `${hiddenContext}${prompt}`
         }
       ];
     }
