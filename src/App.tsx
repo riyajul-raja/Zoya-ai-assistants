@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -84,6 +84,111 @@ export default function App() {
   const [textInput, setTextInput] = useState("");
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
+
+  // Biometric Security Lock Screen states
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [unlockStatus, setUnlockStatus] = useState<"awaiting" | "granted" | "failed">("awaiting");
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdTimerRef = useRef<any>(null);
+
+  const handleUnlockSuccess = () => {
+    setUnlockStatus("granted");
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    setHoldProgress(100);
+    setTimeout(() => {
+      setIsUnlocked(true);
+    }, 1000);
+  };
+
+  const triggerBiometrics = async () => {
+    if (unlockStatus === "granted") return;
+    if (navigator.credentials && navigator.credentials.create) {
+      try {
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        
+        const options: CredentialCreationOptions = {
+          publicKey: {
+            challenge: challenge,
+            rp: {
+              name: "Zoya Assistant",
+              id: window.location.hostname || "localhost"
+            },
+            user: {
+              id: new Uint8Array([1, 2, 3, 4]),
+              name: "Boss",
+              displayName: "Boss"
+            },
+            pubKeyCredParams: [
+              { type: "public-key", alg: -7 },
+              { type: "public-key", alg: -257 }
+            ],
+            timeout: 10000,
+            authenticatorSelection: {
+              authenticatorAttachment: "platform",
+              userVerification: "required"
+            }
+          }
+        };
+        
+        console.log("Requesting Biometrics credential...");
+        await navigator.credentials.create(options);
+        handleUnlockSuccess();
+      } catch (err: any) {
+        console.warn("Biometrics error / Not supported / Cancelled:", err);
+        setUnlockStatus("failed");
+        setTimeout(() => setUnlockStatus("awaiting"), 2000);
+      }
+    } else {
+      console.warn("navigator.credentials is not supported.");
+      setUnlockStatus("failed");
+      setTimeout(() => setUnlockStatus("awaiting"), 2000);
+    }
+  };
+
+  const startHold = () => {
+    if (unlockStatus === "granted") return;
+    setUnlockStatus("awaiting");
+    setHoldProgress(0);
+    
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+    }
+    
+    const startTime = Date.now();
+    holdTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / 2000) * 100, 100);
+      setHoldProgress(progress);
+      
+      if (progress >= 100) {
+        clearInterval(holdTimerRef.current);
+        holdTimerRef.current = null;
+        handleUnlockSuccess();
+      }
+    }, 50);
+  };
+
+  const endHold = () => {
+    if (unlockStatus === "granted") return;
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    setHoldProgress(0);
+  };
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearInterval(holdTimerRef.current);
+      }
+    };
+  }, []);
 
   // Behavioral Mood Switcher states
   const [isProfessionalMode, setIsProfessionalMode] = useState(false);
@@ -836,11 +941,152 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   return (
     <div className="h-[100dvh] w-screen bg-[#050505] text-white flex flex-col items-center justify-between font-sans relative overflow-hidden m-0 p-0">
-      {showPermissionModal && (
-        <PermissionModal 
-          onClose={() => setShowPermissionModal(false)} 
-        />
-      )}
+      <AnimatePresence mode="wait">
+        {!isUnlocked ? (
+          <motion.div
+            key="lock-screen"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black text-white p-6 font-sans overflow-hidden"
+          >
+            {/* Sci-Fi Cinematic Grid & Glowing Nodes */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[350px] h-[350px] bg-violet-600/10 blur-[100px] rounded-full" />
+              <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 w-[350px] h-[350px] bg-pink-600/10 blur-[100px] rounded-full" />
+            </div>
+
+            <div className="z-10 flex flex-col items-center max-w-md w-full text-center space-y-12">
+              {/* Top Lock Badge */}
+              <motion.div 
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="flex flex-col items-center gap-2"
+              >
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-md shadow-inner">
+                  {unlockStatus === "granted" ? (
+                    <Unlock size={14} className="text-emerald-400 animate-bounce" />
+                  ) : (
+                    <Lock size={14} className="text-violet-400 animate-pulse" />
+                  )}
+                  <span className="text-[10px] uppercase tracking-[0.25em] font-mono text-white/60">
+                    ZOYA SECURITY GATEWAY
+                  </span>
+                </div>
+              </motion.div>
+
+              {/* Pulsing Fingerprint Container with Hold Progress Circle */}
+              <div className="relative flex items-center justify-center">
+                {/* Radial progress ring */}
+                <svg className="w-56 h-56 absolute transform -rotate-90 pointer-events-none">
+                  <circle
+                    cx="112"
+                    cy="112"
+                    r="96"
+                    className="stroke-white/[0.03] fill-none"
+                    strokeWidth="4"
+                  />
+                  <circle
+                    cx="112"
+                    cy="112"
+                    r="96"
+                    className="stroke-violet-500 fill-none transition-all duration-75"
+                    strokeWidth="4"
+                    strokeDasharray={2 * Math.PI * 96}
+                    strokeDashoffset={2 * Math.PI * 96 * (1 - holdProgress / 100)}
+                    strokeLinecap="round"
+                  />
+                </svg>
+
+                {/* Fingerprint Main Button */}
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onMouseDown={startHold}
+                  onMouseUp={endHold}
+                  onMouseLeave={endHold}
+                  onTouchStart={(e) => { e.preventDefault(); startHold(); }}
+                  onTouchEnd={endHold}
+                  onClick={triggerBiometrics}
+                  className={`w-40 h-40 rounded-full flex flex-col items-center justify-center relative cursor-pointer select-none transition-all duration-500 shadow-2xl ${
+                    unlockStatus === "granted"
+                      ? "bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.3)]"
+                      : unlockStatus === "failed"
+                      ? "bg-red-500/10 border border-red-500/50 text-red-400 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-shake"
+                      : holdProgress > 0
+                      ? "bg-violet-600/20 border border-violet-500/40 text-violet-300 shadow-[0_0_40px_rgba(139,92,246,0.2)]"
+                      : "bg-white/[0.02] border border-white/10 hover:border-white/20 text-white/80 hover:text-white"
+                  }`}
+                >
+                  {/* Sweeping Scanner laser line */}
+                  {unlockStatus === "awaiting" && (
+                    <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent shadow-[0_0_12px_rgba(139,92,246,0.8)] animate-scanner top-0 pointer-events-none" />
+                  )}
+
+                  <Fingerprint 
+                    size={64} 
+                    className={`transition-transform duration-300 ${
+                      holdProgress > 0 ? "scale-110" : ""
+                    } ${unlockStatus === "granted" ? "animate-pulse" : ""}`}
+                  />
+
+                  {/* Hold Helper text overlaid inside the button */}
+                  <span className="absolute bottom-6 text-[9px] font-mono tracking-widest text-white/40 uppercase pointer-events-none select-none">
+                    {holdProgress > 0 ? `${Math.round(holdProgress)}%` : "TAP / HOLD"}
+                  </span>
+                </motion.button>
+              </div>
+
+              {/* Text Area */}
+              <div className="space-y-3">
+                <motion.h2 
+                  key={unlockStatus}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`text-lg md:text-xl font-mono tracking-[0.2em] uppercase font-bold transition-colors duration-300 ${
+                    unlockStatus === "granted"
+                      ? "text-emerald-400 font-sans tracking-wide"
+                      : unlockStatus === "failed"
+                      ? "text-red-400"
+                      : "text-violet-100"
+                  }`}
+                >
+                  {unlockStatus === "granted" ? (
+                    "ACCESS GRANTED - WELCOME BOSS"
+                  ) : unlockStatus === "failed" ? (
+                    "AUTHORIZATION FAILED"
+                  ) : holdProgress > 0 ? (
+                    "SCANNING BIOMETRICS..."
+                  ) : (
+                    "BIOMETRIC LOCK: AWAITING AUTHORIZATION"
+                  )}
+                </motion.h2>
+
+                <p className="text-xs text-white/40 font-mono tracking-wide max-w-xs mx-auto leading-relaxed">
+                  {unlockStatus === "granted"
+                    ? "Syncing core subroutines and loading Zoya neural link..."
+                    : unlockStatus === "failed"
+                    ? "Verification timeout. Try again or hold fingerprint for 2 seconds."
+                    : "Tap icon to trigger system credentials, or press and hold for 2s to authorize manually."}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="main-app"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-between"
+          >
+            {showPermissionModal && (
+              <PermissionModal 
+                onClose={() => setShowPermissionModal(false)} 
+              />
+            )}
 
       {/* Cinematic Background Gradients */}
       <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
@@ -1253,6 +1499,9 @@ In your very first response or greeting to the user, you MUST casually and natur
           >
             <Shield size={14} className="text-violet-400 animate-pulse" />
             <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

@@ -25,3 +25,33 @@ html, body, #root {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+@keyframes scanner {
+  0% {
+    top: 10%;
+    opacity: 0.2;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  100% {
+    top: 10%;
+    opacity: 0.2;
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.animate-scanner {
+  animation: scanner 2.5s ease-in-out infinite;
+}
+
+.animate-shake {
+  animation: shake 0.2s ease-in-out 2;
+}
+
