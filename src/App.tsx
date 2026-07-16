@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost } from "lucide-react";
-import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
@@ -846,9 +846,29 @@ In your very first response or greeting to the user, you MUST casually and natur
       }, 1500);
     } else {
       // 2. General Chit-Chat via Gemini
+      const responseMessageId = Date.now().toString() + "-z";
+      
+      // Append an initial message for Zoya with empty text so that the UI updates in real-time
+      setMessages((prev) => [
+        ...prev,
+        { id: responseMessageId, sender: "zoya", text: "" }
+      ]);
+
       try {
-        responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64, isProfessionalMode, environmentContext);
-        setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", text: responseText }]);
+        responseText = await getZoyaResponseStream(
+          finalTranscript,
+          messagesRef.current,
+          capturedImageBase64,
+          isProfessionalMode,
+          environmentContext,
+          (currentText) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === responseMessageId ? { ...msg, text: currentText } : msg
+              )
+            );
+          }
+        );
         
         if (!isMuted) {
           setAppState("speaking");
@@ -859,6 +879,9 @@ In your very first response or greeting to the user, you MUST casually and natur
         }
       } catch (error: any) {
         console.error("Chat Error:", error);
+        // Remove the empty/incomplete message on error
+        setMessages((prev) => prev.filter((msg) => msg.id !== responseMessageId));
+
         if (error?.message === "Timeout" || error?.name === "AbortError") {
           setMessages((prev) => [
             ...prev,

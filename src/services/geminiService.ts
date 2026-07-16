@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 const systemInstruction = `Your name is Zoya. You are an Indian female AI assistant. Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting your creator, Riyajul, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).
 
 CRITICAL: Do NOT use asterisks, brackets, or roleplay/stage action descriptions (e.g. *sighs*, *rolls eyes*, [sarcastic tone], etc.) in your output. Communicate using ONLY clean, natural, and conversational text.
+DO NOT fetch the current time, date, or weather unless the user explicitly asks for it. Provide direct, immediate answers to the user's questions to save processing time.
 
 TECHNICAL CAPABILITIES YOU ARE AWARE OF:
 1. **Live Multimodal Video Feed**: You can see the user in real-time continuously over a live camera video stream, allowing you to answer questions and react/roast based on what you see.
@@ -31,6 +32,125 @@ export function resetZoyaSession() {
   lastSessionEnvironmentContext = "";
 }
 
+export async function getZoyaResponseStream(
+  prompt: string,
+  history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
+  imageFrame?: string,
+  isProfessionalMode: boolean = false,
+  environmentContext: string = "",
+  onChunk?: (text: string) => void
+): Promise<string> {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    if (isProfessionalMode !== lastSessionIsProfessional || environmentContext !== lastSessionEnvironmentContext) {
+      chatSession = null;
+      lastSessionIsProfessional = isProfessionalMode;
+      lastSessionEnvironmentContext = environmentContext;
+    }
+    
+    if (!chatSession) {
+      // SLIDING WINDOW MEMORY: Keep strictly only the last 4 messages to reduce token processing and payload size
+      const recentHistory = history.slice(-4).map((msg) => ({
+        ...msg,
+        image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
+      }));
+      
+      let formattedHistory: any[] = [];
+      let currentRole = "";
+ 
+      for (const msg of recentHistory) {
+        const role = msg.sender === "user" ? "user" : "model";
+        
+        let parts: any[] = [];
+        parts.push({ text: msg.text });
+ 
+        if (role === currentRole && formattedHistory.length > 0) {
+          formattedHistory[formattedHistory.length - 1].parts.push(...parts);
+        } else {
+          formattedHistory.push({ role, parts });
+          currentRole = role;
+        }
+      }
+ 
+      if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
+        formattedHistory.shift();
+      }
+ 
+      let activeSystemInstruction = isProfessionalMode
+        ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
+        : systemInstruction;
+ 
+      if (environmentContext) {
+        activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
+      }
+ 
+      chatSession = ai.chats.create({
+        model: "gemini-3.5-flash",
+        config: {
+          systemInstruction: activeSystemInstruction,
+        },
+        history: formattedHistory,
+      });
+    }
+ 
+    let messageInput: any = prompt;
+    if (imageFrame) {
+      messageInput = [
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: imageFrame,
+          }
+        },
+        {
+          text: prompt
+        }
+      ];
+    }
+ 
+    // Set up AbortController with a 20-second timeout
+    const originalFetch = window.fetch;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 20000);
+ 
+    try {
+      window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+        return originalFetch(input, { ...init, signal: controller.signal });
+      };
+ 
+      const responseStream = await chatSession.sendMessageStream({ message: messageInput });
+      let accumulatedText = "";
+      for await (const chunk of responseStream) {
+        if (controller.signal.aborted) {
+          throw new Error("Timeout");
+        }
+        const chunkText = chunk.text || "";
+        if (chunkText) {
+          accumulatedText += chunkText;
+          if (onChunk) {
+            onChunk(accumulatedText);
+          }
+        }
+      }
+      return accumulatedText;
+    } catch (error: any) {
+      if (error?.name === "AbortError" || controller.signal.aborted) {
+        throw new Error("Timeout");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+      window.fetch = originalFetch;
+    }
+  } catch (error) {
+    console.error("Gemini Error:", error);
+    throw error;
+  }
+}
+
 export async function getZoyaResponse(
   prompt: string,
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
@@ -48,8 +168,8 @@ export async function getZoyaResponse(
     }
     
     if (!chatSession) {
-      // SLIDING WINDOW MEMORY: Keep strictly only the last 6 messages to reduce token processing and payload size
-      const recentHistory = history.slice(-6).map((msg) => ({
+      // SLIDING WINDOW MEMORY: Keep strictly only the last 4 messages to reduce token processing and payload size
+      const recentHistory = history.slice(-4).map((msg) => ({
         ...msg,
         image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
       }));
