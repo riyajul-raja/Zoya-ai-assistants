@@ -5,6 +5,7 @@ import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
+import TypingIndicator from "./components/TypingIndicator";
 import { playPCM } from "./utils/audioUtils";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -68,6 +69,8 @@ export default function App() {
     }
     return [];
   });
+  const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesRef = useRef(messages);
 
   useEffect(() => {
@@ -849,6 +852,9 @@ In your very first response or greeting to the user, you MUST casually and natur
       // 2. General Chit-Chat via Gemini
       const responseMessageId = Date.now().toString() + "-z";
       
+      setIsTyping(true);
+      setIsLoading(true);
+      
       // Append an initial message for Zoya with empty text so that the UI updates in real-time
       setMessages((prev) => [
         ...prev,
@@ -863,6 +869,8 @@ In your very first response or greeting to the user, you MUST casually and natur
           isProfessionalMode,
           environmentContext,
           (currentText) => {
+            setIsTyping(false);
+            setIsLoading(false);
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === responseMessageId ? { ...msg, text: currentText } : msg
@@ -870,6 +878,9 @@ In your very first response or greeting to the user, you MUST casually and natur
             );
           }
         );
+        
+        setIsTyping(false);
+        setIsLoading(false);
         
         if (!isMuted) {
           setAppState("speaking");
@@ -879,6 +890,8 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         }
       } catch (error: any) {
+        setIsTyping(false);
+        setIsLoading(false);
         console.error("Chat Error:", error);
         // Remove the empty/incomplete message on error
         setMessages((prev) => prev.filter((msg) => msg.id !== responseMessageId));
@@ -1712,6 +1725,11 @@ In your very first response or greeting to the user, you MUST casually and natur
                         </motion.div>
                       );
                     })}
+                  </AnimatePresence>
+                  <AnimatePresence>
+                    {(isTyping || isLoading) && (
+                      <TypingIndicator isGhostMode={isGhostMode} />
+                    )}
                   </AnimatePresence>
                   <div ref={messagesEndRef} />
                 </div>
