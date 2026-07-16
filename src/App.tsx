@@ -1010,6 +1010,23 @@ export default function App() {
             <Keyboard size={20} />
           </button>
         </div>
+
+        {/* Developer Signature */}
+        <div 
+          id="developer-signature"
+          style={{
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            textAlign: 'center',
+            color: 'rgba(255, 255, 255, 0.4)',
+            marginTop: '4px',
+            userSelect: 'none',
+          }}
+          className="font-mono"
+        >
+          Developed by Riyajul
+        </div>
       </footer>
 
       {/* Hidden video element for 3D Globe Picture-in-Picture */}
