@@ -445,13 +445,14 @@ export default function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 100);
   };
 
   useEffect(() => {
-    const timer = setTimeout(scrollToBottom, 80);
-    return () => clearTimeout(timer);
-  }, [messages, appState, showChat]);
+    scrollToBottom();
+  }, [messages, showChat]);
 
   const handleTextCommand = useCallback(async (finalTranscript: string) => {
     if (!finalTranscript.trim()) {
@@ -912,37 +913,43 @@ export default function App() {
               <div className="w-full max-h-[calc(100%-3rem)] overflow-y-auto scrollbar-hide flex flex-col pointer-events-auto pr-2 pb-4 scroll-smooth">
                 <div className="flex flex-col gap-3 mt-auto w-full">
                   <AnimatePresence initial={false}>
-                    {messages.map((msg) => (
-                      <motion.div
-                        key={msg.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className={`flex flex-col max-w-[85%] ${
-                          msg.sender === "user" ? "self-end items-end" : "self-start items-start"
-                        }`}
-                      >
-                        <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit ${
-                          msg.sender === "user" 
-                            ? "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
-                            : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
-                        }`}>
-                          {msg.image && (
-                            <img 
-                              src={msg.image} 
-                              alt="Camera snap" 
-                              className="max-w-[180px] max-h-[140px] rounded-lg mb-2 border border-white/20 object-cover shadow h-fit w-fit"
-                              referrerPolicy="no-referrer"
-                            />
-                          )}
-                          {msg.text}
-                        </div>
-                        <span className="text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest">
-                          {msg.sender === "user" ? "Riyajul" : "Zoya"}
-                        </span>
-                      </motion.div>
-                    ))}
+                    {messages.map((msg) => {
+                      // Strict React condition: ONLY render a message bubble if it actually contains text, an image URL, or base64 image
+                      const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
+                      const hasImage = !!(msg.image || (msg as any).imageUrl);
+                      if (!hasText && !hasImage) return null;
+                      return (
+                        <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.3, ease: "easeOut" }}
+                          className={`flex flex-col max-w-[85%] min-h-0 ${
+                            msg.sender === "user" ? "self-end items-end" : "self-start items-start"
+                          }`}
+                        >
+                          <div className={`px-4 py-2.5 rounded-2xl text-sm md:text-base border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
+                            msg.sender === "user" 
+                              ? "bg-violet-600/15 border-violet-500/30 text-violet-100 rounded-br-none font-sans" 
+                              : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
+                          }`}>
+                            {(msg.image || (msg as any).imageUrl) && (
+                              <img 
+                                src={msg.image || (msg as any).imageUrl} 
+                                alt="Camera snap" 
+                                className="max-w-[180px] max-h-[140px] rounded-lg mb-2 border border-white/20 object-cover shadow h-fit w-fit min-h-0"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                            {msg.text}
+                          </div>
+                          <span className="text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest">
+                            {msg.sender === "user" ? "Riyajul" : "Zoya"}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
                   </AnimatePresence>
                   <div ref={messagesEndRef} />
                 </div>
