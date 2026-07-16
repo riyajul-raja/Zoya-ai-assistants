@@ -29,9 +29,11 @@ export class LiveSessionManager {
   private mediaStream: MediaStream | null = null;
   private processor: ScriptProcessorNode | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
+  private analyser: AnalyserNode | null = null;
   
   // Audio playback state
   private playbackContext: AudioContext | null = null;
+  private playbackAnalyser: AnalyserNode | null = null;
   private nextPlayTime: number = 0;
   private isPlaying: boolean = false;
   public isMuted: boolean = false;
@@ -44,13 +46,15 @@ export class LiveSessionManager {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
-  async start(useMic: boolean = true) {
+  async start(useMic: boolean = true, isProfessionalMode: boolean = false) {
     try {
       this.onStateChange("processing");
       
       // Initialize Audio Contexts
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.playbackContext = new AudioContextClass({ sampleRate: 24000 });
+      this.playbackAnalyser = this.playbackContext.createAnalyser();
+      this.playbackAnalyser.fftSize = 256;
       this.nextPlayTime = this.playbackContext.currentTime;
 
       if (useMic) {
@@ -68,6 +72,9 @@ export class LiveSessionManager {
         });
 
         this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 256;
+        
         this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
         this.processor.onaudioprocess = (e) => {
@@ -100,9 +107,14 @@ export class LiveSessionManager {
           }).catch(err => console.error("Error sending audio", err));
         };
 
-        this.source.connect(this.processor);
+        this.source.connect(this.analyser);
+        this.analyser.connect(this.processor);
         this.processor.connect(this.audioContext.destination);
       }
+
+      const activeSystemInstruction = isProfessionalMode
+        ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
+        : systemInstruction;
 
       // Connect to Live API
       this.sessionPromise = this.ai.live.connect({
@@ -112,7 +124,7 @@ export class LiveSessionManager {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
           },
-          systemInstruction,
+          systemInstruction: activeSystemInstruction,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
           tools: [{
@@ -231,7 +243,12 @@ export class LiveSessionManager {
       
       const source = this.playbackContext.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(this.playbackContext.destination);
+      if (this.playbackAnalyser) {
+        source.connect(this.playbackAnalyser);
+        this.playbackAnalyser.connect(this.playbackContext.destination);
+      } else {
+        source.connect(this.playbackContext.destination);
+      }
       
       const currentTime = this.playbackContext.currentTime;
       if (this.nextPlayTime < currentTime) {
@@ -306,5 +323,58 @@ export class LiveSessionManager {
         });
       }).catch(err => console.error("Error sending video frame to Live API:", err));
     }
+  }
+
+  getAudioData() {
+    let micVolume = 0;
+    let micHighEnergy = 0;
+    let speakerVolume = 0;
+    let speakerHighEnergy = 0;
+
+    // Read microphone analyser
+    if (this.analyser) {
+      const bufferLength = this.analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      this.analyser.getByteFrequencyData(dataArray);
+
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+      }
+      micVolume = sum / bufferLength;
+
+      let highSum = 0;
+      const startBin = Math.floor(bufferLength / 2);
+      for (let i = startBin; i < bufferLength; i++) {
+        highSum += dataArray[i];
+      }
+      micHighEnergy = highSum / (bufferLength - startBin);
+    }
+
+    // Read speaker/playback analyser
+    if (this.playbackAnalyser) {
+      const bufferLength = this.playbackAnalyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      this.playbackAnalyser.getByteFrequencyData(dataArray);
+
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+      }
+      speakerVolume = sum / bufferLength;
+
+      let highSum = 0;
+      const startBin = Math.floor(bufferLength / 2);
+      for (let i = startBin; i < bufferLength; i++) {
+        highSum += dataArray[i];
+      }
+      speakerHighEnergy = highSum / (bufferLength - startBin);
+    }
+
+    // Combine them (take the maximum of both) and normalize to 0-1 range
+    const volume = Math.max(micVolume, speakerVolume) / 255;
+    const highEnergy = Math.max(micHighEnergy, speakerHighEnergy) / 255;
+
+    return { volume, highEnergy };
   }
 }

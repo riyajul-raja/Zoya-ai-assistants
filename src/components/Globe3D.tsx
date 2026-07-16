@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
+import { LiveSessionManager } from "../services/liveService";
 
 type VisualizerState = "idle" | "listening" | "processing" | "speaking";
 
 interface Globe3DProps {
   state: VisualizerState;
+  liveSessionRef: React.MutableRefObject<LiveSessionManager | null>;
 }
 
 interface Point3D {
@@ -17,7 +19,7 @@ interface Renderable {
   draw: (ctx: CanvasRenderingContext2D) => void;
 }
 
-export default function Globe3D({ state }: Globe3DProps) {
+export default function Globe3D({ state, liveSessionRef }: Globe3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dimensions, setDimensions] = useState({ width: 350, height: 350 });
@@ -28,6 +30,12 @@ export default function Globe3D({ state }: Globe3DProps) {
 
   const scalePulseRef = useRef(1);
   const animationFrameIdRef = useRef<number | null>(null);
+
+  const lastTimeRef = useRef<number | null>(null);
+  const rotationAngleRef = useRef(0);
+  const beadAccumulatorRef = useRef(0);
+  const smoothedVolumeRef = useRef(0);
+  const smoothedHighEnergyRef = useRef(0);
 
   // Distribute points on the sphere surface using Fibonacci Golden Spiral
   useEffect(() => {
@@ -71,10 +79,28 @@ export default function Globe3D({ state }: Globe3DProps) {
     if (!ctx) return;
 
     const startTime = performance.now();
+    lastTimeRef.current = null;
 
     const render = () => {
       const now = performance.now();
       const elapsedSeconds = (now - startTime) / 1000;
+
+      const lastTime = lastTimeRef.current || now;
+      lastTimeRef.current = now;
+      const deltaTimeSeconds = Math.min((now - lastTime) / 1000, 0.1);
+
+      // Get real-time audio analysis if active session is available
+      let audioVolume = 0;
+      let audioHighEnergy = 0;
+      if (liveSessionRef.current) {
+        const audioData = liveSessionRef.current.getAudioData();
+        audioVolume = audioData.volume;
+        audioHighEnergy = audioData.highEnergy;
+      }
+
+      // Smooth the audio-reactive inputs to prevent animation jitter
+      smoothedVolumeRef.current += (audioVolume - smoothedVolumeRef.current) * 0.12;
+      smoothedHighEnergyRef.current += (audioHighEnergy - smoothedHighEnergyRef.current) * 0.12;
 
       // 1. Scale pulse/breathing speed based on Zoya's active state
       let pulseFreq = 2.0;
@@ -87,7 +113,6 @@ export default function Globe3D({ state }: Globe3DProps) {
         pulseFreq = 11.0;
         pulseAmp = 0.02;
       } else if (state === "speaking") {
-        const speechMod = Math.sin(elapsedSeconds * 14) * 0.5 + 0.5;
         pulseFreq = 7.5;
         pulseAmp = 0.06;
       }
@@ -95,11 +120,19 @@ export default function Globe3D({ state }: Globe3DProps) {
       // Update scale pulse/breathing
       scalePulseRef.current = 1 + Math.sin(elapsedSeconds * pulseFreq) * pulseAmp;
 
-      // One full rotation every 10 seconds: (2 * Math.PI) / 10 radians per second
-      const baseRotationAngle = (elapsedSeconds * 2 * Math.PI) / 10;
+      // Base rotation speed: 2 * Math.PI / 10 radians per second
+      const baseRotationSpeed = (2 * Math.PI) / 10;
+      // High frequency audio peaks subtly increase the rotation speed (up to 2.5x speed)
+      const rotationBoost = 1 + smoothedHighEnergyRef.current * 1.5;
+      
+      // Accumulate rotation angle frame-by-frame smoothly
+      rotationAngleRef.current += baseRotationSpeed * rotationBoost * deltaTimeSeconds;
+      
+      // Accumulate bead movement with matching speed boost
+      beadAccumulatorRef.current += 0.5 * rotationBoost * deltaTimeSeconds;
 
       // Smooth continuous Y-rotation angle for both the sphere and the rings
-      const spinY = baseRotationAngle;
+      const spinY = rotationAngleRef.current;
 
       // Cycle HSL color hue continuously from 0 to 360 over 12 seconds
       const colorHue = (elapsedSeconds * (360 / 12)) % 360;
@@ -120,7 +153,10 @@ export default function Globe3D({ state }: Globe3DProps) {
       
       // Scaled down slightly for elegant, high-end minimalist presentation
       const baseRadius = Math.min(w, h) * 0.28;
-      const sphereRadius = baseRadius * scalePulseRef.current;
+      
+      // Map audio amplitude to the 3D particle system's radius: radius scales up slightly during speaks
+      const audioScaleBonus = smoothedVolumeRef.current * 0.25;
+      const sphereRadius = baseRadius * (scalePulseRef.current + audioScaleBonus);
 
       // Shifting RGB Color definitions based on HSL color wheel
       const ringColor = `hsla(${colorHue}, 90%, 60%, `;
@@ -168,8 +204,8 @@ export default function Globe3D({ state }: Globe3DProps) {
 
         const opacityFactor = (zFinal + 1) / 2; // 0 to 1
         
-        // Crisp, ultra-small dot size: 0.5px to 0.9px radius
-        const size = 0.45 + opacityFactor * 0.45;
+        // Crisp, ultra-small dot size: 0.5px to 0.9px radius, scaled up slightly during audio peaks
+        const size = (0.45 + opacityFactor * 0.45) * (1 + smoothedVolumeRef.current * 0.5);
         const alpha = 0.12 + opacityFactor * 0.72;
 
         renderables.push({
@@ -196,8 +232,8 @@ export default function Globe3D({ state }: Globe3DProps) {
         const ringPoints3D: Point3D[] = [];
         const ringScreenCoords: { px: number; py: number }[] = [];
 
-        // Continuous spin on Y-axis completing exactly 1 rotation every 10 seconds
-        const ringSpinY = isReverse ? -baseRotationAngle : baseRotationAngle;
+        // Continuous spin on Y-axis completing rotation smoothly
+        const ringSpinY = isReverse ? -rotationAngleRef.current : rotationAngleRef.current;
 
         // Draw perfect circle in XZ plane, apply tilts & Y spin
         for (let k = 0; k <= numRingPoints; k++) {
@@ -273,7 +309,7 @@ export default function Globe3D({ state }: Globe3DProps) {
 
         // Draw glowing micro tracer beads along the rings
         for (let bIdx = 0; bIdx < numBeads; bIdx++) {
-          const beadTheta = (bIdx * 2 * Math.PI) / numBeads + (elapsedSeconds * 0.5 * (isReverse ? -1 : 1));
+          const beadTheta = (bIdx * 2 * Math.PI) / numBeads + (beadAccumulatorRef.current * (isReverse ? -1 : 1));
           const rx = Math.cos(beadTheta);
           const rz = Math.sin(beadTheta);
           const ry = 0;

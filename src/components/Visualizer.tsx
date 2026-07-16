@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import Globe3D from "./Globe3D";
+import { LiveSessionManager } from "../services/liveService";
 
 type VisualizerState = "idle" | "listening" | "processing" | "speaking";
 
 interface VisualizerProps {
   state: VisualizerState;
+  liveSessionRef: React.MutableRefObject<LiveSessionManager | null>;
 }
 
-export default function Visualizer({ state }: VisualizerProps) {
+export default function Visualizer({ state, liveSessionRef }: VisualizerProps) {
   // Synchronized color hue state matching Globe3D's 12-second color cycle perfectly
   const [hue, setHue] = useState(160);
 
@@ -121,7 +123,7 @@ export default function Visualizer({ state }: VisualizerProps) {
 
       {/* Holographic 3D Rotating Globe - now massive, unclipped and layered behind the Core Circle */}
       <div className="absolute w-[65%] h-[65%] md:w-[60%] md:h-[60%] flex items-center justify-center pointer-events-none z-0">
-        <Globe3D state={state} />
+        <Globe3D state={state} liveSessionRef={liveSessionRef} />
       </div>
 
       {/* Center Text floating cleanly with matching synchronized text shadow and breathing pulse animation */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -56,6 +56,21 @@ export default function App() {
   const [textInput, setTextInput] = useState("");
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
+
+  // Behavioral Mood Switcher states
+  const [isProfessionalMode, setIsProfessionalMode] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<any>(null);
+
+  const triggerToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  }, []);
 
   // Camera states
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -356,15 +371,16 @@ export default function App() {
         return;
       }
 
-      // If already running, check if mic requirements match
+      // If already running, check if mic requirements and professional mode match
       if (currentSession) {
         currentSession.isMuted = isMuted;
         const currentMic = (currentSession as any)._useMic;
-        if (currentMic === requiredMic) {
+        const currentProfessional = (currentSession as any)._isProfessionalMode;
+        if (currentMic === requiredMic && currentProfessional === isProfessionalMode) {
           // All good, no need to recreate
           return;
         }
-        // Restart session because mic requirement changed
+        // Restart session because mic requirement or mood changed
         currentSession.stop();
         liveSessionRef.current = null;
       }
@@ -374,6 +390,7 @@ export default function App() {
         const session = new LiveSessionManager();
         session.isMuted = isMuted;
         (session as any)._useMic = requiredMic;
+        (session as any)._isProfessionalMode = isProfessionalMode;
         liveSessionRef.current = session;
 
         session.onStateChange = (state) => {
@@ -413,7 +430,7 @@ export default function App() {
           }, 1000);
         };
 
-        await session.start(requiredMic);
+        await session.start(requiredMic, isProfessionalMode);
       } catch (err) {
         console.error("Failed to start synchronized live session:", err);
         liveSessionRef.current = null;
@@ -422,7 +439,7 @@ export default function App() {
     };
 
     manageSession();
-  }, [isCameraActive, isSessionActive, isMuted]);
+  }, [isCameraActive, isSessionActive, isMuted, isProfessionalMode]);
 
   const liveSessionRef = useRef<LiveSessionManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -522,7 +539,7 @@ export default function App() {
       }, 1500);
     } else {
       // 2. General Chit-Chat via Gemini
-      responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64);
+      responseText = await getZoyaResponse(finalTranscript, messagesRef.current, capturedImageBase64, isProfessionalMode);
       setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", text: responseText }]);
       
       if (!isMuted) {
@@ -534,7 +551,7 @@ export default function App() {
       }
       setAppState("idle");
     }
-  }, [isMuted, isSessionActive, isCameraActive]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode]);
 
   useEffect(() => {
     return () => {
@@ -790,6 +807,27 @@ export default function App() {
             </button>
           )}
           
+          {/* Mood Switcher Toggle Button */}
+          <button
+            onClick={() => {
+              const nextMode = !isProfessionalMode;
+              setIsProfessionalMode(nextMode);
+              if (nextMode) {
+                triggerToast("Professional Mode: ON");
+              } else {
+                triggerToast("Professional Mode: OFF");
+              }
+            }}
+            className={`p-2 rounded-full border transition-all cursor-pointer pointer-events-auto flex items-center justify-center ${
+              isProfessionalMode
+                ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-lg shadow-violet-500/20"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
+            }`}
+            title={isProfessionalMode ? "Professional Mode: ON (Addressing you as 'Boss')" : "Switch to Professional Mode"}
+          >
+            <Shield size={18} className={isProfessionalMode ? "animate-pulse" : ""} />
+          </button>
+
           {/* PiP Elegant Icon Button */}
           <button
             onClick={handlePiP}
@@ -845,7 +883,7 @@ export default function App() {
 
         {/* Center Visualizer (Fixed Full Screen Background) */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-          <Visualizer state={appState} />
+          <Visualizer state={appState} liveSessionRef={liveSessionRef} />
         </div>
 
         {/* Centered Scrollable Chat Messages Overlay */}
@@ -1047,6 +1085,21 @@ export default function App() {
         muted
         playsInline
       />
+
+      {/* Elegant Toast Overlay for Behavioral Mood Switcher */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-[10000] px-5 py-2.5 bg-neutral-900/90 border border-white/10 text-white rounded-full shadow-2xl backdrop-blur-md text-sm font-mono tracking-wide pointer-events-none flex items-center gap-2"
+          >
+            <Shield size={14} className="text-violet-400 animate-pulse" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

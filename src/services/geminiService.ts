@@ -22,18 +22,26 @@ DYNAMIC FEATURE MEMORY PROTOCOL:
 - [Update 2026-07-15]: Upgraded your central visualizer container to an ultra-crisp, clean minimalist 3D spherical shell inspired by the high-end IRIS AI reference. It uses 750 micro-particles (0.4px-0.8px radius), incredibly thin 3D wrapping orbital rings with flawless depth sorting/layering, and a sharp, high-tech neon green default color theme that rotates and breathes dynamically based on your state.`;
 
 let chatSession: any = null;
+let lastSessionIsProfessional: boolean | null = null;
 
 export function resetZoyaSession() {
   chatSession = null;
+  lastSessionIsProfessional = null;
 }
 
 export async function getZoyaResponse(
   prompt: string,
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
-  imageFrame?: string
+  imageFrame?: string,
+  isProfessionalMode: boolean = false
 ): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    if (isProfessionalMode !== lastSessionIsProfessional) {
+      chatSession = null;
+      lastSessionIsProfessional = isProfessionalMode;
+    }
     
     if (!chatSession) {
       // SLIDING WINDOW MEMORY: Keep only the last 20 messages to prevent "buffer full" (context window overflow)
@@ -69,10 +77,14 @@ export async function getZoyaResponse(
         formattedHistory.shift();
       }
 
+      const activeSystemInstruction = isProfessionalMode
+        ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
+        : systemInstruction;
+
       chatSession = ai.chats.create({
         model: "gemini-3.5-flash",
         config: {
-          systemInstruction,
+          systemInstruction: activeSystemInstruction,
         },
         history: formattedHistory,
       });
