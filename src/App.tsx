@@ -884,7 +884,73 @@ In your very first response or greeting to the user, you MUST casually and natur
         setMessages((prev) => prev.filter((msg) => msg.id !== responseMessageId));
 
         console.log(error);
-        const errMsg = error?.status ? `Status ${error.status}: ${error.message || ""}` : (error?.message || String(error));
+        let errMsg = "";
+        const status = error?.status || error?.statusCode || error?.code;
+        let rawMessage = error?.message || String(error);
+
+        const is503 = status === 503 || 
+                      (typeof rawMessage === "string" && (
+                        rawMessage.includes("503") || 
+                        rawMessage.toLowerCase().includes("overloaded") || 
+                        rawMessage.toLowerCase().includes("service unavailable") ||
+                        rawMessage.toLowerCase().includes("high demand")
+                      ));
+
+        if (is503) {
+          errMsg = "Server overloaded (High Demand). Please wait a few minutes.";
+        } else {
+          if (typeof rawMessage === "string") {
+            try {
+              const parsed = JSON.parse(rawMessage);
+              if (parsed?.error?.message) {
+                rawMessage = parsed.error.message;
+              } else if (parsed?.message) {
+                rawMessage = parsed.message;
+              }
+            } catch (e) {
+              try {
+                const startIdx = rawMessage.indexOf("{");
+                const endIdx = rawMessage.lastIndexOf("}");
+                if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                  const potentialJson = rawMessage.substring(startIdx, endIdx + 1);
+                  const parsedEmbedded = JSON.parse(potentialJson);
+                  if (parsedEmbedded?.error?.message) {
+                    rawMessage = parsedEmbedded.error.message;
+                  } else if (parsedEmbedded?.message) {
+                    rawMessage = parsedEmbedded.message;
+                  }
+                }
+              } catch (err2) {}
+            }
+
+            rawMessage = rawMessage
+              .replace(/\\"/g, '"')
+              .replace(/\\'/g, "'")
+              .replace(/\\n/g, " ")
+              .trim();
+
+            if (rawMessage.startsWith("{") || rawMessage.includes('{"') || rawMessage.includes('":')) {
+              rawMessage = rawMessage
+                .replace(/[\{\}\[\]"']/g, "")
+                .replace(/error\s*:/gi, "")
+                .replace(/message\s*:/gi, "")
+                .replace(/code\s*:\s*\d+/gi, "")
+                .replace(/\s+/g, " ")
+                .trim();
+            }
+          }
+          errMsg = rawMessage;
+        }
+
+        if (
+          errMsg.toLowerCase().includes("overloaded") || 
+          errMsg.toLowerCase().includes("service unavailable") || 
+          errMsg.includes("503") ||
+          errMsg.toLowerCase().includes("high demand")
+        ) {
+          errMsg = "Server overloaded (High Demand). Please wait a few minutes.";
+        }
+
         setMessages((prev) => [
           ...prev,
           {
