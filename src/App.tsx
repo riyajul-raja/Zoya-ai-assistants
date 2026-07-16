@@ -91,7 +91,6 @@ export default function App() {
   }, [isMuted]);
 
   const [showChat, setShowChat] = useState(false);
-  const [showYellowOverlay, setShowYellowOverlay] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [isInputMicActive, setIsInputMicActive] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -1227,20 +1226,6 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
-  const closeYellowOverlay = () => {
-    setShowYellowOverlay(false);
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch (err) {
-        console.error("Error aborting recognition:", err);
-      }
-    }
-    setIsInputMicActive(false);
-    setAppState("idle");
-    setIsSessionActive(false);
-  };
-
   const toggleInputDictation = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -1270,7 +1255,6 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsInputMicActive(true);
         setAppState("listening");
         setIsSessionActive(true);
-        setShowYellowOverlay(true);
       };
 
       recognition.onresult = (event: any) => {
@@ -1295,7 +1279,6 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsInputMicActive(false);
         setAppState("idle");
         setIsSessionActive(false);
-        setShowYellowOverlay(false);
         if (!speechDetected) {
           setShowChat(false);
         }
@@ -1305,7 +1288,6 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsInputMicActive(false);
         setAppState("idle");
         setIsSessionActive(false);
-        setShowYellowOverlay(false);
         if (!speechDetected) {
           setShowChat(false);
         }
@@ -1318,7 +1300,6 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsInputMicActive(false);
       setAppState("idle");
       setIsSessionActive(false);
-      setShowYellowOverlay(false);
       if (!speechDetected) {
         setShowChat(false);
       }
@@ -1515,7 +1496,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className={`absolute inset-0 w-full h-full flex flex-col items-center justify-between transition-all duration-500 ${showYellowOverlay ? "pointer-events-none select-none opacity-20 filter blur-sm" : ""}`}
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-between transition-all duration-500"
           >
             {showPermissionModal && (
               <PermissionModal 
@@ -1900,47 +1881,63 @@ In your very first response or greeting to the user, you MUST casually and natur
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               onSubmit={handleTextSubmit}
-              className={`w-full max-w-md flex items-center gap-2 rounded-full p-1 pl-4 backdrop-blur-md shadow-2xl pointer-events-auto transition-all duration-300 ${
-                isGhostMode
-                  ? "bg-black/45 border border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                  : isARMode 
-                    ? "bg-black/35 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]" 
-                    : "bg-white/5 border border-white/10"
-              }`}
+              className="w-full md:w-[50%] max-w-[90vw] md:max-w-[50vw] self-end pr-6 md:pr-12 pointer-events-auto transition-all duration-300"
             >
-              <input 
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder={isGhostMode ? "Ghost Protocol active..." : isARMode ? "Send instruction to Hologram..." : "Type a message to Zoya..."}
-                className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={toggleInputDictation}
-                className={`p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center ${
-                  isInputMicActive
-                    ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 animate-pulse scale-105"
-                    : "text-white/60 hover:text-white hover:bg-white/10"
-                }`}
-                title="Dictate message (Speech to Text)"
-              >
-                <Mic size={16} />
-              </button>
-              <button 
-                type="submit"
-                disabled={!textInput.trim()}
-                className={`p-2 rounded-full disabled:opacity-50 transition-all duration-300 cursor-pointer ${
+              <div 
+                className={`relative w-full rounded-2xl p-3 backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col ${
                   isGhostMode
-                    ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 disabled:text-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.4)] text-white"
+                    ? "bg-black/60 border border-red-500/90 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                     : isARMode 
-                      ? "bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/30 disabled:text-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.4)] text-black" 
-                      : "bg-violet-500 hover:bg-violet-600 text-white"
+                      ? "bg-black/50 border border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.3)]" 
+                      : "bg-neutral-950/80 border border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
                 }`}
               >
-                <Send size={16} />
-              </button>
+                <textarea 
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder={isGhostMode ? "Ghost Protocol active..." : isARMode ? "Send instruction to Hologram..." : "Type a message to Zoya..."}
+                  className="w-full min-h-[100px] bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm focus:ring-0 leading-relaxed font-sans"
+                  autoFocus
+                  style={{
+                    resize: "both",
+                    overflow: "auto",
+                    maxWidth: "90vw",
+                    maxHeight: "85vh",
+                  }}
+                />
+                
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10 shrink-0">
+                  <span className="text-[10px] text-red-400 font-mono tracking-widest uppercase animate-pulse">
+                    {isInputMicActive ? "● Voice Link Sync" : "Zoya Interactive Console"}
+                  </span>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={toggleInputDictation}
+                      className={`p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                        isInputMicActive
+                          ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105"
+                          : "text-white/60 hover:text-white hover:bg-white/10"
+                      }`}
+                      title="Dictate message (Speech to Text)"
+                    >
+                      <Mic size={16} />
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={!textInput.trim()}
+                      className={`p-2 rounded-full disabled:opacity-50 transition-all duration-300 cursor-pointer ${
+                        isGhostMode
+                          ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 shadow-[0_0_10px_rgba(239,68,68,0.4)] text-white"
+                          : "bg-red-600 hover:bg-red-500 disabled:bg-neutral-800 disabled:text-white/30 shadow-[0_0_10px_rgba(239,68,68,0.3)] text-white"
+                      }`}
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </motion.form>
           )}
         </AnimatePresence>
@@ -2064,85 +2061,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         )}
       </AnimatePresence>
 
-      {/* Full-Screen Yellow Overlay for Dictation/Speech Recognition */}
-      <AnimatePresence>
-        {showYellowOverlay && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="fixed inset-0 z-[9999] bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-300 text-neutral-950 flex flex-col items-center justify-center p-6 md:p-12 shadow-2xl backdrop-blur-xl pointer-events-auto select-none"
-          >
-            {/* Force Close Button (Red Cross Icon) */}
-            <button
-              onClick={closeYellowOverlay}
-              className="absolute top-6 right-6 p-4 rounded-full bg-red-500 hover:bg-red-600 border border-red-400/30 text-white shadow-xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center cursor-pointer text-xl font-bold"
-              title="Cancel & Abort Speech Recognition"
-            >
-              ❌
-            </button>
 
-            {/* Central Panel */}
-            <div className="w-full max-w-2xl flex flex-col items-center gap-8 text-center pointer-events-auto">
-              
-              {/* Pulsing Visual Wave Rings */}
-              <div className="relative flex items-center justify-center">
-                <motion.div
-                  animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                  className="absolute w-28 h-28 rounded-full bg-neutral-950/10"
-                />
-                <motion.div
-                  animate={{ scale: [1, 1.5, 1], opacity: [0.15, 0.4, 0.15] }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 0.4 }}
-                  className="absolute w-28 h-28 rounded-full bg-neutral-950/5"
-                />
-                <div className="w-16 h-16 rounded-full bg-neutral-950 text-yellow-400 flex items-center justify-center shadow-2xl relative z-10">
-                  <Mic size={28} className="animate-pulse text-amber-400" />
-                </div>
-              </div>
-
-              {/* Header Texts */}
-              <div className="space-y-2">
-                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 font-sans uppercase">
-                  Listening to Riyajul...
-                </h2>
-                <p className="text-sm md:text-base font-semibold tracking-wider text-neutral-900/60 font-mono uppercase">
-                  Zoya Voice Assistant Sync
-                </p>
-              </div>
-
-              {/* Centered Input Box Area */}
-              <div className="w-full bg-neutral-950/5 border border-neutral-950/10 rounded-3xl p-6 md:p-8 shadow-inner backdrop-blur-sm transition-all duration-300">
-                <textarea
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Your voice will appear here. Speak now..."
-                  className="w-full bg-transparent border-none outline-none resize-none text-center text-xl md:text-3xl font-extrabold text-neutral-900 placeholder:text-neutral-900/30 font-sans min-h-[140px] focus:ring-0"
-                  autoFocus
-                />
-              </div>
-
-              {/* Control Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mt-2">
-                <button
-                  onClick={() => {
-                    // Close the overlay and keep the text inside the box for manual sending
-                    setShowYellowOverlay(false);
-                    setIsInputMicActive(false);
-                    setAppState("idle");
-                    setIsSessionActive(false);
-                  }}
-                  className="w-full sm:w-auto px-8 py-3.5 bg-neutral-950 text-amber-400 hover:bg-neutral-900 hover:text-white rounded-full font-bold shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer text-sm tracking-widest uppercase"
-                >
-                  Confirm Text & Hide
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
