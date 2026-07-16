@@ -1246,12 +1246,11 @@ In your very first response or greeting to the user, you MUST casually and natur
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((result: any) => result[0])
-          .map((result) => result.transcript)
-          .join("");
+        const transcript = event.results && event.results[0] && event.results[0][0]
+          ? event.results[0][0].transcript
+          : "";
         
-        if (transcript.trim()) {
+        if (transcript && transcript.trim()) {
           // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
           setTextInput((prev) => {
             const trimmedPrev = prev.trim();
