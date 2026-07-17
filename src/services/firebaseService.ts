@@ -135,6 +135,19 @@ provider.addScope('https://www.googleapis.com/auth/meetings.space.settings');
 provider.addScope('https://www.googleapis.com/auth/keep');
 provider.addScope('https://www.googleapis.com/auth/keep.readonly');
 
+// Add Google Classroom scopes
+provider.addScope('https://www.googleapis.com/auth/classroom.courses.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.coursework.me');
+provider.addScope('https://www.googleapis.com/auth/classroom.coursework.me.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.coursework.students');
+provider.addScope('https://www.googleapis.com/auth/classroom.coursework.students.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.announcements');
+provider.addScope('https://www.googleapis.com/auth/classroom.announcements.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.rosters.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.topics.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.student-submissions.me.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.student-submissions.students.readonly');
+
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory

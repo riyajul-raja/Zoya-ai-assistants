@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -19,6 +19,7 @@ import DocsManager from "./components/DocsManager";
 import FormsManager from "./components/FormsManager";
 import MeetManager from "./components/MeetManager";
 import KeepManager from "./components/KeepManager";
+import ClassroomManager from "./components/ClassroomManager";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -131,6 +132,7 @@ export default function App() {
   const [showForms, setShowForms] = useState(false);
   const [showMeet, setShowMeet] = useState(false);
   const [showKeep, setShowKeep] = useState(false);
+  const [showClassroom, setShowClassroom] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
@@ -2018,6 +2020,21 @@ In your very first response or greeting to the user, you MUST casually and natur
             <StickyNote size={18} className={showKeep ? "animate-pulse" : ""} />
           </button>
 
+          {/* Google Classroom Toggle Button */}
+          <button
+            onClick={() => {
+              setShowClassroom(!showClassroom);
+            }}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              showClassroom
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 border-emerald-400/50 text-white shadow-[0_0_15px_rgba(16,185,129,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-emerald-400 hover:border-emerald-500/30"
+            }`}
+            title={showClassroom ? "Close Google Classroom" : "Open Google Classroom"}
+          >
+            <GraduationCap size={18} className={showClassroom ? "animate-pulse" : ""} />
+          </button>
+
           {/* Google Drive Toggle Button */}
           <button
             onClick={() => {
@@ -2619,6 +2636,15 @@ In your very first response or greeting to the user, you MUST casually and natur
       {showKeep && (
         <KeepManager
           onClose={() => setShowKeep(false)}
+          isGhostMode={isGhostMode}
+          onToast={triggerToast}
+        />
+      )}
+
+      {/* Google Classroom Manager Overlay */}
+      {showClassroom && (
+        <ClassroomManager
+          onClose={() => setShowClassroom(false)}
           isGhostMode={isGhostMode}
           onToast={triggerToast}
         />
