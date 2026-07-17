@@ -878,6 +878,32 @@ In your very first response or greeting to the user, you MUST casually and natur
       ]);
 
       try {
+        let lastProcessedIndex = 0;
+        let playPromiseChain = Promise.resolve();
+
+        const queueSentenceSpeak = (sentence: string) => {
+          if (isMuted) return;
+          const trimmed = sentence.trim();
+          if (!trimmed) return;
+
+          // Start fetching TTS immediately in the background
+          const ttsPromise = getZoyaAudio(trimmed);
+
+          // Chain the playback so they play sequentially in order
+          playPromiseChain = playPromiseChain.then(async () => {
+            if (isMuted) return;
+            try {
+              setAppState("speaking");
+              const audioBase64 = await ttsPromise;
+              if (audioBase64 && !isMuted) {
+                await playPCM(audioBase64);
+              }
+            } catch (err) {
+              console.error("Error in queued sentence speech:", err);
+            }
+          });
+        };
+
         responseText = await getZoyaResponseStream(
           finalTranscript,
           messagesRef.current,
@@ -892,19 +918,35 @@ In your very first response or greeting to the user, you MUST casually and natur
                 msg.id === responseMessageId ? { ...msg, text: currentText } : msg
               )
             );
+
+            if (!isMuted) {
+              const textToProcess = currentText.slice(lastProcessedIndex);
+              const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
+              let match;
+              let tempIndex = lastProcessedIndex;
+              while ((match = sentenceRegex.exec(textToProcess)) !== null) {
+                const sentence = match[0];
+                queueSentenceSpeak(sentence);
+                tempIndex = lastProcessedIndex + match.index + sentence.length;
+              }
+              lastProcessedIndex = tempIndex;
+            }
           }
         );
         
         setIsTyping(false);
         setIsLoading(false);
-        
-        if (!isMuted) {
-          setAppState("speaking");
-          const audioBase64 = await getZoyaAudio(responseText);
-          if (audioBase64) {
-            await playPCM(audioBase64);
+
+        if (!isMuted && lastProcessedIndex < responseText.length) {
+          const remainingText = responseText.slice(lastProcessedIndex);
+          if (remainingText.trim()) {
+            queueSentenceSpeak(remainingText);
           }
         }
+
+        // Wait for all queued audio segments to finish playing
+        await playPromiseChain;
+        setAppState("idle");
       } catch (error: any) {
         setIsTyping(false);
         setIsLoading(false);
