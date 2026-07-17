@@ -126,6 +126,11 @@ provider.addScope('https://www.googleapis.com/auth/forms.body');
 provider.addScope('https://www.googleapis.com/auth/forms.body.readonly');
 provider.addScope('https://www.googleapis.com/auth/forms.responses.readonly');
 
+// Add Google Meet scopes
+provider.addScope('https://www.googleapis.com/auth/meetings.space.created');
+provider.addScope('https://www.googleapis.com/auth/meetings.space.readonly');
+provider.addScope('https://www.googleapis.com/auth/meetings.space.settings');
+
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory
