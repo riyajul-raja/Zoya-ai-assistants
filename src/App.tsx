@@ -794,7 +794,53 @@ In your very first response or greeting to the user, you MUST casually and natur
     scrollToBottom();
   }, [messages, showChat]);
 
-  const handleTextCommand = useCallback(async (finalTranscript: string) => {
+  const speakMessageText = useCallback((text: string) => {
+    window.speechSynthesis.cancel();
+    activeUtterancesRef.current = [];
+
+    const sentences = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
+    sentences.forEach((sentence) => {
+      const trimmed = sentence.trim();
+      if (trimmed !== "") {
+        const utterance = new SpeechSynthesisUtterance(trimmed);
+        if (selectedVoiceRef.current) {
+          utterance.voice = selectedVoiceRef.current;
+          utterance.lang = selectedVoiceRef.current.lang;
+        } else {
+          utterance.lang = "hi-IN";
+        }
+        utterance.pitch = 1.0;
+        utterance.rate = 1.0;
+        
+        activeUtterancesRef.current.push(utterance);
+        
+        utterance.onstart = () => {
+          setAppState("speaking");
+        };
+        
+        utterance.onend = () => {
+          activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
+          if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+            setAppState("idle");
+          }
+        };
+
+        utterance.onerror = (e) => {
+          activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
+          console.error("Speech error", e);
+          if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+            setAppState("idle");
+          }
+        };
+
+        if (trimmed !== "") {
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+    });
+  }, []);
+
+  const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false) => {
     if (!finalTranscript.trim()) {
       setAppState("idle");
       return;
@@ -865,39 +911,8 @@ In your very first response or greeting to the user, you MUST casually and natur
       responseText = commandResult.action;
       setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", role: "model", text: responseText }]);
       
-      if (!isMuted) {
-        window.speechSynthesis.cancel();
-        const sentences = responseText.match(/[^.!?\n]+[.!?\n]*/g) || [responseText];
-        sentences.forEach((sentence) => {
-          const trimmed = sentence.trim();
-          if (trimmed) {
-            const utterance = new SpeechSynthesisUtterance(trimmed);
-            if (selectedVoiceRef.current) {
-              utterance.voice = selectedVoiceRef.current;
-              utterance.lang = selectedVoiceRef.current.lang;
-            } else {
-              utterance.lang = 'hi-IN';
-            }
-            utterance.pitch = 1.0;
-            utterance.rate = 1.0;
-            
-            activeUtterancesRef.current.push(utterance);
-            utterance.onstart = () => setAppState("speaking");
-            utterance.onend = () => {
-              activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
-              if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-                setAppState("idle");
-              }
-            };
-            utterance.onerror = () => {
-              activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
-              if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-                setAppState("idle");
-              }
-            };
-            window.speechSynthesis.speak(utterance);
-          }
-        });
+      if (!isMuted && !skipSpeech) {
+        speakMessageText(responseText);
       } else {
         setAppState("idle");
       }
@@ -923,22 +938,22 @@ In your very first response or greeting to the user, you MUST casually and natur
       try {
         let lastProcessedIndex = 0;
         
-        if (!isMuted) {
+        if (!isMuted && !skipSpeech) {
           window.speechSynthesis.cancel(); // Clear any ongoing speech
           activeUtterancesRef.current = [];
         }
 
         const queueSentenceSpeak = (sentence: string) => {
-          if (isMuted) return;
+          if (isMuted || skipSpeech) return;
           const trimmed = sentence.trim();
-          if (!trimmed) return;
+          if (trimmed === "") return;
 
           const utterance = new SpeechSynthesisUtterance(trimmed);
           if (selectedVoiceRef.current) {
             utterance.voice = selectedVoiceRef.current;
             utterance.lang = selectedVoiceRef.current.lang;
           } else {
-            utterance.lang = 'hi-IN';
+            utterance.lang = "hi-IN";
           }
           utterance.pitch = 1.0;
           utterance.rate = 1.0;
@@ -964,7 +979,9 @@ In your very first response or greeting to the user, you MUST casually and natur
             }
           };
 
-          window.speechSynthesis.speak(utterance);
+          if (trimmed !== "") {
+            window.speechSynthesis.speak(utterance);
+          }
         };
 
         responseText = await getZoyaResponseStream(
@@ -982,7 +999,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               )
             );
 
-            if (!isMuted) {
+            if (!isMuted && !skipSpeech) {
               const textToProcess = currentText.slice(lastProcessedIndex);
               const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
               let match;
@@ -1000,7 +1017,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsTyping(false);
         setIsLoading(false);
 
-        if (!isMuted && lastProcessedIndex < responseText.length) {
+        if (!isMuted && !skipSpeech && lastProcessedIndex < responseText.length) {
           const remainingText = responseText.slice(lastProcessedIndex);
           if (remainingText.trim()) {
             queueSentenceSpeak(remainingText);
@@ -1008,7 +1025,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         }
 
         // Wait a brief moment to ensure idle state updates if needed, though onend handles it
-        if (isMuted || (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
+        if (isMuted || skipSpeech || (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
           setAppState("idle");
         }
       } catch (error: any) {
@@ -1454,7 +1471,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsInputMicActive(false);
     }
 
-    handleTextCommand(textInput);
+    handleTextCommand(textInput, true);
     setTextInput("");
   };
 
@@ -2009,7 +2026,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                             msg.sender === "user" ? "self-end items-end" : "self-start items-start"
                           }`}
                         >
-                          <div className={`px-2.5 py-1.5 rounded-xl text-[11px] md:text-xs border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 ${
+                          <div className={`relative px-3.5 py-2 md:px-4 md:py-2.5 rounded-xl text-xs md:text-[13px] border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 leading-relaxed ${
                             msg.isError
                               ? "bg-red-950/85 border-red-500/50 text-red-200 font-sans shadow-[0_0_12px_rgba(239,68,68,0.25)]"
                               : msg.sender === "user" 
@@ -2017,8 +2034,8 @@ In your very first response or greeting to the user, you MUST casually and natur
                                   ? "bg-red-950/45 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
                                   : "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans" 
                                 : isGhostMode
-                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)]"
-                                  : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide"
+                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)] pr-8"
+                                  : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide pr-8"
                           }`}>
                             {(msg.image || (msg as any).imageUrl) && (
                               <img 
@@ -2028,7 +2045,17 @@ In your very first response or greeting to the user, you MUST casually and natur
                                 referrerPolicy="no-referrer"
                               />
                             )}
-                            {msg.text}
+                            <div className="whitespace-pre-wrap">{msg.text}</div>
+                            {msg.sender === "zoya" && !msg.isError && msg.text && (
+                              <button
+                                type="button"
+                                onClick={() => speakMessageText(msg.text)}
+                                className="absolute bottom-1.5 right-1.5 p-1 rounded bg-white/5 hover:bg-white/15 text-pink-300/70 hover:text-pink-100 transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
+                                title="Speak message"
+                              >
+                                <Volume2 size={11} />
+                              </button>
+                            )}
                           </div>
                           <span className={`text-[8px] opacity-40 mt-0.5 px-1.5 font-mono uppercase tracking-widest ${
                             isGhostMode ? "text-rose-400" : ""
