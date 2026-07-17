@@ -89,7 +89,10 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
   const handleLogin = async () => {
     setIsSigningIn(true);
     try {
-      const result = await googleSignIn();
+      const result = await googleSignIn([
+        "https://www.googleapis.com/auth/keep",
+        "https://www.googleapis.com/auth/keep.readonly"
+      ]);
       if (result) {
         setToken(result.accessToken);
         setFirebaseUser(result.user);
