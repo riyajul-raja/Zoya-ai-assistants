@@ -110,6 +110,7 @@ export default function App() {
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
+  const chatContainerRef = useRef<HTMLFormElement>(null);
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
@@ -1320,7 +1321,6 @@ In your very first response or greeting to the user, you MUST casually and natur
       }
     } else {
       setShowChat(true);
-      toggleInputDictation();
       try {
         // Do not show "Microphone Blocked" before actually requesting microphone permission.
         // Call navigator.mediaDevices.getUserMedia() first.
@@ -1523,7 +1523,9 @@ In your very first response or greeting to the user, you MUST casually and natur
     let newHeight = startHeightRef.current + deltaY;
     if (newHeight < 100) newHeight = 100;
     if (newHeight > window.innerHeight * 0.8) newHeight = window.innerHeight * 0.8;
-    setChatHeight(newHeight);
+    if (chatContainerRef.current) {
+      chatContainerRef.current.style.height = `${newHeight}px`;
+    }
   }, []);
 
   const handlePointerUp = useCallback(() => {
@@ -1531,12 +1533,17 @@ In your very first response or greeting to the user, you MUST casually and natur
     document.removeEventListener("pointermove", handlePointerMove);
     document.removeEventListener("pointerup", handlePointerUp);
     document.body.style.userSelect = '';
+    if (chatContainerRef.current) {
+      const finalHeight = chatContainerRef.current.offsetHeight;
+      setChatHeight(finalHeight);
+    }
   }, [handlePointerMove]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDraggingRef.current = true;
     startYRef.current = e.clientY;
-    startHeightRef.current = chatHeight;
+    const currentHeight = chatContainerRef.current ? chatContainerRef.current.offsetHeight : chatHeight;
+    startHeightRef.current = currentHeight;
     document.body.style.userSelect = 'none';
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerUp);
@@ -1953,6 +1960,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       <AnimatePresence>
         {showChat && (
           <motion.form 
+            ref={chatContainerRef}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -1984,6 +1992,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                 <div 
                   className="absolute top-0 left-0 right-0 h-4 flex items-start pt-1.5 justify-center cursor-ns-resize group touch-none"
                   onPointerDown={handlePointerDown}
+                  style={{ touchAction: 'none' }}
                 >
                   <div className="w-12 h-1 bg-red-500/50 group-hover:bg-red-500 rounded-full transition-colors pointer-events-none"></div>
                 </div>
