@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -13,6 +13,7 @@ import MemoryManager from "./components/MemoryManager";
 import GmailManager from "./components/GmailManager";
 import CalendarManager from "./components/CalendarManager";
 import TasksManager from "./components/TasksManager";
+import SlidesManager from "./components/SlidesManager";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -119,6 +120,7 @@ export default function App() {
   const [showGmail, setShowGmail] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
+  const [showSlides, setShowSlides] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
@@ -1901,6 +1903,21 @@ In your very first response or greeting to the user, you MUST casually and natur
             <ListTodo size={18} className={showTasks ? "animate-pulse" : ""} />
           </button>
 
+          {/* Google Slides Toggle Button */}
+          <button
+            onClick={() => {
+              setShowSlides(!showSlides);
+            }}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              showSlides
+                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
+            }`}
+            title={showSlides ? "Close Slides Manager" : "Open Slides Manager"}
+          >
+            <Presentation size={18} className={showSlides ? "animate-pulse" : ""} />
+          </button>
+
           {/* Google Contacts Toggle Button */}
           <button
             onClick={() => {
@@ -2463,6 +2480,15 @@ In your very first response or greeting to the user, you MUST casually and natur
       {showTasks && (
         <TasksManager
           onClose={() => setShowTasks(false)}
+          isGhostMode={isGhostMode}
+          onToast={triggerToast}
+        />
+      )}
+
+      {/* Google Slides Manager Overlay */}
+      {showSlides && (
+        <SlidesManager
+          onClose={() => setShowSlides(false)}
           isGhostMode={isGhostMode}
           onToast={triggerToast}
         />
