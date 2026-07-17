@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -12,6 +12,7 @@ import DriveManager from "./components/DriveManager";
 import MemoryManager from "./components/MemoryManager";
 import GmailManager from "./components/GmailManager";
 import CalendarManager from "./components/CalendarManager";
+import TasksManager from "./components/TasksManager";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -117,6 +118,7 @@ export default function App() {
   const [showMemories, setShowMemories] = useState(false);
   const [showGmail, setShowGmail] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
@@ -1884,6 +1886,21 @@ In your very first response or greeting to the user, you MUST casually and natur
             <Calendar size={18} className={showCalendar ? "animate-pulse" : ""} />
           </button>
 
+          {/* Google Tasks Toggle Button */}
+          <button
+            onClick={() => {
+              setShowTasks(!showTasks);
+            }}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              showTasks
+                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
+            }`}
+            title={showTasks ? "Close Tasks Manager" : "Open Tasks Manager"}
+          >
+            <ListTodo size={18} className={showTasks ? "animate-pulse" : ""} />
+          </button>
+
           {/* Google Contacts Toggle Button */}
           <button
             onClick={() => {
@@ -2437,6 +2454,15 @@ In your very first response or greeting to the user, you MUST casually and natur
       {showCalendar && (
         <CalendarManager
           onClose={() => setShowCalendar(false)}
+          isGhostMode={isGhostMode}
+          onToast={triggerToast}
+        />
+      )}
+
+      {/* Google Tasks Manager Overlay */}
+      {showTasks && (
+        <TasksManager
+          onClose={() => setShowTasks(false)}
           isGhostMode={isGhostMode}
           onToast={triggerToast}
         />
