@@ -43,6 +43,7 @@ export class LiveSessionManager {
   public onStateChange: (state: "idle" | "listening" | "processing" | "speaking") => void = () => {};
   public onMessage: (sender: "user" | "zoya", text: string) => void = () => {};
   public onCommand: (url: string) => void = () => {};
+  public onUIAction: (panelName: string) => void = () => {};
 
   constructor() {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -147,6 +148,20 @@ export class LiveSessionManager {
                   },
                   required: ["actionType", "query"]
                 }
+              },
+              {
+                name: "openPanel",
+                description: "Open a specific workspace integration panel or tool (like Gmail, Calendar, Tasks, Keep, Contacts, Drive Explorer, Memories). Call this whenever the user wants to see, write, search, or read notes, emails, calendar entries, tasks, contacts, files, documents, slides, classroom or chat.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    panelName: {
+                      type: Type.STRING,
+                      description: "The name of the workspace panel to open. Allowed values: 'gmail', 'calendar', 'tasks', 'keep', 'contacts', 'drive', 'chat', 'docs', 'forms', 'meet', 'classroom', 'slides', 'memories'."
+                    }
+                  },
+                  required: ["panelName"]
+                }
               }
             ]
           }]
@@ -205,6 +220,22 @@ export class LiveSessionManager {
                          name: call.name,
                          id: call.id,
                          response: { result: "Action executed successfully in the browser." }
+                       }]
+                     });
+                  });
+                } else if (call.name === "openPanel") {
+                  const args = call.args as any;
+                  if (args.panelName) {
+                    this.onUIAction(args.panelName);
+                  }
+                  
+                  // Send tool response
+                  this.sessionPromise?.then(session => {
+                     session.sendToolResponse({
+                       functionResponses: [{
+                         name: call.name,
+                         id: call.id,
+                         response: { result: `Opened ${args.panelName} panel successfully.` }
                        }]
                      });
                   });

@@ -822,6 +822,64 @@ In your very first response or greeting to the user, you MUST casually and natur
           }, 1000);
         };
 
+        session.onUIAction = (panelName) => {
+          if (!panelName) return;
+          const lower = panelName.toLowerCase();
+          if (lower === "gmail") {
+            setShowGmail(true);
+            setShowChat(true);
+            triggerToast("Opening Zoya Mailroom...");
+          } else if (lower === "calendar") {
+            setShowCalendar(true);
+            setShowChat(true);
+            triggerToast("Opening Zoya Calendar...");
+          } else if (lower === "tasks") {
+            setShowTasks(true);
+            setShowChat(true);
+            triggerToast("Opening Zoya Tasks...");
+          } else if (lower === "keep") {
+            setShowKeep(true);
+            setShowChat(true);
+            triggerToast("Opening Zoya Keep...");
+          } else if (lower === "contacts") {
+            setShowContacts(true);
+            setShowChat(true);
+            triggerToast("Opening Google Contacts...");
+          } else if (lower === "drive") {
+            setShowDrive(true);
+            setShowChat(true);
+            triggerToast("Opening Drive Explorer...");
+          } else if (lower === "slides") {
+            setShowSlides(true);
+            setShowChat(true);
+            triggerToast("Opening Google Slides...");
+          } else if (lower === "chat") {
+            setShowGoogleChat(true);
+            setShowChat(true);
+            triggerToast("Opening Google Chat...");
+          } else if (lower === "docs") {
+            setShowDocs(true);
+            setShowChat(true);
+            triggerToast("Opening Google Docs...");
+          } else if (lower === "forms") {
+            setShowForms(true);
+            setShowChat(true);
+            triggerToast("Opening Google Forms...");
+          } else if (lower === "meet") {
+            setShowMeet(true);
+            setShowChat(true);
+            triggerToast("Opening Google Meet...");
+          } else if (lower === "classroom") {
+            setShowClassroom(true);
+            setShowChat(true);
+            triggerToast("Opening Google Classroom...");
+          } else if (lower === "memories") {
+            setShowMemories(true);
+            setShowChat(true);
+            triggerToast("Opening Memory Core...");
+          }
+        };
+
         await session.start(requiredMic, isProfessionalMode, environmentContext);
       } catch (err) {
         console.error("Failed to start synchronized live session:", err);
@@ -892,11 +950,72 @@ In your very first response or greeting to the user, you MUST casually and natur
     });
   }, []);
 
+  const autoTriggerUIFromText = useCallback((text: string) => {
+    if (!text) return;
+    const lower = text.toLowerCase();
+    
+    if (lower.includes("gmail") || lower.includes("email") || lower.includes("mail")) {
+      setShowGmail(true);
+      setShowChat(true);
+      triggerToast("Opening Zoya Mailroom...");
+    } else if (lower.includes("calendar") || lower.includes("schedule") || lower.includes("event") || lower.includes("appointment")) {
+      setShowCalendar(true);
+      setShowChat(true);
+      triggerToast("Opening Zoya Calendar...");
+    } else if (lower.includes("tasks") || lower.includes("todo") || lower.includes("to-do")) {
+      setShowTasks(true);
+      setShowChat(true);
+      triggerToast("Opening Zoya Tasks...");
+    } else if (lower.includes("keep") || lower.includes("note")) {
+      setShowKeep(true);
+      setShowChat(true);
+      triggerToast("Opening Zoya Keep...");
+    } else if (lower.includes("contacts") || lower.includes("people")) {
+      setShowContacts(true);
+      setShowChat(true);
+      triggerToast("Opening Google Contacts...");
+    } else if (lower.includes("drive") || lower.includes("explorer") || lower.includes("file")) {
+      setShowDrive(true);
+      setShowChat(true);
+      triggerToast("Opening Drive Explorer...");
+    } else if (lower.includes("classroom") || lower.includes("class")) {
+      setShowClassroom(true);
+      setShowChat(true);
+      triggerToast("Opening Google Classroom...");
+    } else if (lower.includes("memory") || lower.includes("memories")) {
+      setShowMemories(true);
+      setShowChat(true);
+      triggerToast("Opening Memory Core...");
+    } else if (lower.includes("slide")) {
+      setShowSlides(true);
+      setShowChat(true);
+      triggerToast("Opening Google Slides...");
+    } else if (lower.includes("chat")) {
+      setShowGoogleChat(true);
+      setShowChat(true);
+      triggerToast("Opening Google Chat...");
+    } else if (lower.includes("docs") || lower.includes("document")) {
+      setShowDocs(true);
+      setShowChat(true);
+      triggerToast("Opening Google Docs...");
+    } else if (lower.includes("forms")) {
+      setShowForms(true);
+      setShowChat(true);
+      triggerToast("Opening Google Forms...");
+    } else if (lower.includes("meet")) {
+      setShowMeet(true);
+      setShowChat(true);
+      triggerToast("Opening Google Meet...");
+    }
+  }, []);
+
   const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false) => {
     if (!finalTranscript.trim()) {
       setAppState("idle");
       return;
     }
+
+    autoTriggerUIFromText(finalTranscript);
 
     let capturedImageBase64: string | undefined = undefined;
     if (isCameraActive) {
@@ -2068,6 +2187,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                         key={tool.id}
                         onClick={() => {
                           tool.toggle();
+                          setIsToolMenuOpen(false);
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
                           tool.active
@@ -2517,11 +2637,6 @@ In your very first response or greeting to the user, you MUST casually and natur
         )}
       </AnimatePresence>
 
-
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Google Contacts Manager Overlay */}
       {showContacts && (
         <ContactsManager
@@ -2638,6 +2753,9 @@ In your very first response or greeting to the user, you MUST casually and natur
           onToast={triggerToast}
         />
       )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
