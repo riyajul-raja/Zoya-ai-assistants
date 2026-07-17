@@ -401,6 +401,15 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
         {/* Holographic Header Bar for Sci-Fi Style */}
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-red-600 via-orange-500 to-red-600" />
         
+        {/* Absolute Universal Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+          title="Close Panel"
+        >
+          <X size={16} />
+        </button>
+        
         {/* Left pane: Contacts list & search */}
         <div className="flex-1 flex flex-col border-r border-white/10 min-w-0 h-full">
           {/* Header */}

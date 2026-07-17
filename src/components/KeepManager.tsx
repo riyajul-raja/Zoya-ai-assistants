@@ -79,6 +79,8 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
         setFirebaseUser(null);
         setToken(null);
         setIsAuthChecking(false);
+        setApiMode("fallback");
+        loadFallbackNotes();
       }
     );
     return () => unsubscribe();
@@ -407,6 +409,15 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
         {/* Top glowing amber accent strip */}
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 animate-pulse" />
 
+        {/* Absolute Universal Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+          title="Close Panel"
+        >
+          <X size={16} />
+        </button>
+
         {/* Left Drawer */}
         <div className="w-full md:w-[260px] border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between h-full">
           <div className="p-5 flex flex-col h-[calc(100%-70px)] overflow-y-auto space-y-5">
@@ -422,77 +433,73 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
             </div>
 
             {/* Quick Action Button */}
-            {isAuthenticated && (
-              <button
-                onClick={() => {
-                  setIsCreateOpen(true);
-                  setSelectedNote(null);
-                }}
-                className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white py-2.5 px-4 rounded-xl font-mono text-xs tracking-wider uppercase shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Plus size={14} />
-                <span>COMPOSE NOTE</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setIsCreateOpen(true);
+                setSelectedNote(null);
+              }}
+              className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white py-2.5 px-4 rounded-xl font-mono text-xs tracking-wider uppercase shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus size={14} />
+              <span>COMPOSE NOTE</span>
+            </button>
 
             {/* Sync Mode Information */}
-            {isAuthenticated && (
-              <div className={`p-3 rounded-xl border flex flex-col gap-1.5 ${
-                apiMode === "real" 
-                  ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" 
-                  : "bg-amber-500/5 border-amber-500/20 text-amber-400"
-              }`}>
-                <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider font-semibold">
-                  {apiMode === "real" ? <Cloud size={11} /> : <CloudOff size={11} />}
-                  <span>{apiMode === "real" ? "GOOGLE CLOUD SYNC" : "LOCAL WORKSPACE"}</span>
-                </div>
-                <p className="text-[9px] text-white/50 leading-relaxed font-sans">
-                  {apiMode === "real" 
-                    ? "Changes are mirrored in real-time to your Google Keep." 
-                    : "Running in local fallback mode. Enterprise scopes restricted on consumer accounts."}
-                </p>
+            <div className={`p-3 rounded-xl border flex flex-col gap-1.5 ${
+              (isAuthenticated && apiMode === "real")
+                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" 
+                : "bg-amber-500/5 border-amber-500/20 text-amber-400"
+            }`}>
+              <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider font-semibold">
+                {(isAuthenticated && apiMode === "real") ? <Cloud size={11} /> : <CloudOff size={11} />}
+                <span>{(isAuthenticated && apiMode === "real") ? "GOOGLE CLOUD SYNC" : "LOCAL WORKSPACE"}</span>
               </div>
-            )}
+              <p className="text-[9px] text-white/50 leading-relaxed font-sans">
+                {(isAuthenticated && apiMode === "real") 
+                  ? "Changes are mirrored in real-time to your Google Keep." 
+                  : !isAuthenticated
+                    ? "Connect your Google Account below to enable cloud synchronization."
+                    : "Running in local fallback mode. Enterprise scopes restricted on consumer accounts."}
+              </p>
+            </div>
 
             {/* Filter Swapper */}
-            {isAuthenticated && (
-              <div className="space-y-2">
-                <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest px-1">Filters</p>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => setFilterType("all")}
-                    className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
-                      filterType === "all" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
-                    }`}
-                  >
-                    <Sliders size={12} />
-                    <span>All Notes</span>
-                  </button>
-                  <button
-                    onClick={() => setFilterType("text")}
-                    className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
-                      filterType === "text" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
-                    }`}
-                  >
-                    <FileText size={12} />
-                    <span>Plain Text</span>
-                  </button>
-                  <button
-                    onClick={() => setFilterType("list")}
-                    className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
-                      filterType === "list" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
-                    }`}
-                  >
-                    <ListPlus size={12} />
-                    <span>Checklists</span>
-                  </button>
-                </div>
+            <div className="space-y-2">
+              <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest px-1">Filters</p>
+              <div className="space-y-1">
+                <button
+                  onClick={() => setFilterType("all")}
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
+                    filterType === "all" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                  }`}
+                >
+                  <Sliders size={12} />
+                  <span>All Notes</span>
+                </button>
+                <button
+                  onClick={() => setFilterType("text")}
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
+                    filterType === "text" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                  }`}
+                >
+                  <FileText size={12} />
+                  <span>Plain Text</span>
+                </button>
+                <button
+                  onClick={() => setFilterType("list")}
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
+                    filterType === "list" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                  }`}
+                >
+                  <ListPlus size={12} />
+                  <span>Checklists</span>
+                </button>
               </div>
-            )}
+            </div>
           </div>
 
           {/* User profile footer */}
-          {isAuthenticated && firebaseUser && (
+          {isAuthenticated && firebaseUser ? (
             <div className="p-4 border-t border-white/10 shrink-0 bg-white/2 flex flex-col space-y-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 {firebaseUser.photoURL ? (
@@ -522,6 +529,18 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                 <span>SIGN OUT</span>
               </button>
             </div>
+          ) : (
+            <div className="p-4 border-t border-white/10 shrink-0 bg-white/2 flex flex-col space-y-2">
+              <p className="text-[9px] text-white/30 leading-none">Workspace Auth</p>
+              <button
+                onClick={handleLogin}
+                disabled={isSigningIn}
+                className="w-full p-2 rounded-lg border border-amber-500/20 hover:border-amber-500/40 text-amber-400 hover:text-amber-300 hover:bg-amber-500/5 transition-all cursor-pointer text-[10px] font-mono flex items-center justify-center gap-1.5"
+              >
+                {isSigningIn ? <Loader2 size={11} className="animate-spin" /> : <Cloud size={11} />}
+                <span>CONNECT ACCOUNT</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -537,28 +556,26 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                 </h3>
               </div>
 
-              {isAuthenticated && (
-                <div className="relative max-w-xs w-full md:w-64">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-white/35">
-                    <Search size={12} />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search operational records..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white text-xs pl-8.5 pr-3 py-1.5 rounded-xl font-mono focus:outline-none transition-all placeholder:text-white/30"
-                  />
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="absolute inset-y-0 right-3 flex items-center text-white/40 hover:text-white cursor-pointer"
-                    >
-                      <X size={10} />
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="relative max-w-xs w-full md:w-64">
+                <span className="absolute inset-y-0 left-3 flex items-center text-white/35">
+                  <Search size={12} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search operational records..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white text-xs pl-8.5 pr-3 py-1.5 rounded-xl font-mono focus:outline-none transition-all placeholder:text-white/30"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute inset-y-0 right-3 flex items-center text-white/40 hover:text-white cursor-pointer"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <button
@@ -570,71 +587,57 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
             </button>
           </div>
 
-          {!isAuthenticated ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-5 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-                <StickyNote size={28} className="text-amber-400 animate-pulse" />
-              </div>
-              <h3 className="text-lg font-medium text-white mb-2">Google Keep Integration</h3>
-              <p className="text-white/50 text-xs max-w-sm mb-6 leading-relaxed">
-                Log technical data, maintain checklists, and persistent notes across Zoya. Authorize workspace scopes to begin.
-              </p>
-              
-              <button 
+          {!isAuthenticated && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
+              <span className="flex items-center gap-2">
+                <CloudOff size={14} className="text-amber-400" />
+                <span>Running in premium Offline-First local storage mode. Cloud sync is disabled.</span>
+              </span>
+              <button
                 onClick={handleLogin}
-                disabled={isSigningIn}
-                className="bg-white hover:bg-neutral-200 text-black py-2.5 px-5 rounded-xl font-medium tracking-wide shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center gap-3 text-xs"
+                className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-200 px-3 py-1 rounded-lg transition-all text-[10px] uppercase font-mono cursor-pointer"
               >
-                {isSigningIn ? (
-                  <Loader2 className="animate-spin text-black" size={15} />
-                ) : (
-                  <svg className="w-4 h-4" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                  </svg>
-                )}
-                <span>Authorize Google Keep</span>
+                Connect Cloud
               </button>
             </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto p-5">
-              {isLoading ? (
-                <div className="h-full flex flex-col items-center justify-center text-white/50 space-y-3">
-                  <Loader2 size={24} className="animate-spin text-amber-500" />
-                  <p className="text-xs font-mono">Syncing Keep databases...</p>
-                </div>
-              ) : filteredNotes.length > 0 ? (
-                /* NOTES GRID */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredNotes.map((note) => {
-                    const isList = !!note.body?.list;
-                    return (
-                      <div
-                        key={note.name}
-                        onClick={() => setSelectedNote(note)}
-                        className={`p-5 rounded-2xl border cursor-pointer relative group transition-all duration-300 flex flex-col justify-between h-[180px] bg-neutral-900/60 border-white/5 hover:border-amber-500/40 hover:shadow-[0_0_15px_rgba(245,158,11,0.08)]`}
-                      >
-                        <div>
-                          {/* Note Header Title & Action */}
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="text-sm font-medium text-white line-clamp-1">
-                              {note.title || "Untitled Note"}
-                            </h4>
-                            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteNote(note.name);
-                                }}
-                                className="p-1 hover:bg-white/5 rounded-md text-white/30 hover:text-red-400 transition-colors cursor-pointer"
-                                title="Delete note"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto p-5">
+            {isLoading ? (
+              <div className="h-full flex flex-col items-center justify-center text-white/50 space-y-3">
+                <Loader2 size={24} className="animate-spin text-amber-500" />
+                <p className="text-xs font-mono">Syncing Keep databases...</p>
+              </div>
+            ) : filteredNotes.length > 0 ? (
+              /* NOTES GRID */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredNotes.map((note) => {
+                  const isList = !!note.body?.list;
+                  return (
+                    <div
+                      key={note.name}
+                      onClick={() => setSelectedNote(note)}
+                      className={`p-5 rounded-2xl border cursor-pointer relative group transition-all duration-300 flex flex-col justify-between h-[180px] bg-neutral-900/60 border-white/5 hover:border-amber-500/40 hover:shadow-[0_0_15px_rgba(245,158,11,0.08)]`}
+                    >
+                      <div>
+                        {/* Note Header Title & Action */}
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-sm font-medium text-white line-clamp-1">
+                            {note.title || "Untitled Note"}
+                          </h4>
+                          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNote(note.name);
+                              }}
+                              className="p-1 hover:bg-white/5 rounded-md text-white/30 hover:text-red-400 transition-colors cursor-pointer"
+                              title="Delete note"
+                            >
+                              <Trash2 size={12} />
+                            </button>
                           </div>
+                        </div>
 
                           {/* Note Body Content */}
                           <div className="mt-3 text-xs text-white/60 line-clamp-4 space-y-1">
@@ -689,7 +692,6 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                 </div>
               )}
             </div>
-          )}
         </div>
 
         {/* Right Panel Composer */}

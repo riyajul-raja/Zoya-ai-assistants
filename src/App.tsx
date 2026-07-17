@@ -346,6 +346,170 @@ export default function App() {
     }, 3000);
   }, []);
 
+  const checkAIIntentAndAutoOpen = useCallback((userInput: string, aiResponse: string) => {
+    const lowerInput = userInput.toLowerCase();
+    const lowerAI = aiResponse.toLowerCase();
+
+    // 1. Google Keep Note Intent
+    if (
+      lowerInput.includes("note") || 
+      lowerInput.includes("keep") || 
+      lowerAI.includes("note") || 
+      lowerAI.includes("keep")
+    ) {
+      setShowKeep(true);
+
+      const makeNoteRegex = /(?:make a note to|write a note to|create a note to|make a note about|add a note about|save a note to|note to|note about)\s+(.+)/i;
+      const match = userInput.match(makeNoteRegex);
+      if (match && match[1]) {
+        const noteContent = match[1].trim();
+        const noteTitle = noteContent.charAt(0).toUpperCase() + noteContent.slice(1);
+        
+        const cached = localStorage.getItem("zoya_keep_notes");
+        let notesList = [];
+        if (cached) {
+          notesList = JSON.parse(cached);
+        }
+        
+        const alreadyExists = notesList.some((n: any) => n.title === noteTitle);
+        if (!alreadyExists) {
+          const newNote = {
+            name: `notes/zoya-auto-${Date.now()}`,
+            title: noteTitle,
+            body: {
+              text: {
+                text: `Saved automatically by Zoya AI: "${noteContent}".`
+              }
+            },
+            createTime: new Date().toISOString(),
+            updateTime: new Date().toISOString()
+          };
+          notesList = [newNote, ...notesList];
+          localStorage.setItem("zoya_keep_notes", JSON.stringify(notesList));
+          
+          triggerToast(`Zoya created a note: "${noteTitle}"`);
+          window.dispatchEvent(new CustomEvent("zoya_notes_updated"));
+        }
+      }
+    }
+
+    // 2. Google Calendar Event Intent
+    if (
+      lowerInput.includes("calendar") || 
+      lowerInput.includes("schedule") || 
+      lowerInput.includes("event") || 
+      lowerInput.includes("meeting") || 
+      lowerAI.includes("calendar") || 
+      lowerAI.includes("schedule") || 
+      lowerAI.includes("meeting")
+    ) {
+      setShowCalendar(true);
+
+      const scheduleRegex = /(?:schedule a meeting|schedule an event|create an event|schedule|add event|add to calendar)\s+(?:for|about|to)?\s*(.+)/i;
+      const match = userInput.match(scheduleRegex);
+      if (match && match[1]) {
+        const eventSummary = match[1].trim();
+        const capitalizedSummary = eventSummary.charAt(0).toUpperCase() + eventSummary.slice(1);
+
+        const cached = localStorage.getItem("zoya_calendar_events");
+        let eventsList = [];
+        if (cached) {
+          eventsList = JSON.parse(cached);
+        }
+
+        const alreadyExists = eventsList.some((e: any) => e.summary === capitalizedSummary);
+        if (!alreadyExists) {
+          const newEvent = {
+            id: `local-ev-${Date.now()}`,
+            summary: capitalizedSummary,
+            description: `Scheduled via Zoya AI Voice/Text assistant command: "${userInput}".`,
+            location: "Virtual Meeting Room",
+            start: { dateTime: new Date(Date.now() + 3600000).toISOString() }, 
+            end: { dateTime: new Date(Date.now() + 7200000).toISOString() }
+          };
+          eventsList = [newEvent, ...eventsList];
+          localStorage.setItem("zoya_calendar_events", JSON.stringify(eventsList));
+          
+          triggerToast(`Zoya scheduled an event: "${capitalizedSummary}"`);
+          window.dispatchEvent(new CustomEvent("zoya_calendar_updated"));
+        }
+      }
+    }
+
+    // 3. Gmail Inbox/Email Intent
+    if (
+      lowerInput.includes("gmail") || 
+      lowerInput.includes("email") || 
+      lowerInput.includes("mail") || 
+      lowerInput.includes("inbox") || 
+      lowerAI.includes("gmail") || 
+      lowerAI.includes("email") || 
+      lowerAI.includes("mailroom")
+    ) {
+      setShowGmail(true);
+
+      const emailRegex = /(?:send an email to|email to|compose an email to)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4})/i;
+      const match = userInput.match(emailRegex);
+      if (match && match[1]) {
+        const recipient = match[1].trim();
+        triggerToast(`Opening Zoya Mailroom composer for: ${recipient}`);
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("zoya_gmail_compose", { detail: { to: recipient } }));
+        }, 300);
+      }
+    }
+
+    // 4. Tasks Intent
+    if (
+      lowerInput.includes("task") || 
+      lowerInput.includes("todo") || 
+      lowerInput.includes("to-do") || 
+      lowerAI.includes("task") || 
+      lowerAI.includes("todo")
+    ) {
+      setShowTasks(true);
+
+      const taskRegex = /(?:add a task to|create a task to|add task|create task|todo to|remind me to)\s+(.+)/i;
+      const match = userInput.match(taskRegex);
+      if (match && match[1]) {
+        const taskTitle = match[1].trim();
+        const capitalizedTask = taskTitle.charAt(0).toUpperCase() + taskTitle.slice(1);
+
+        const cached = localStorage.getItem("zoya_tasks");
+        let tasksList = [];
+        if (cached) {
+          tasksList = JSON.parse(cached);
+        }
+
+        const alreadyExists = tasksList.some((t: any) => t.title === capitalizedTask);
+        if (!alreadyExists) {
+          const newTask = {
+            id: `local-task-${Date.now()}`,
+            title: capitalizedTask,
+            notes: "Created automatically by Zoya AI console stream.",
+            status: "needsAction",
+            due: new Date(Date.now() + 86400000).toISOString()
+          };
+          tasksList = [newTask, ...tasksList];
+          localStorage.setItem("zoya_tasks", JSON.stringify(tasksList));
+
+          triggerToast(`Zoya added a task: "${capitalizedTask}"`);
+          window.dispatchEvent(new CustomEvent("zoya_tasks_updated"));
+        }
+      }
+    }
+
+    // 5. Google Contacts
+    if (lowerInput.includes("contacts") || lowerInput.includes("contact list") || lowerAI.includes("contacts")) {
+      setShowContacts(true);
+    }
+
+    // 6. Google Drive
+    if (lowerInput.includes("drive") || lowerInput.includes("explorer") || lowerAI.includes("drive explorer") || lowerAI.includes("google drive")) {
+      setShowDrive(true);
+    }
+  }, [triggerToast, setShowKeep, setShowCalendar, setShowGmail, setShowTasks, setShowContacts, setShowDrive]);
+
   // Geolocation & Weather Environment Context state
   const [environmentContext, setEnvironmentContext] = useState<string>("");
 
@@ -1187,6 +1351,9 @@ In your very first response or greeting to the user, you MUST casually and natur
         
         setIsTyping(false);
         setIsLoading(false);
+
+        // Check Zoya AI Intent and Auto-Open Panel overlays in real-time
+        checkAIIntentAndAutoOpen(finalTranscript, responseText);
 
         if (!isMuted && !skipSpeech && lastProcessedIndex < responseText.length) {
           const remainingText = responseText.slice(lastProcessedIndex);

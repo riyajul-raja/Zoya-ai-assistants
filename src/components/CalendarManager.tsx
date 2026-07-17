@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   Calendar, Clock, MapPin, Search, Trash2, Plus, X, Loader2, LogOut, 
-  RefreshCw, Check, Send, AlertCircle, CalendarRange, User, AlignLeft
+  RefreshCw, Check, Send, AlertCircle, CalendarRange, User, AlignLeft,
+  CloudOff, Cloud
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { User as FirebaseUser } from "firebase/auth";
@@ -37,6 +38,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
   const [token, setToken] = useState<string | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [apiMode, setApiMode] = useState<"real" | "fallback">("real");
 
   // Calendar States
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -58,6 +60,40 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
   // Action States
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
+  const loadFallbackEvents = () => {
+    setApiMode("fallback");
+    const cached = localStorage.getItem("zoya_calendar_events");
+    if (cached) {
+      setEvents(JSON.parse(cached));
+    } else {
+      const initialEvents: CalendarEvent[] = [
+        {
+          id: "local-ev-1",
+          summary: "Zoya Orbital Sync Meeting",
+          description: "Routine calibration check of AI server arrays and telemetry streams.",
+          location: "Deep Space Platform Sector 7",
+          start: { dateTime: new Date(Date.now() + 3600000).toISOString() }, // in 1 hour
+          end: { dateTime: new Date(Date.now() + 7200000).toISOString() }
+        },
+        {
+          id: "local-ev-2",
+          summary: "Database Backup Operations",
+          description: "Encrypted memory backup to persistent cold storage volumes.",
+          location: "Zoya Lunar Server Farm",
+          start: { dateTime: new Date(Date.now() + 86400000).toISOString() }, // tomorrow
+          end: { dateTime: new Date(Date.now() + 90000000).toISOString() }
+        }
+      ];
+      setEvents(initialEvents);
+      localStorage.setItem("zoya_calendar_events", JSON.stringify(initialEvents));
+    }
+  };
+
+  const saveFallbackEventsToStore = (updated: CalendarEvent[]) => {
+    setEvents(updated);
+    localStorage.setItem("zoya_calendar_events", JSON.stringify(updated));
+  };
+
   // Initialize Auth & Load
   useEffect(() => {
     const unsubscribe = initAuth(
@@ -66,6 +102,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
         setToken(cachedToken);
         setIsAuthenticated(true);
         setIsAuthChecking(false);
+        setApiMode("real");
         fetchEvents(cachedToken);
       },
       () => {
@@ -73,6 +110,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
         setFirebaseUser(null);
         setToken(null);
         setIsAuthChecking(false);
+        loadFallbackEvents();
       }
     );
     return () => unsubscribe();
@@ -114,6 +152,10 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
 
   // Fetch upcoming events from primary calendar
   const fetchEvents = async (accessToken: string, queryStr = "") => {
+    if (!accessToken) {
+      loadFallbackEvents();
+      return;
+    }
     setIsLoading(true);
     try {
       const timeMin = new Date().toISOString();
@@ -133,9 +175,10 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
 
       const data = await response.json();
       setEvents(data.items || []);
+      setApiMode("real");
     } catch (err) {
-      console.error("Error loading calendar events:", err);
-      onToast("Failed to fetch calendar events.");
+      console.error("Error loading calendar events, falling back:", err);
+      loadFallbackEvents();
     } finally {
       setIsLoading(false);
     }
@@ -144,10 +187,19 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
   // Delete event
   const handleDeleteEvent = async (event: CalendarEvent) => {
     // MANDATORY USER CONFIRMATION FOR DESTRUCTIVE SYSTEM WORKSPACE OPERATIONS
-    const confirmed = window.confirm(`Permanently delete "${event.summary}" from your Google Calendar? This action cannot be undone.`);
+    const confirmed = window.confirm(`Permanently delete "${event.summary}" from your Calendar? This action cannot be undone.`);
     if (!confirmed) return;
 
-    if (!token) return;
+    if (!token || apiMode === "fallback") {
+      const updated = events.filter((ev) => ev.id !== event.id);
+      saveFallbackEventsToStore(updated);
+      onToast("Event deleted from local workspace.");
+      if (selectedEvent?.id === event.id) {
+        setSelectedEvent(null);
+      }
+      return;
+    }
+
     setIsDeleting(event.id);
 
     try {
@@ -196,7 +248,30 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
     const confirmed = window.confirm(`Create event "${summary}" scheduled for ${startDate} at ${startTime}?`);
     if (!confirmed) return;
 
-    if (!token) return;
+    if (!token || apiMode === "fallback") {
+      const newEvent: CalendarEvent = {
+        id: `local-ev-${Date.now()}`,
+        summary: summary.trim(),
+        description: description.trim(),
+        location: location.trim(),
+        start: { dateTime: startDateTime },
+        end: { dateTime: endDateTime }
+      };
+
+      const updated = [newEvent, ...events];
+      saveFallbackEventsToStore(updated);
+      onToast("Event saved to local workspace.");
+      setIsCreateOpen(false);
+      setSummary("");
+      setDescription("");
+      setLocation("");
+      setStartDate("");
+      setStartTime("");
+      setEndDate("");
+      setEndTime("");
+      return;
+    }
+
     setIsCreating(true);
 
     try {
@@ -280,6 +355,15 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
         {/* Hologram top strip bar */}
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-red-600 via-rose-500 to-red-600 animate-pulse" />
 
+        {/* Absolute Universal Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+          title="Close Panel"
+        >
+          <X size={16} />
+        </button>
+
         {/* Left Side: Navigation Drawer and User Profile */}
         <div className="w-full md:w-[240px] border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between h-full">
           <div className="p-5 space-y-6">
@@ -293,22 +377,19 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
               </div>
             </div>
 
-            {isAuthenticated && (
-              <button
-                onClick={() => {
-                  setIsCreateOpen(true);
-                  setSelectedEvent(null);
-                }}
-                className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-xl font-mono text-xs tracking-wider uppercase shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Plus size={14} />
-                <span>SCHEDULE EVENT</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setIsCreateOpen(true);
+                setSelectedEvent(null);
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-xl font-mono text-xs tracking-wider uppercase shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus size={14} />
+              <span>SCHEDULE EVENT</span>
+            </button>
 
             <div className="space-y-1">
               <button
-                disabled={!isAuthenticated}
                 className="w-full text-left py-2 px-3 rounded-lg flex items-center gap-2.5 font-mono text-xs transition-colors cursor-pointer bg-red-500/15 border-l-2 border-red-500 text-white font-medium"
               >
                 <span className="text-red-400">
@@ -320,7 +401,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
           </div>
 
           {/* User Profile Footer */}
-          {isAuthenticated && firebaseUser && (
+          {isAuthenticated && firebaseUser ? (
             <div className="p-4 border-t border-white/10 shrink-0 bg-white/2 flex flex-col space-y-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 {firebaseUser.photoURL ? (
@@ -350,6 +431,18 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
                 <span>SIGN OUT</span>
               </button>
             </div>
+          ) : (
+            <div className="p-4 border-t border-white/10 shrink-0 bg-white/2 flex flex-col space-y-2">
+              <p className="text-[9px] text-white/30 leading-none">Workspace Auth</p>
+              <button
+                onClick={handleLogin}
+                disabled={isSigningIn}
+                className="w-full p-2 rounded-lg border border-red-500/20 hover:border-red-500/40 text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all cursor-pointer text-[10px] font-mono flex items-center justify-center gap-1.5"
+              >
+                {isSigningIn ? <Loader2 size={11} className="animate-spin" /> : <Calendar size={11} />}
+                <span>CONNECT ACCOUNT</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -362,16 +455,20 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
               <h3 className="text-sm font-mono text-white uppercase tracking-widest">
                 UPCOMING AGENDA
               </h3>
-              {isAuthenticated && (
-                <button
-                  onClick={() => fetchEvents(token!, searchQuery)}
-                  disabled={isLoading}
-                  className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white transition-colors cursor-pointer"
-                  title="Reload Schedule"
-                >
-                  <RefreshCw size={11} className={isLoading ? "animate-spin" : ""} />
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (token) {
+                    fetchEvents(token, searchQuery);
+                  } else {
+                    loadFallbackEvents();
+                  }
+                }}
+                disabled={isLoading}
+                className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white transition-colors cursor-pointer"
+                title="Reload Schedule"
+              >
+                <RefreshCw size={11} className={isLoading ? "animate-spin" : ""} />
+              </button>
             </div>
 
             <button
@@ -383,146 +480,129 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
             </button>
           </div>
 
-          {!isAuthenticated ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-5 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-                <Calendar size={28} className="text-red-400 animate-pulse" />
-              </div>
-              <h3 className="text-lg font-medium text-white mb-2">Google Calendar Authorization Required</h3>
-              <p className="text-white/50 text-xs max-w-sm mb-6 leading-relaxed">
-                Connect your Google Account to view, schedule, and sync your calendar events inside Zoya's holographic dashboard.
-              </p>
-              
-              <button 
+          {!isAuthenticated && (
+            <div className="bg-red-500/10 border-b border-red-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-red-300 shrink-0">
+              <span className="flex items-center gap-2">
+                <CloudOff size={14} className="text-red-400" />
+                <span>Running in premium Offline-First local storage mode. Cloud sync is disabled.</span>
+              </span>
+              <button
                 onClick={handleLogin}
-                disabled={isSigningIn}
-                className="bg-white hover:bg-neutral-200 text-black py-2.5 px-5 rounded-xl font-medium tracking-wide shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center gap-3 text-xs"
+                className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-200 px-3 py-1 rounded-lg transition-all text-[10px] uppercase font-mono cursor-pointer"
               >
-                {isSigningIn ? (
-                  <Loader2 className="animate-spin text-black" size={15} />
-                ) : (
-                  <svg className="w-4 h-4" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                  </svg>
-                )}
-                <span>Connect Google Calendar</span>
+                Connect Cloud
               </button>
             </div>
-          ) : (
-            <>
-              {/* Search bar */}
-              <form onSubmit={handleSearch} className="p-3 border-b border-white/10 shrink-0 bg-white/1 flex gap-2">
-                <div className="relative flex-1 flex items-center">
-                  <Search size={13} className="absolute left-3 text-white/30" />
-                  <input
-                    type="text"
-                    placeholder="Search calendar events..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50"
-                  />
-                  {searchQuery && (
-                    <button 
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 text-white/40 hover:text-white"
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 text-xs text-white hover:bg-white/10 hover:text-white font-mono"
+          )}
+
+          {/* Search bar */}
+          <form onSubmit={handleSearch} className="p-3 border-b border-white/10 shrink-0 bg-white/1 flex gap-2">
+            <div className="relative flex-1 flex items-center">
+              <Search size={13} className="absolute left-3 text-white/30" />
+              <input
+                type="text"
+                placeholder="Search calendar events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50"
+              />
+              {searchQuery && (
+                <button 
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 text-white/40 hover:text-white"
                 >
-                  FILTER
+                  <X size={13} />
                 </button>
-              </form>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 text-xs text-white hover:bg-white/10 hover:text-white font-mono"
+            >
+              FILTER
+            </button>
+          </form>
 
-              {/* Events list */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-                {isLoading && events.length === 0 ? (
-                  <div className="h-64 flex items-center justify-center">
-                    <Loader2 className="animate-spin text-red-500" size={28} />
-                  </div>
-                ) : events.length === 0 ? (
-                  <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-white/30">
-                    <Calendar size={32} className="opacity-35 mb-2 text-red-500/40" />
-                    <p className="text-xs font-mono uppercase tracking-wider">No Events scheduled</p>
-                    <p className="text-[10px] mt-1 max-w-xs leading-normal">
-                      Schedule a new meeting or event from the side panel to see it displayed here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {events.map((evt) => {
-                      const { dateString, timeString } = formatEventTime(evt) as any;
-                      return (
-                        <div
-                          key={evt.id}
-                          onClick={() => {
-                            setSelectedEvent(evt);
-                            setIsCreateOpen(false);
-                          }}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col relative overflow-hidden group hover:border-white/10 hover:bg-white/4 ${
-                            selectedEvent?.id === evt.id
-                              ? "bg-red-500/10 border-red-500/50 shadow-[0_0_12px_rgba(239,68,68,0.15)]"
-                              : "bg-white/2 border-white/5"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="min-w-0 flex-1">
-                              {/* Event Name */}
-                              <h4 className="text-xs font-medium text-white truncate leading-snug">
-                                {evt.summary || "(No Title)"}
-                              </h4>
-                              
-                              {/* Event Details Row */}
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] font-mono text-white/40">
-                                <div className="flex items-center gap-1">
-                                  <Clock size={10} className="text-red-400" />
-                                  <span>{timeString}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span>{dateString}</span>
-                                </div>
-                                {evt.location && (
-                                  <div className="flex items-center gap-1 max-w-[200px] truncate">
-                                    <MapPin size={10} className="text-rose-400" />
-                                    <span>{evt.location}</span>
-                                  </div>
-                                )}
-                              </div>
+          {/* Events list */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+            {isLoading && events.length === 0 ? (
+              <div className="h-64 flex items-center justify-center">
+                <Loader2 className="animate-spin text-red-500" size={28} />
+              </div>
+            ) : events.length === 0 ? (
+              <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-white/30">
+                <Calendar size={32} className="opacity-35 mb-2 text-red-500/40" />
+                <p className="text-xs font-mono uppercase tracking-wider">No Events scheduled</p>
+                <p className="text-[10px] mt-1 max-w-xs leading-normal">
+                  Schedule a new meeting or event from the side panel to see it displayed here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {events.map((evt) => {
+                  const { dateString, timeString } = formatEventTime(evt) as any;
+                  return (
+                    <div
+                      key={evt.id}
+                      onClick={() => {
+                        setSelectedEvent(evt);
+                        setIsCreateOpen(false);
+                      }}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col relative overflow-hidden group hover:border-white/10 hover:bg-white/4 ${
+                        selectedEvent?.id === evt.id
+                          ? "bg-red-500/10 border-red-500/50 shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                          : "bg-white/2 border-white/5"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="min-w-0 flex-1">
+                          {/* Event Name */}
+                          <h4 className="text-xs font-medium text-white truncate leading-snug">
+                            {evt.summary || "(No Title)"}
+                          </h4>
+                          
+                          {/* Event Details Row */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] font-mono text-white/40">
+                            <div className="flex items-center gap-1">
+                              <Clock size={10} className="text-red-400" />
+                              <span>{timeString}</span>
                             </div>
-
-                            {/* Delete Event Trigger Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteEvent(evt);
-                              }}
-                              disabled={isDeleting === evt.id}
-                              className="p-1 rounded hover:bg-red-500/25 text-white/40 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Delete Event"
-                            >
-                              {isDeleting === evt.id ? (
-                                <Loader2 size={10} className="animate-spin text-red-500" />
-                              ) : (
-                                <Trash2 size={11} />
-                              )}
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <span>{dateString}</span>
+                            </div>
+                            {evt.location && (
+                              <div className="flex items-center gap-1 max-w-[200px] truncate">
+                                <MapPin size={10} className="text-rose-400" />
+                                <span>{evt.location}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+
+                        {/* Delete Event Trigger Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteEvent(evt);
+                          }}
+                          disabled={isDeleting === evt.id}
+                          className="p-1 rounded hover:bg-red-500/25 text-white/40 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete Event"
+                        >
+                          {isDeleting === evt.id ? (
+                            <Loader2 size={10} className="animate-spin text-red-500" />
+                          ) : (
+                            <Trash2 size={11} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Right Pane: Selected Event Details View OR Scheduling Composer */}
