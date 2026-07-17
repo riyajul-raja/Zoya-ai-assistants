@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -133,14 +133,28 @@ export default function App() {
   const [showMeet, setShowMeet] = useState(false);
   const [showKeep, setShowKeep] = useState(false);
   const [showClassroom, setShowClassroom] = useState(false);
+  const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
   const chatContainerRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toolMenuRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (isToolMenuOpen && toolMenuRef.current && !toolMenuRef.current.contains(event.target as Node)) {
+        setIsToolMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isToolMenuOpen]);
 
   useEffect(() => {
     if (showChat && textareaRef.current) {
@@ -1870,242 +1884,217 @@ In your very first response or greeting to the user, you MUST casually and natur
             <Shield size={18} className={isProfessionalMode ? "animate-pulse" : ""} />
           </button>
 
-          {/* Google Gmail Toggle Button */}
-          <button
-            onClick={() => {
-              setShowGmail(!showGmail);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showGmail
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showGmail ? "Close Gmail Mailroom" : "Open Gmail Mailroom"}
-          >
-            <Mail size={18} className={showGmail ? "animate-pulse" : ""} />
-          </button>
+          {/* Hamburger Menu (Dropdown with Tool Labels) */}
+          <div className="relative flex items-center justify-center" ref={toolMenuRef}>
+            <button
+              onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
+              className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+                isToolMenuOpen
+                  ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-[0_0_15px_rgba(139,92,246,0.6)] animate-pulse"
+                  : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-violet-400 hover:border-violet-500/30"
+              }`}
+              title="Integrations & Tools Menu"
+            >
+              <Menu size={18} className={isToolMenuOpen ? "rotate-90 transition-transform duration-300" : "transition-transform duration-300"} />
+            </button>
 
-          {/* Google Calendar Toggle Button */}
-          <button
-            onClick={() => {
-              setShowCalendar(!showCalendar);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showCalendar
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showCalendar ? "Close Calendar Manager" : "Open Calendar Manager"}
-          >
-            <Calendar size={18} className={showCalendar ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Tasks Toggle Button */}
-          <button
-            onClick={() => {
-              setShowTasks(!showTasks);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showTasks
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showTasks ? "Close Tasks Manager" : "Open Tasks Manager"}
-          >
-            <ListTodo size={18} className={showTasks ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Slides Toggle Button */}
-          <button
-            onClick={() => {
-              setShowSlides(!showSlides);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showSlides
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showSlides ? "Close Slides Manager" : "Open Slides Manager"}
-          >
-            <Presentation size={18} className={showSlides ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Contacts Toggle Button */}
-          <button
-            onClick={() => {
-              setShowContacts(!showContacts);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showContacts
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showContacts ? "Close Contacts Manager" : "Open Contacts Manager"}
-          >
-            <Users size={18} className={showContacts ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Chat Toggle Button */}
-          <button
-            onClick={() => {
-              setShowGoogleChat(!showGoogleChat);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showGoogleChat
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showGoogleChat ? "Close Google Chat" : "Open Google Chat"}
-          >
-            <MessageSquare size={18} className={showGoogleChat ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Docs Toggle Button */}
-          <button
-            onClick={() => {
-              setShowDocs(!showDocs);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showDocs
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showDocs ? "Close Google Docs" : "Open Google Docs"}
-          >
-            <FileText size={18} className={showDocs ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Forms Toggle Button */}
-          <button
-            onClick={() => {
-              setShowForms(!showForms);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showForms
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showForms ? "Close Google Forms" : "Open Google Forms"}
-          >
-            <ClipboardList size={18} className={showForms ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Meet Toggle Button */}
-          <button
-            onClick={() => {
-              setShowMeet(!showMeet);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showMeet
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showMeet ? "Close Google Meet" : "Open Google Meet"}
-          >
-            <Video size={18} className={showMeet ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Keep Toggle Button */}
-          <button
-            onClick={() => {
-              setShowKeep(!showKeep);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showKeep
-                ? "bg-gradient-to-r from-amber-600 to-yellow-600 border-amber-400/50 text-white shadow-[0_0_15px_rgba(245,158,11,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-amber-400 hover:border-amber-500/30"
-            }`}
-            title={showKeep ? "Close Google Keep" : "Open Google Keep"}
-          >
-            <StickyNote size={18} className={showKeep ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Classroom Toggle Button */}
-          <button
-            onClick={() => {
-              setShowClassroom(!showClassroom);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showClassroom
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 border-emerald-400/50 text-white shadow-[0_0_15px_rgba(16,185,129,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-emerald-400 hover:border-emerald-500/30"
-            }`}
-            title={showClassroom ? "Close Google Classroom" : "Open Google Classroom"}
-          >
-            <GraduationCap size={18} className={showClassroom ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Google Drive Toggle Button */}
-          <button
-            onClick={() => {
-              setShowDrive(!showDrive);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showDrive
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showDrive ? "Close Drive Explorer" : "Open Drive Explorer"}
-          >
-            <HardDrive size={18} className={showDrive ? "animate-pulse" : ""} />
-          </button>
-
-          {/* Zoya Memory Core Toggle Button */}
-          <button
-            onClick={() => {
-              setShowMemories(!showMemories);
-            }}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              showMemories
-                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
-            }`}
-            title={showMemories ? "Close Memory Core" : "Open Zoya Memory Core"}
-          >
-            <Brain size={18} className={showMemories ? "animate-pulse" : ""} />
-          </button>
-
-          {/* AR Hologram Button */}
-          <button
-            onClick={toggleAR}
-            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
-              isARMode
-                ? isCameraActive
-                  ? "bg-gradient-to-r from-cyan-500 to-teal-500 border-cyan-400/50 text-white shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse"
-                  : "bg-cyan-950/80 border-cyan-700/50 text-cyan-500 shadow-none"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
-            }`}
-            title={isARMode ? "Deactivate AR Mode" : "Activate AR Hologram Mode"}
-          >
-            <Box 
-              size={18} 
-              className={`transition-all duration-300 ${
-                isARMode 
-                  ? isCameraActive 
-                    ? "animate-spin text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" 
-                    : "text-cyan-600 opacity-60" 
-                  : ""
-              }`} 
-              style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
-            />
-          </button>
-
-          {/* PiP Elegant Icon Button */}
-          <button
-            onClick={handlePiP}
-            style={{ zIndex: 9999 }}
-            className={`p-2 rounded-full border transition-all cursor-pointer pointer-events-auto flex items-center justify-center ${
-              isGlobePiPActive
-                ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-lg shadow-violet-500/20"
-                : "bg-white/10 hover:bg-white/20 border-white/25 text-white"
-            }`}
-            title={isGlobePiPActive ? "Exit Floating Core Mode" : "Floating Core Mode (Picture-in-Picture)"}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGlobePiPActive ? "animate-pulse" : ""}>
-              <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
-              <rect width="20" height="14" x="2" y="3" rx="2" />
-            </svg>
-          </button>
+            <AnimatePresence>
+              {isToolMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="absolute right-0 mt-3 w-72 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/15 bg-black/95 backdrop-blur-xl p-4 shadow-[0_10px_50px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 z-50 pointer-events-auto select-none"
+                  style={{ top: "100%" }}
+                >
+                  <div className="px-2 pb-2 border-b border-white/10 flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold">Integrations & Tools</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
+                  </div>
+                  
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      {
+                        id: "gmail",
+                        name: "Google Gmail",
+                        icon: <Mail size={16} />,
+                        active: showGmail,
+                        toggle: () => setShowGmail(!showGmail),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "calendar",
+                        name: "Google Calendar",
+                        icon: <Calendar size={16} />,
+                        active: showCalendar,
+                        toggle: () => setShowCalendar(!showCalendar),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "tasks",
+                        name: "Google Tasks",
+                        icon: <ListTodo size={16} />,
+                        active: showTasks,
+                        toggle: () => setShowTasks(!showTasks),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "slides",
+                        name: "Google Slides",
+                        icon: <Presentation size={16} />,
+                        active: showSlides,
+                        toggle: () => setShowSlides(!showSlides),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "contacts",
+                        name: "Google Contacts",
+                        icon: <Users size={16} />,
+                        active: showContacts,
+                        toggle: () => setShowContacts(!showContacts),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "chat",
+                        name: "Google Chat",
+                        icon: <MessageSquare size={16} />,
+                        active: showGoogleChat,
+                        toggle: () => setShowGoogleChat(!showGoogleChat),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "docs",
+                        name: "Google Docs",
+                        icon: <FileText size={16} />,
+                        active: showDocs,
+                        toggle: () => setShowDocs(!showDocs),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "forms",
+                        name: "Google Forms",
+                        icon: <ClipboardList size={16} />,
+                        active: showForms,
+                        toggle: () => setShowForms(!showForms),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "meet",
+                        name: "Google Meet",
+                        icon: <Video size={16} />,
+                        active: showMeet,
+                        toggle: () => setShowMeet(!showMeet),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "keep",
+                        name: "Google Keep",
+                        icon: <StickyNote size={16} />,
+                        active: showKeep,
+                        toggle: () => setShowKeep(!showKeep),
+                        colorClass: "from-amber-600 to-yellow-600",
+                        accentColor: "text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
+                      },
+                      {
+                        id: "classroom",
+                        name: "Google Classroom",
+                        icon: <GraduationCap size={16} />,
+                        active: showClassroom,
+                        toggle: () => setShowClassroom(!showClassroom),
+                        colorClass: "from-emerald-600 to-teal-600",
+                        accentColor: "text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
+                      },
+                      {
+                        id: "drive",
+                        name: "Drive Explorer",
+                        icon: <HardDrive size={16} />,
+                        active: showDrive,
+                        toggle: () => setShowDrive(!showDrive),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "memories",
+                        name: "Memory Core",
+                        icon: <Brain size={16} />,
+                        active: showMemories,
+                        toggle: () => setShowMemories(!showMemories),
+                        colorClass: "from-red-600 to-rose-600",
+                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                      },
+                      {
+                        id: "ar-hologram",
+                        name: "AR Hologram Mode",
+                        icon: (
+                          <Box 
+                            size={16} 
+                            className={`transition-all duration-300 ${
+                              isARMode && isCameraActive ? "animate-spin text-cyan-100" : ""
+                            }`} 
+                            style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
+                          />
+                        ),
+                        active: isARMode,
+                        toggle: toggleAR,
+                        colorClass: "from-cyan-500 to-teal-500",
+                        accentColor: "text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
+                      },
+                      {
+                        id: "floating-core",
+                        name: "Floating Core Mode",
+                        icon: (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
+                            <rect width="20" height="14" x="2" y="3" rx="2" />
+                          </svg>
+                        ),
+                        active: isGlobePiPActive,
+                        toggle: handlePiP,
+                        colorClass: "from-violet-600 to-pink-600",
+                        accentColor: "text-violet-400 border-violet-500/30 shadow-[0_0_10px_rgba(139,92,246,0.4)]",
+                      },
+                    ].map((tool) => (
+                      <button
+                        key={tool.id}
+                        onClick={() => {
+                          tool.toggle();
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
+                          tool.active
+                            ? `bg-gradient-to-r ${tool.colorClass} border-transparent text-white font-medium ${tool.accentColor}`
+                            : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className={tool.active ? "text-white" : "text-white/40"}>
+                            {tool.icon}
+                          </span>
+                          <span className="font-medium tracking-wide">{tool.name}</span>
+                        </div>
+                        
+                        {/* Active indicator dot */}
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          tool.active 
+                            ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
+                            : "bg-white/10"
+                        }`} />
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           <button
             onClick={() => setIsMuted(!isMuted)}
