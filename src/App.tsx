@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -7,6 +7,7 @@ import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
 import TypingIndicator from "./components/TypingIndicator";
 import { motion, AnimatePresence } from "motion/react";
+import ContactsManager from "./components/ContactsManager";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -107,6 +108,7 @@ export default function App() {
   }, [isMuted]);
 
   const [showChat, setShowChat] = useState(false);
+  const [showContacts, setShowContacts] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
@@ -1844,6 +1846,21 @@ In your very first response or greeting to the user, you MUST casually and natur
             <Shield size={18} className={isProfessionalMode ? "animate-pulse" : ""} />
           </button>
 
+          {/* Google Contacts Toggle Button */}
+          <button
+            onClick={() => {
+              setShowContacts(!showContacts);
+            }}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              showContacts
+                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
+            }`}
+            title={showContacts ? "Close Contacts Manager" : "Open Contacts Manager"}
+          >
+            <Users size={18} className={showContacts ? "animate-pulse" : ""} />
+          </button>
+
           {/* AR Hologram Button */}
           <button
             onClick={toggleAR}
@@ -2311,6 +2328,15 @@ In your very first response or greeting to the user, you MUST casually and natur
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Google Contacts Manager Overlay */}
+      {showContacts && (
+        <ContactsManager
+          onClose={() => setShowContacts(false)}
+          isGhostMode={isGhostMode}
+          onToast={triggerToast}
+        />
+      )}
     </div>
   );
 }
