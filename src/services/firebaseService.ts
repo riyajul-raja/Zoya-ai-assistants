@@ -19,6 +19,12 @@ provider.addScope('https://www.googleapis.com/auth/user.gender.read');
 provider.addScope('https://www.googleapis.com/auth/user.organization.read');
 provider.addScope('https://www.googleapis.com/auth/user.phonenumbers.read');
 
+// Add Google Drive scopes
+provider.addScope('https://www.googleapis.com/auth/drive');
+provider.addScope('https://www.googleapis.com/auth/drive.file');
+provider.addScope('https://www.googleapis.com/auth/drive.readonly');
+provider.addScope('https://www.googleapis.com/auth/drive.metadata.readonly');
+
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory
