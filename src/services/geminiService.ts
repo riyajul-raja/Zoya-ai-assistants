@@ -34,6 +34,32 @@ export function resetZoyaSession() {
   lastSessionEnvironmentContext = "";
 }
 
+function buildActiveSystemInstruction(isProfessionalMode: boolean, environmentContext: string, dynamicTime: string): string {
+  const currentHour = new Date().getHours();
+  let greeting = "Good morning Boss, main aapke liye kya madad kar sakti hu?";
+  if (currentHour >= 12 && currentHour < 17) {
+    greeting = "Good afternoon Boss, main aapke liye kya madad kar sakti hu?";
+  } else if (currentHour >= 17) {
+    greeting = "Good evening Boss, main aapke liye kya madad kar sakti hu?";
+  }
+
+  const baseInstruction = isProfessionalMode
+    ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
+    : systemInstruction;
+
+  const dynamicContext = `You are Zoya, a highly advanced AI assistant. The user is your 'Boss'. The current time hour is ${currentHour}. If the user says 'Hey Zoya' or greets you, look at the time and respond strictly in Hinglish like: '${greeting}' (Adjust for Afternoon/Evening based on the hour). Always be respectful, concise, and converse in Hinglish.`;
+
+  let activeSystemInstruction = `${dynamicContext}\n\n${baseInstruction}`;
+
+  activeSystemInstruction = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n${activeSystemInstruction}`;
+
+  if (environmentContext) {
+    activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
+  }
+
+  return activeSystemInstruction;
+}
+
 export async function getZoyaResponseStream(
   prompt: string,
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
@@ -98,22 +124,12 @@ export async function getZoyaResponseStream(
         formattedHistory.shift();
       }
  
-      let activeSystemInstruction = isProfessionalMode
-        ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
-        : systemInstruction;
- 
-      // Inject the current timestamp directly into the active system instructions
-      activeSystemInstruction = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n${activeSystemInstruction}`;
-
-      if (environmentContext) {
-        activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
-      }
+      const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
  
       chatSession = ai.chats.create({
         model: "gemini-3.5-flash",
         config: {
           systemInstruction: activeSystemInstruction,
-          maxOutputTokens: 150,
         },
         history: formattedHistory,
       });
@@ -220,22 +236,12 @@ export async function getZoyaResponse(
         formattedHistory.shift();
       }
 
-      let activeSystemInstruction = isProfessionalMode
-        ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
-        : systemInstruction;
-
-      // Inject the current timestamp directly into the active system instructions
-      activeSystemInstruction = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n${activeSystemInstruction}`;
-
-      if (environmentContext) {
-        activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
-      }
+      const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
 
       chatSession = ai.chats.create({
         model: "gemini-3.5-flash",
         config: {
           systemInstruction: activeSystemInstruction,
-          maxOutputTokens: 150,
         },
         history: formattedHistory,
       });
