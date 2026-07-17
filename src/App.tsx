@@ -109,6 +109,10 @@ export default function App() {
   const [showChat, setShowChat] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [chatHeight, setChatHeight] = useState(150);
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(0);
   const [isInputMicActive, setIsInputMicActive] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -1513,6 +1517,31 @@ In your very first response or greeting to the user, you MUST casually and natur
     return offset;
   })();
 
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    if (!isDraggingRef.current) return;
+    const deltaY = startYRef.current - e.clientY;
+    let newHeight = startHeightRef.current + deltaY;
+    if (newHeight < 100) newHeight = 100;
+    if (newHeight > window.innerHeight * 0.8) newHeight = window.innerHeight * 0.8;
+    setChatHeight(newHeight);
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    isDraggingRef.current = false;
+    document.removeEventListener("pointermove", handlePointerMove);
+    document.removeEventListener("pointerup", handlePointerUp);
+    document.body.style.userSelect = '';
+  }, [handlePointerMove]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    isDraggingRef.current = true;
+    startYRef.current = e.clientY;
+    startHeightRef.current = chatHeight;
+    document.body.style.userSelect = 'none';
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+  };
+
   return (
     <div className="h-[100dvh] w-screen bg-[#050505] text-white flex flex-col items-center justify-between font-sans relative overflow-hidden m-0 p-0">
       <AnimatePresence mode="wait">
@@ -1932,24 +1961,33 @@ In your very first response or greeting to the user, you MUST casually and natur
             style={{
               zIndex: isChatMaximized ? 999 : 40,
               transform: isChatMaximized ? "none" : undefined,
+              height: isChatMaximized ? undefined : `${chatHeight}px`,
             }}
             className={
               isChatMaximized
                 ? "fixed inset-0 w-screen h-screen flex flex-col pointer-events-auto p-6 md:p-8 transition-all duration-300 ease-in-out"
-                : "fixed bottom-32 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] md:w-[45%] max-w-[90vw] md:max-w-[45vw] h-[150px] flex flex-col pointer-events-auto rounded-2xl p-2.5 transition-all duration-300 ease-in-out"
+                : "fixed bottom-32 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] md:w-[45%] max-w-[90vw] md:max-w-[45vw] flex flex-col pointer-events-auto rounded-2xl p-2.5 transition-all duration-300 ease-in-out"
             }
           >
             <div 
-              className={`relative w-full h-full rounded-2xl backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col min-h-0 ${
-                isChatMaximized ? "p-4" : "p-2.5"
+              className={`relative w-full h-full rounded-2xl backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col min-h-0 pt-3 ${
+                isChatMaximized ? "px-4 pb-4" : "px-2.5 pb-2.5"
               } ${
                 isGhostMode
                   ? "bg-black/90 border border-red-500/90 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
                   : isARMode 
-                    ? "bg-black/80 border border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.3)]" 
-                    : "bg-neutral-950/90 border border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                     ? "bg-black/80 border border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                     : "bg-neutral-950/90 border border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
               }`}
             >
+              {!isChatMaximized && (
+                <div 
+                  className="absolute top-0 left-0 right-0 h-4 flex items-start pt-1.5 justify-center cursor-ns-resize group touch-none"
+                  onPointerDown={handlePointerDown}
+                >
+                  <div className="w-12 h-1 bg-red-500/50 group-hover:bg-red-500 rounded-full transition-colors pointer-events-none"></div>
+                </div>
+              )}
               {/* Header section with toggle full-screen and close buttons */}
               <div className="flex items-center justify-between pb-1 mb-1 border-b border-white/10 shrink-0">
                 <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
@@ -2078,6 +2116,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               {/* Compact Input Bar */}
               <div className="flex items-center gap-1.5 mt-1 pt-1.5 border-t border-white/10 shrink-0">
                 <textarea
+                  autoFocus={false}
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
                   onKeyDown={(e) => {

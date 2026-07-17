@@ -1,0 +1,15 @@
+          >
+            <div 
+              className={`relative w-full h-full rounded-2xl backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col min-h-0 ${
+                isChatMaximized ? "p-4" : "p-2.5"
+              } ${
+                isGhostMode
+                  ? "bg-black/90 border border-red-500/90 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
+                  : isARMode 
+                    ? "bg-black/80 border border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.3)]" 
+                    : "bg-neutral-950/90 border border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+              }`}
+            >
+              {/* Header section with toggle full-screen and close buttons */}
+              <div className="flex items-center justify-between pb-1 mb-1 border-b border-white/10 shrink-0">
+                <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
