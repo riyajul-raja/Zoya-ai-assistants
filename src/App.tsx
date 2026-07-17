@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -11,6 +11,7 @@ import ContactsManager from "./components/ContactsManager";
 import DriveManager from "./components/DriveManager";
 import MemoryManager from "./components/MemoryManager";
 import GmailManager from "./components/GmailManager";
+import CalendarManager from "./components/CalendarManager";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -115,6 +116,7 @@ export default function App() {
   const [showDrive, setShowDrive] = useState(false);
   const [showMemories, setShowMemories] = useState(false);
   const [showGmail, setShowGmail] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
@@ -1867,6 +1869,21 @@ In your very first response or greeting to the user, you MUST casually and natur
             <Mail size={18} className={showGmail ? "animate-pulse" : ""} />
           </button>
 
+          {/* Google Calendar Toggle Button */}
+          <button
+            onClick={() => {
+              setShowCalendar(!showCalendar);
+            }}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              showCalendar
+                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
+            }`}
+            title={showCalendar ? "Close Calendar Manager" : "Open Calendar Manager"}
+          >
+            <Calendar size={18} className={showCalendar ? "animate-pulse" : ""} />
+          </button>
+
           {/* Google Contacts Toggle Button */}
           <button
             onClick={() => {
@@ -2411,6 +2428,15 @@ In your very first response or greeting to the user, you MUST casually and natur
       {showGmail && (
         <GmailManager
           onClose={() => setShowGmail(false)}
+          isGhostMode={isGhostMode}
+          onToast={triggerToast}
+        />
+      )}
+
+      {/* Google Calendar Manager Overlay */}
+      {showCalendar && (
+        <CalendarManager
+          onClose={() => setShowCalendar(false)}
           isGhostMode={isGhostMode}
           onToast={triggerToast}
         />
