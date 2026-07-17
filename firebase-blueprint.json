@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "Memory": {
+      "title": "Memory",
+      "description": "A customized memory, reminder, note, or preference persisted in Zoya's database.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The Google owner UID of the user."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "The content of the memory or note."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["note", "reminder", "preference", "todo"],
+          "description": "The classification category of the memory."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when this memory was logged."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when this memory was modified."
+        }
+      },
+      "required": ["userId", "text", "category", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/memories/{memoryId}": {
+      "schema": "Memory",
+      "description": "Stores user-authored memories, notes, and reminders for Zoya's voice and chat interface."
+    }
+  }
+}

@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Definitions
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    
+    function isSignedIn() { 
+      return request.auth != null; 
+    }
+    
+    function isOwner(userId) { 
+      return isSignedIn() && request.auth.uid == userId; 
+    }
+
+    // Validation Blueprint for creating memories
+    function isValidMemory(data) {
+      return data.userId == request.auth.uid
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 1000
+        && data.category is string && (data.category == 'note' || data.category == 'reminder' || data.category == 'preference' || data.category == 'todo')
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Match path for Memories
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      match /memories/{memoryId} {
+        // Secure query & retrieval
+        allow read, delete: if isOwner(userId);
+        
+        // Secure create
+        allow create: if isOwner(userId) 
+          && isValidId(memoryId) 
+          && isValidMemory(request.resource.data);
+        
+        // Secure action-based updates
+        allow update: if isOwner(userId) 
+          && isValidId(memoryId)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.text is string && request.resource.data.text.size() >= 1 && request.resource.data.text.size() <= 1000
+          && request.resource.data.category is string && (request.resource.data.category == 'note' || request.resource.data.category == 'reminder' || request.resource.data.category == 'preference' || request.resource.data.category == 'todo')
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'category', 'updatedAt']);
+      }
+    }
+  }
+}

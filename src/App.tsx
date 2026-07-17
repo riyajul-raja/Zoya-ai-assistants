@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -9,6 +9,7 @@ import TypingIndicator from "./components/TypingIndicator";
 import { motion, AnimatePresence } from "motion/react";
 import ContactsManager from "./components/ContactsManager";
 import DriveManager from "./components/DriveManager";
+import MemoryManager from "./components/MemoryManager";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -111,6 +112,7 @@ export default function App() {
   const [showChat, setShowChat] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
   const [showDrive, setShowDrive] = useState(false);
+  const [showMemories, setShowMemories] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
@@ -1878,6 +1880,21 @@ In your very first response or greeting to the user, you MUST casually and natur
             <HardDrive size={18} className={showDrive ? "animate-pulse" : ""} />
           </button>
 
+          {/* Zoya Memory Core Toggle Button */}
+          <button
+            onClick={() => {
+              setShowMemories(!showMemories);
+            }}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              showMemories
+                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
+            }`}
+            title={showMemories ? "Close Memory Core" : "Open Zoya Memory Core"}
+          >
+            <Brain size={18} className={showMemories ? "animate-pulse" : ""} />
+          </button>
+
           {/* AR Hologram Button */}
           <button
             onClick={toggleAR}
@@ -2359,6 +2376,15 @@ In your very first response or greeting to the user, you MUST casually and natur
       {showDrive && (
         <DriveManager
           onClose={() => setShowDrive(false)}
+          isGhostMode={isGhostMode}
+          onToast={triggerToast}
+        />
+      )}
+
+      {/* Zoya Memory Core Overlay */}
+      {showMemories && (
+        <MemoryManager
+          onClose={() => setShowMemories(false)}
           isGhostMode={isGhostMode}
           onToast={triggerToast}
         />
