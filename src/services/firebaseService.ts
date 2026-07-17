@@ -131,6 +131,10 @@ provider.addScope('https://www.googleapis.com/auth/meetings.space.created');
 provider.addScope('https://www.googleapis.com/auth/meetings.space.readonly');
 provider.addScope('https://www.googleapis.com/auth/meetings.space.settings');
 
+// Add Google Keep scopes
+provider.addScope('https://www.googleapis.com/auth/keep');
+provider.addScope('https://www.googleapis.com/auth/keep.readonly');
+
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory
