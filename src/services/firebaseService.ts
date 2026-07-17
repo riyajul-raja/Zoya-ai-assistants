@@ -121,6 +121,11 @@ provider.addScope('https://www.googleapis.com/auth/chat.memberships.readonly');
 provider.addScope('https://www.googleapis.com/auth/documents');
 provider.addScope('https://www.googleapis.com/auth/documents.readonly');
 
+// Add Google Forms scopes
+provider.addScope('https://www.googleapis.com/auth/forms.body');
+provider.addScope('https://www.googleapis.com/auth/forms.body.readonly');
+provider.addScope('https://www.googleapis.com/auth/forms.responses.readonly');
+
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory
