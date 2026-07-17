@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -15,6 +15,7 @@ import CalendarManager from "./components/CalendarManager";
 import TasksManager from "./components/TasksManager";
 import SlidesManager from "./components/SlidesManager";
 import GoogleChatManager from "./components/GoogleChatManager";
+import DocsManager from "./components/DocsManager";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -123,6 +124,7 @@ export default function App() {
   const [showTasks, setShowTasks] = useState(false);
   const [showSlides, setShowSlides] = useState(false);
   const [showGoogleChat, setShowGoogleChat] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
@@ -1950,6 +1952,21 @@ In your very first response or greeting to the user, you MUST casually and natur
             <MessageSquare size={18} className={showGoogleChat ? "animate-pulse" : ""} />
           </button>
 
+          {/* Google Docs Toggle Button */}
+          <button
+            onClick={() => {
+              setShowDocs(!showDocs);
+            }}
+            className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              showDocs
+                ? "bg-gradient-to-r from-red-600 to-rose-600 border-red-400/50 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-red-400 hover:border-red-500/30"
+            }`}
+            title={showDocs ? "Close Google Docs" : "Open Google Docs"}
+          >
+            <FileText size={18} className={showDocs ? "animate-pulse" : ""} />
+          </button>
+
           {/* Google Drive Toggle Button */}
           <button
             onClick={() => {
@@ -2515,6 +2532,15 @@ In your very first response or greeting to the user, you MUST casually and natur
       {showGoogleChat && (
         <GoogleChatManager
           onClose={() => setShowGoogleChat(false)}
+          isGhostMode={isGhostMode}
+          onToast={triggerToast}
+        />
+      )}
+
+      {/* Google Docs Manager Overlay */}
+      {showDocs && (
+        <DocsManager
+          onClose={() => setShowDocs(false)}
           isGhostMode={isGhostMode}
           onToast={triggerToast}
         />

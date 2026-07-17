@@ -117,6 +117,10 @@ provider.addScope('https://www.googleapis.com/auth/chat.messages.readonly');
 provider.addScope('https://www.googleapis.com/auth/chat.memberships');
 provider.addScope('https://www.googleapis.com/auth/chat.memberships.readonly');
 
+// Add Google Docs scopes
+provider.addScope('https://www.googleapis.com/auth/documents');
+provider.addScope('https://www.googleapis.com/auth/documents.readonly');
+
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory
