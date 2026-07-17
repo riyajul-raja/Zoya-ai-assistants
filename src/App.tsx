@@ -111,9 +111,16 @@ export default function App() {
   const [textInput, setTextInput] = useState("");
   const [chatHeight, setChatHeight] = useState(150);
   const chatContainerRef = useRef<HTMLFormElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
+
+  useEffect(() => {
+    if (showChat && textareaRef.current) {
+      textareaRef.current.blur();
+    }
+  }, [showChat]);
   const [isInputMicActive, setIsInputMicActive] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -2125,6 +2132,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               {/* Compact Input Bar */}
               <div className="flex items-center gap-1.5 mt-1 pt-1.5 border-t border-white/10 shrink-0">
                 <textarea
+                  ref={textareaRef}
                   autoFocus={false}
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
@@ -2221,7 +2229,15 @@ In your very first response or greeting to the user, you MUST casually and natur
           
           <button
             id="keyboard-toggle-btn"
-            onClick={() => setShowChat(!showChat)}
+            onClick={() => {
+              const nextShowChat = !showChat;
+              setShowChat(nextShowChat);
+              if (nextShowChat) {
+                setTimeout(() => {
+                  textareaRef.current?.focus();
+                }, 150);
+              }
+            }}
             className={`p-4 rounded-full border transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer ${
               showChat
                 ? isGhostMode
