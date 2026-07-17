@@ -108,6 +108,15 @@ provider.addScope('https://www.googleapis.com/auth/presentations.readonly');
 provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
 
+// Add Google Chat scopes
+provider.addScope('https://www.googleapis.com/auth/chat.spaces');
+provider.addScope('https://www.googleapis.com/auth/chat.spaces.readonly');
+provider.addScope('https://www.googleapis.com/auth/chat.messages');
+provider.addScope('https://www.googleapis.com/auth/chat.messages.create');
+provider.addScope('https://www.googleapis.com/auth/chat.messages.readonly');
+provider.addScope('https://www.googleapis.com/auth/chat.memberships');
+provider.addScope('https://www.googleapis.com/auth/chat.memberships.readonly');
+
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory
