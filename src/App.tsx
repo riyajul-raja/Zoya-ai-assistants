@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
 import TypingIndicator from "./components/TypingIndicator";
-import { playPCM } from "./utils/audioUtils";
 import { motion, AnimatePresence } from "motion/react";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
@@ -73,6 +72,7 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesRef = useRef(messages);
+  const activeUtterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -850,14 +850,32 @@ In your very first response or greeting to the user, you MUST casually and natur
       setMessages((prev) => [...prev, { id: Date.now().toString() + "-z", sender: "zoya", role: "model", text: responseText }]);
       
       if (!isMuted) {
-        setAppState("speaking");
-        const audioBase64 = await getZoyaAudio(responseText);
-        if (audioBase64) {
-          await playPCM(audioBase64);
-        }
+        window.speechSynthesis.cancel();
+        const sentences = responseText.match(/[^.!?\n]+[.!?\n]*/g) || [responseText];
+        sentences.forEach((sentence) => {
+          const trimmed = sentence.trim();
+          if (trimmed) {
+            const utterance = new SpeechSynthesisUtterance(trimmed);
+            activeUtterancesRef.current.push(utterance);
+            utterance.onstart = () => setAppState("speaking");
+            utterance.onend = () => {
+              activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
+              if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+                setAppState("idle");
+              }
+            };
+            utterance.onerror = () => {
+              activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
+              if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+                setAppState("idle");
+              }
+            };
+            window.speechSynthesis.speak(utterance);
+          }
+        });
+      } else {
+        setAppState("idle");
       }
-
-      setAppState("idle");
 
       setTimeout(() => {
         if (commandResult.url) {
@@ -879,29 +897,40 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       try {
         let lastProcessedIndex = 0;
-        let playPromiseChain = Promise.resolve();
+        
+        if (!isMuted) {
+          window.speechSynthesis.cancel(); // Clear any ongoing speech
+          activeUtterancesRef.current = [];
+        }
 
         const queueSentenceSpeak = (sentence: string) => {
           if (isMuted) return;
           const trimmed = sentence.trim();
           if (!trimmed) return;
 
-          // Start fetching TTS immediately in the background
-          const ttsPromise = getZoyaAudio(trimmed);
-
-          // Chain the playback so they play sequentially in order
-          playPromiseChain = playPromiseChain.then(async () => {
-            if (isMuted) return;
-            try {
-              setAppState("speaking");
-              const audioBase64 = await ttsPromise;
-              if (audioBase64 && !isMuted) {
-                await playPCM(audioBase64);
-              }
-            } catch (err) {
-              console.error("Error in queued sentence speech:", err);
+          const utterance = new SpeechSynthesisUtterance(trimmed);
+          activeUtterancesRef.current.push(utterance);
+          
+          utterance.onstart = () => {
+            setAppState("speaking");
+          };
+          
+          utterance.onend = () => {
+            activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
+            if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+              setAppState("idle");
             }
-          });
+          };
+
+          utterance.onerror = (e) => {
+            activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
+            console.error("Speech error", e);
+            if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+              setAppState("idle");
+            }
+          };
+
+          window.speechSynthesis.speak(utterance);
         };
 
         responseText = await getZoyaResponseStream(
@@ -944,9 +973,10 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         }
 
-        // Wait for all queued audio segments to finish playing
-        await playPromiseChain;
-        setAppState("idle");
+        // Wait a brief moment to ensure idle state updates if needed, though onend handles it
+        if (isMuted || (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
+          setAppState("idle");
+        }
       } catch (error: any) {
         setIsTyping(false);
         setIsLoading(false);
