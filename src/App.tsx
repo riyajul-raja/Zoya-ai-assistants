@@ -1642,22 +1642,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               <span className="text-xs font-mono font-medium tracking-wider">INSTALL</span>
             </button>
           )}
-          {showChat && messages.length > 0 && (
-            <button
-              onClick={() => {
-                if (confirm("Are you sure you want to clear all chat history?")) {
-                  setMessages([]);
-                  localStorage.removeItem("zoya_chat_history");
-                  resetZoyaSession();
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-red-500/20 hover:text-red-400 transition-all border border-white/10 cursor-pointer"
-              title="Delete all history"
-            >
-              <Trash2 size={16} className="opacity-80" />
-              <span className="text-xs font-mono tracking-wide">Delete all history</span>
-            </button>
-          )}
+
           
           {/* Ghost Mode Toggle Button */}
           <button
@@ -1850,6 +1835,24 @@ In your very first response or greeting to the user, you MUST casually and natur
                 </span>
                 
                 <div className="flex items-center gap-2">
+                  {/* Trash Icon Button to Clear Chat History */}
+                  {messages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to clear all chat history?")) {
+                          setMessages([]);
+                          localStorage.removeItem("zoya_chat_history");
+                          resetZoyaSession();
+                        }
+                      }}
+                      className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10 animate-fade-in"
+                      title="Delete all history"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+
                   {/* Full Screen Toggle Button */}
                   <button
                     type="button"

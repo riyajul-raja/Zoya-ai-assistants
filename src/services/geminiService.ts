@@ -135,24 +135,10 @@ export async function getZoyaResponseStream(
       ];
     }
  
-    // Set up AbortController with a strict 5-second timeout goal for high-speed response
-    const originalFetch = window.fetch;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, 5000);
- 
     try {
-      window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
-        return originalFetch(input, { ...init, signal: controller.signal });
-      };
- 
       const responseStream = await chatSession.sendMessageStream({ message: messageInput });
       let accumulatedText = "";
       for await (const chunk of responseStream) {
-        if (controller.signal.aborted) {
-          throw new Error("Timeout");
-        }
         const chunkText = chunk.text || "";
         if (chunkText) {
           accumulatedText += chunkText;
@@ -163,13 +149,7 @@ export async function getZoyaResponseStream(
       }
       return accumulatedText;
     } catch (error: any) {
-      if (error?.name === "AbortError" || controller.signal.aborted) {
-        throw new Error("Timeout");
-      }
       throw error;
-    } finally {
-      clearTimeout(timeoutId);
-      window.fetch = originalFetch;
     }
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -277,28 +257,11 @@ export async function getZoyaResponse(
       ];
     }
 
-    // Set up AbortController with a strict 5-second timeout goal for high-speed response
-    const originalFetch = window.fetch;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, 5000);
-
     try {
-      window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
-        return originalFetch(input, { ...init, signal: controller.signal });
-      };
-
       const response = await chatSession.sendMessage({ message: messageInput });
       return response.text || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
-      if (error?.name === "AbortError" || controller.signal.aborted) {
-        throw new Error("Timeout");
-      }
       throw error;
-    } finally {
-      clearTimeout(timeoutId);
-      window.fetch = originalFetch;
     }
   } catch (error) {
     console.error("Gemini Error:", error);
