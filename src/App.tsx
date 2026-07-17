@@ -73,6 +73,22 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesRef = useRef(messages);
   const activeUtterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
+  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      let voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+      if (!voice && voices.length > 0) {
+        voice = voices[0];
+      }
+      if (voice) {
+        selectedVoiceRef.current = voice;
+      }
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -856,6 +872,15 @@ In your very first response or greeting to the user, you MUST casually and natur
           const trimmed = sentence.trim();
           if (trimmed) {
             const utterance = new SpeechSynthesisUtterance(trimmed);
+            if (selectedVoiceRef.current) {
+              utterance.voice = selectedVoiceRef.current;
+              utterance.lang = selectedVoiceRef.current.lang;
+            } else {
+              utterance.lang = 'hi-IN';
+            }
+            utterance.pitch = 1.0;
+            utterance.rate = 1.0;
+            
             activeUtterancesRef.current.push(utterance);
             utterance.onstart = () => setAppState("speaking");
             utterance.onend = () => {
@@ -909,6 +934,15 @@ In your very first response or greeting to the user, you MUST casually and natur
           if (!trimmed) return;
 
           const utterance = new SpeechSynthesisUtterance(trimmed);
+          if (selectedVoiceRef.current) {
+            utterance.voice = selectedVoiceRef.current;
+            utterance.lang = selectedVoiceRef.current.lang;
+          } else {
+            utterance.lang = 'hi-IN';
+          }
+          utterance.pitch = 1.0;
+          utterance.rate = 1.0;
+          
           activeUtterancesRef.current.push(utterance);
           
           utterance.onstart = () => {
