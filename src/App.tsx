@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -182,6 +182,24 @@ export default function App() {
   const [unlockStatus, setUnlockStatus] = useState<"awaiting" | "granted" | "failed">("awaiting");
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimerRef = useRef<any>(null);
+
+  const [passkeyInput, setPasskeyInput] = useState("");
+  const [passkeyError, setPasskeyError] = useState(false);
+
+  const handlePasskeySubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (passkeyInput === "#zoya") {
+      setPasskeyError(false);
+      setUnlockStatus("granted");
+      setTimeout(() => {
+        setIsUnlocked(true);
+      }, 1000);
+    } else {
+      setPasskeyError(true);
+      setUnlockStatus("failed");
+      setTimeout(() => setUnlockStatus("awaiting"), 2000);
+    }
+  };
 
   const triggerBiometrics = async () => {
     if (unlockStatus === "granted") return;
@@ -1919,6 +1937,56 @@ In your very first response or greeting to the user, you MUST casually and natur
                   </span>
                 </div>
               </motion.div>
+
+              {/* Passkey Input Field */}
+              <motion.form 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                onSubmit={handlePasskeySubmit}
+                className="flex flex-col items-center gap-3 w-full max-w-xs"
+              >
+                <div className="relative w-full group">
+                  <input
+                    type="password"
+                    placeholder="ENTER OVERRIDE PASSKEY"
+                    value={passkeyInput}
+                    onChange={(e) => {
+                      setPasskeyInput(e.target.value);
+                      if (passkeyError) setPasskeyError(false);
+                    }}
+                    className={`w-full bg-white/[0.02] border focus:outline-none focus:ring-1 text-center font-mono text-sm tracking-[0.2em] py-3 px-4 rounded-xl transition-all duration-300 placeholder:text-white/20 ${
+                      passkeyError 
+                        ? "border-red-500/50 focus:ring-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" 
+                        : "border-white/10 hover:border-violet-500/30 focus:border-violet-500/50 focus:ring-violet-500/50 text-violet-100 shadow-[0_0_15px_rgba(139,92,246,0.05)] focus:shadow-[0_0_20px_rgba(139,92,246,0.2)]"
+                    }`}
+                  />
+                  <button 
+                    type="submit" 
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-white/5 hover:bg-violet-500/20 text-white/40 hover:text-violet-300 transition-colors cursor-pointer"
+                  >
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+                <AnimatePresence>
+                  {passkeyError && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      className="text-[10px] font-mono text-red-400 tracking-wider uppercase drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]"
+                    >
+                      Wrong Passkey - Access Denied
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </motion.form>
+
+              <div className="flex items-center gap-4 w-full max-w-xs opacity-40">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent to-white/20"></div>
+                <span className="text-[9px] font-mono tracking-widest text-white/50">OR</span>
+                <div className="flex-1 h-px bg-gradient-to-l from-transparent to-white/20"></div>
+              </div>
 
               {/* Pulsing Fingerprint Container with Hold Progress Circle */}
               <div className="relative flex items-center justify-center">
