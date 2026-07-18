@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -54,16 +54,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ 
-  prompt: 'consent',
-  client_id: '866655994820-p1vng5399ae5lnnhu22gniatk5hlda57.apps.googleusercontent.com'
-});
-
-// Add requested scopes
-provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
-
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory and local storage
@@ -75,14 +65,22 @@ export const initAuth = (
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
-    if (user) {
-      // Re-read from localStorage just in case
-      cachedAccessToken = localStorage.getItem('zoya_google_token');
+    // Re-read from localStorage just in case
+    cachedAccessToken = localStorage.getItem('zoya_google_token');
+    
+    // In our new GIS flow, we bypass Firebase Auth for Google, so 'user' might be null here
+    // but if we have a valid cachedAccessToken, we consider it authenticated for API usage.
+    if (user || cachedAccessToken) {
       if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
+        // Create a mock user if one doesn't exist so components don't crash
+        const activeUser = user || {
+          uid: 'google-oauth-user',
+          displayName: 'Google User',
+          email: '',
+          photoURL: null
+        } as unknown as User;
+        if (onAuthSuccess) onAuthSuccess(activeUser, cachedAccessToken);
       } else if (!isSigningIn) {
-        // We have a user session but no fresh token in memory yet.
-        // It's safer to prompt a re-auth or clear cached state.
         cachedAccessToken = null;
         localStorage.removeItem('zoya_google_token');
         if (onAuthFailure) onAuthFailure();
@@ -97,40 +95,69 @@ export const initAuth = (
 
 // Must be called from a button click or user interaction
 export const googleSignIn = async (customScopes?: string[]): Promise<{ user: User; accessToken: string } | null> => {
-  try {
+  return new Promise((resolve, reject) => {
     isSigningIn = true;
     
-    if (customScopes && customScopes.length > 0) {
-      const activeProvider = new GoogleAuthProvider();
-      activeProvider.setCustomParameters({ 
-        prompt: 'consent',
-        client_id: '866655994820-p1vng5399ae5lnnhu22gniatk5hlda57.apps.googleusercontent.com'
-      });
-      customScopes.forEach(scope => activeProvider.addScope(scope));
-      const result = await signInWithPopup(auth, activeProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential?.accessToken) {
-        throw new Error('Failed to get access token from Firebase Auth');
+    const defaultScopes = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/contacts.readonly';
+    const scopes = customScopes && customScopes.length > 0 
+      ? customScopes.join(' ') 
+      : defaultScopes;
+
+    const handleSuccess = (tokenResponse: any) => {
+      if (tokenResponse && tokenResponse.access_token) {
+        cachedAccessToken = tokenResponse.access_token;
+        localStorage.setItem('zoya_google_token', tokenResponse.access_token);
+        
+        // Mock user object to satisfy the expected return type without Firebase
+        const mockUser = {
+          uid: 'google-oauth-user',
+          email: '',
+          displayName: 'Google User',
+          photoURL: null,
+        } as unknown as User;
+
+        isSigningIn = false;
+        resolve({ user: mockUser, accessToken: cachedAccessToken });
+      } else {
+        isSigningIn = false;
+        reject(new Error('Failed to get access token from Google Identity Services'));
       }
-      cachedAccessToken = credential.accessToken;
-      localStorage.setItem('zoya_google_token', cachedAccessToken);
-      return { user: result.user, accessToken: cachedAccessToken };
+    };
+
+    const loadAndInit = () => {
+      try {
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '866655994820-p1vng5399ae5lnnhu22gniatk5hlda57.apps.googleusercontent.com',
+          scope: scopes,
+          callback: handleSuccess,
+          error_callback: (error: any) => {
+            isSigningIn = false;
+            reject(error);
+          }
+        });
+        client.requestAccessToken();
+      } catch (e) {
+        isSigningIn = false;
+        reject(e);
+      }
+    };
+
+    // Load GIS script if not present
+    if (!(window as any).google?.accounts?.oauth2) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = loadAndInit;
+      script.onerror = () => {
+        isSigningIn = false;
+        reject(new Error('Failed to load Google Identity Services script'));
+      };
+      document.body.appendChild(script);
     } else {
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential?.accessToken) {
-        throw new Error('Failed to get access token from Firebase Auth');
-      }
-      cachedAccessToken = credential.accessToken;
-      localStorage.setItem('zoya_google_token', cachedAccessToken);
-      return { user: result.user, accessToken: cachedAccessToken };
+      loadAndInit();
     }
-  } catch (error: any) {
-    console.error('Sign in error:', error);
-    throw error;
-  } finally {
-    isSigningIn = false;
-  }
+  });
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
