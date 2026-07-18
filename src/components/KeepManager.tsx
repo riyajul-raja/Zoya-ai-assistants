@@ -244,7 +244,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
         </button>
 
         {/* Left Drawer */}
-        <div className="w-full md:w-[260px] border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between h-full">
+        <div className={`w-full md:w-[260px] border-r border-white/10 shrink-0 bg-white/2 flex-col justify-between h-full ${isCreateOpen || selectedNote ? "hidden md:flex" : "flex"}`}>
           <div className="p-5 flex flex-col h-full overflow-y-auto space-y-5">
             {/* Header / Brand */}
             <div className="flex items-center gap-2.5">
@@ -286,8 +286,8 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
               <div className="space-y-1">
                 <button
                   onClick={() => setFilterType("all")}
-                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
-                    filterType === "all" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all border ${
+                    filterType === "all" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "border-transparent text-white/40 hover:text-white"
                   }`}
                 >
                   <Sliders size={12} />
@@ -295,8 +295,8 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                 </button>
                 <button
                   onClick={() => setFilterType("text")}
-                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
-                    filterType === "text" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all border ${
+                    filterType === "text" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "border-transparent text-white/40 hover:text-white"
                   }`}
                 >
                   <FileText size={12} />
@@ -304,8 +304,8 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                 </button>
                 <button
                   onClick={() => setFilterType("list")}
-                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all ${
-                    filterType === "list" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all border ${
+                    filterType === "list" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "border-transparent text-white/40 hover:text-white"
                   }`}
                 >
                   <ListPlus size={12} />
@@ -317,7 +317,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
         </div>
 
         {/* Center Panel */}
-        <div className="flex-1 flex flex-col min-w-0 h-full bg-neutral-900/10">
+        <div className={`flex-1 flex-col min-w-0 h-full bg-neutral-900/10 ${isCreateOpen || selectedNote ? "hidden md:flex" : "flex"}`}>
           {/* Header */}
           <div className="p-5 border-b border-white/10 shrink-0 flex items-center justify-between">
             <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -454,7 +454,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
         </div>
 
         {/* Right Panel Composer */}
-        <div className="hidden md:flex md:w-[360px] flex-col h-full bg-white/1 border-l border-white/10 relative">
+        <div className={`${isCreateOpen || selectedNote ? "flex absolute inset-0 z-20 bg-neutral-950 md:relative md:z-0 md:bg-white/1" : "hidden md:flex"} md:w-[360px] flex-col h-full border-l border-white/10`}>
           <div className="flex-1 overflow-y-auto p-5 pt-16 h-full flex flex-col justify-between">
             <AnimatePresence mode="wait">
               {isCreateOpen ? (
