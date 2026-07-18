@@ -157,26 +157,28 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript.toLowerCase();
       
-      if (transcript.includes('call ')) {
-        const nameToCall = transcript.split('call ')[1].trim();
+      const callIndex = transcript.indexOf('call ');
+      if (callIndex !== -1) {
+        const rawNameToCall = transcript.substring(callIndex + 5).trim();
+        const nameToCall = rawNameToCall.replace(/\s+/g, '');
+        
         if (nameToCall) {
           const match = contacts.find((c) => {
-            const contactName = (c.names?.[0]?.displayName || "").toLowerCase();
+            const contactNameRaw = (c.names?.[0]?.displayName || "").toLowerCase();
+            const contactName = contactNameRaw.replace(/\s+/g, '');
             return contactName.includes(nameToCall) || nameToCall.includes(contactName);
           });
 
           if (match) {
-            const phone = match.phoneNumbers?.[0]?.value;
-            if (phone) {
-              onToast(`Calling ${match.names?.[0]?.displayName}...`);
-              setTimeout(() => {
-                window.location.href = `tel:${phone}`;
-              }, 1500);
+            const matchedContactPhoneNumber = match.phoneNumbers?.[0]?.value;
+            if (matchedContactPhoneNumber) {
+              onToast(`Dialing ${match.names?.[0]?.displayName}...`);
+              window.location.href = 'tel:' + matchedContactPhoneNumber;
             } else {
               onToast(`Found ${match.names?.[0]?.displayName}, but no phone number available.`);
             }
           } else {
-            onToast(`Contact "${nameToCall}" not found.`);
+            onToast(`Contact not found.`);
           }
         }
       } else {
