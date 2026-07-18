@@ -67,6 +67,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'consent' });
 
 // Add contacts scopes
 provider.addScope('https://www.googleapis.com/auth/contacts');
@@ -182,6 +183,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
     
     if (customScopes && customScopes.length > 0) {
       const activeProvider = new GoogleAuthProvider();
+      activeProvider.setCustomParameters({ prompt: 'consent' });
       customScopes.forEach(scope => activeProvider.addScope(scope));
       const result = await signInWithPopup(auth, activeProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
