@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   StickyNote, Trash2, Plus, Search, X, Info, 
-  Sliders, FileText, ListPlus, CloudOff, CheckSquare, Square, Save
+  Sliders, FileText, ListPlus, CloudOff, CheckSquare, Square, Save,
+  Download, Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -220,6 +221,52 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
   const removeChecklistItemField = (index: number) => {
     if (newChecklistItems.length === 1) return;
     setNewChecklistItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Backup & Restore
+  const handleBackup = () => {
+    try {
+      const dataStr = JSON.stringify(notes, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "zoya-keep-backup.json";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      onToast("Workspace data exported successfully.");
+    } catch (e) {
+      console.error("Backup failed", e);
+      onToast("Backup failed.");
+    }
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const result = event.target?.result;
+        if (typeof result === "string") {
+          const parsed = JSON.parse(result);
+          if (Array.isArray(parsed)) {
+            setNotes(parsed);
+            saveFallbackNotesToStore(parsed);
+            onToast("Workspace data imported successfully.");
+          } else {
+            throw new Error("Invalid format");
+          }
+        }
+      } catch (err) {
+        console.error("Import failed", err);
+        onToast("Import failed: Invalid JSON format.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // reset
   };
 
   // Filter notes
@@ -527,6 +574,26 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                       <span>Checklists</span>
                     </button>
                     
+                    {/* Backup & Restore */}
+                    <div className="h-6 w-px bg-white/10 hidden sm:block mx-1"></div>
+                    <button
+                      onClick={handleBackup}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 font-mono text-xs transition-all border bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10 cursor-pointer"
+                    >
+                      <Download size={14} />
+                      <span>Backup Data</span>
+                    </button>
+                    <label className="flex items-center gap-2 rounded-xl px-3 py-2 font-mono text-xs transition-all border bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10 cursor-pointer">
+                      <Upload size={14} />
+                      <span>Import Data</span>
+                      <input 
+                        type="file" 
+                        accept=".json" 
+                        className="hidden" 
+                        onChange={handleImport}
+                      />
+                    </label>
+
                     {/* Search inside filters row */}
                     <div className="relative flex-1 min-w-[200px] ml-auto">
                       <span className="absolute inset-y-0 left-3 flex items-center text-white/35">
