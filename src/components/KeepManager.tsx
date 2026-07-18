@@ -5,6 +5,9 @@ import {
   Download, Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { User as FirebaseUser } from "firebase/auth";
+import { initAuth, googleSignIn, logout, getAccessToken } from "../services/firebaseService";
+import { UserPlus, Loader2, LogOut } from "lucide-react";
 
 interface KeepListItem {
   text?: {
@@ -36,6 +39,14 @@ interface KeepManagerProps {
 
 export default function KeepManager({ onClose, isGhostMode = false, onToast }: KeepManagerProps) {
   // Notes state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+  const [apiMode, setApiMode] = useState<"real" | "fallback">("fallback");
+
   const [notes, setNotes] = useState<KeepNote[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "text" | "checklist">("all");
@@ -55,8 +66,81 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
 
   // Initialize and load notes from local storage on mount
   useEffect(() => {
-    loadFallbackNotes();
+    const unsubscribe = initAuth(
+      (user, cachedToken) => {
+        setFirebaseUser(user);
+        setToken(cachedToken);
+        setIsAuthenticated(true);
+        setIsAuthChecking(false);
+        setApiMode("real");
+        fetchNotes(cachedToken);
+      },
+      () => {
+        setIsAuthenticated(false);
+        setFirebaseUser(null);
+        setToken(null);
+        setIsAuthChecking(false);
+        setApiMode("fallback");
+        loadFallbackNotes();
+      }
+    );
+    return () => unsubscribe();
   }, []);
+
+  const handleLogin = async () => {
+    setIsSigningIn(true);
+    try {
+      const result = await googleSignIn();
+      if (result) {
+        setToken(result.accessToken);
+        setFirebaseUser(result.user);
+        setIsAuthenticated(true);
+        setApiMode("real");
+        onToast("Google Keep access authorized!");
+        fetchNotes(result.accessToken);
+      }
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      onToast("Authentication failed. Please try again.");
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setIsAuthenticated(false);
+      setFirebaseUser(null);
+      setToken(null);
+      setApiMode("fallback");
+      loadFallbackNotes();
+      onToast("Logged out successfully.");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
+  const fetchNotes = async (accessToken: string) => {
+    setIsLoadingNotes(true);
+    try {
+      const response = await fetch("https://keep.googleapis.com/v1/notes", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (!response.ok) {
+        throw new Error(`Keep API error: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      setNotes(data.notes || []);
+    } catch (error) {
+      console.error("Failed to fetch Google Keep notes", error);
+      onToast("Failed to sync with Google Keep. Falling back to local storage.");
+      setApiMode("fallback");
+      loadFallbackNotes();
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
 
   const loadFallbackNotes = () => {
     try {
@@ -183,6 +267,10 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
     const noteIndex = notes.findIndex(n => n.name === noteName);
     if (noteIndex === -1) return;
 
+    if (apiMode === "real") {
+      onToast("Updating checklist items is not supported by Google Keep API yet. Read-only mode.");
+      return;
+    }
     const updatedNotes = [...notes];
     const targetNote = { ...updatedNotes[noteIndex] };
     

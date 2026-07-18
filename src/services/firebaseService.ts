@@ -98,7 +98,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
   return new Promise((resolve, reject) => {
     isSigningIn = true;
     
-    const defaultScopes = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/contacts.readonly';
+    const defaultScopes = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/keep https://www.googleapis.com/auth/keep.readonly';
     const scopes = customScopes && customScopes.length > 0 
       ? customScopes.join(' ') 
       : defaultScopes;
