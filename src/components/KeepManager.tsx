@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { 
-  StickyNote, Trash2, Plus, Loader2, Search, X, Info, LogOut, 
-  Check, Sliders, FileText, ListPlus, RefreshCw, CloudOff, Cloud, CheckSquare, Square, Save, Edit2
+  StickyNote, Trash2, Plus, Search, X, Info, 
+  Sliders, FileText, ListPlus, CloudOff, CheckSquare, Square, Save
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { User as FirebaseUser } from "firebase/auth";
-import { 
-  initAuth, googleSignIn, logout 
-} from "../services/firebaseService";
 
 interface KeepListItem {
   text?: {
@@ -38,19 +34,10 @@ interface KeepManagerProps {
 }
 
 export default function KeepManager({ onClose, isGhostMode = false, onToast }: KeepManagerProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [isSigningIn, setIsSigningIn] = useState(false);
-
   // Notes state
   const [notes, setNotes] = useState<KeepNote[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "text" | "list">("all");
-  const [apiMode, setApiMode] = useState<"real" | "fallback">("real");
-  const [scopeFailed, setScopeFailed] = useState(false);
 
   // Selection & detail state
   const [selectedNote, setSelectedNote] = useState<KeepNote | null>(null);
@@ -65,138 +52,10 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
   const [newChecklistItems, setNewChecklistItems] = useState<string[]>([""]);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Initialize Auth
+  // Initialize and load notes from local storage on mount
   useEffect(() => {
-    const unsubscribe = initAuth(
-      (user, cachedToken) => {
-        setFirebaseUser(user);
-        setToken(cachedToken);
-        setIsAuthenticated(true);
-        setIsAuthChecking(false);
-        
-        if (user.email?.endsWith("@gmail.com")) {
-          setScopeFailed(true);
-          setApiMode("fallback");
-          loadFallbackNotes();
-        } else {
-          fetchNotes(cachedToken);
-        }
-      },
-      () => {
-        setIsAuthenticated(false);
-        setFirebaseUser(null);
-        setToken(null);
-        setIsAuthChecking(false);
-        setApiMode("fallback");
-        loadFallbackNotes();
-      }
-    );
-    return () => unsubscribe();
+    loadFallbackNotes();
   }, []);
-
-  const handleLogin = async () => {
-    setIsSigningIn(true);
-    
-    // Check if user has a standard @gmail.com consumer account
-    if (firebaseUser?.email?.endsWith("@gmail.com")) {
-      onToast("Google Keep API is restricted to Google Workspace accounts. Zoya is saving your notes locally.");
-      setScopeFailed(true);
-      setApiMode("fallback");
-      loadFallbackNotes();
-      setIsSigningIn(false);
-      return;
-    }
-
-    try {
-      const result = await googleSignIn([
-        "https://www.googleapis.com/auth/keep",
-        "https://www.googleapis.com/auth/keep.readonly"
-      ]);
-      if (result) {
-        setToken(result.accessToken);
-        setFirebaseUser(result.user);
-        setIsAuthenticated(true);
-        setScopeFailed(false);
-        onToast("Google Keep access authorized!");
-        fetchNotes(result.accessToken);
-      }
-    } catch (err: any) {
-      console.error("Login failed with Keep scopes:", err);
-      // Attempt login WITHOUT Google Keep scopes as a fallback
-      try {
-        const result = await googleSignIn([]);
-        if (result) {
-          setToken(result.accessToken);
-          setFirebaseUser(result.user);
-          setIsAuthenticated(true);
-          setScopeFailed(true);
-          setApiMode("fallback");
-          loadFallbackNotes();
-          onToast("Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.");
-        }
-      } catch (fallbackErr: any) {
-        console.error("Fallback login failed:", fallbackErr);
-        onToast("Authentication failed.");
-      }
-    } finally {
-      setIsSigningIn(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      setIsAuthenticated(false);
-      setFirebaseUser(null);
-      setToken(null);
-      setNotes([]);
-      setSelectedNote(null);
-      setIsCreateOpen(false);
-      onToast("Signed out from Google Keep.");
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
-  };
-
-  // Fetch Keep notes (from real API or fallback to local storage)
-  const fetchNotes = async (accessToken: string, forceLocalMode = false) => {
-    if (forceLocalMode) {
-      loadFallbackNotes();
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Try hitting the official Keep notes API list endpoint
-      const response = await fetch("https://keep.googleapis.com/v1/notes?pageSize=50", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      });
-
-      if (!response.ok) {
-        // If 403 Forbidden or 404 (consumer accounts), trigger fallback mode gracefully
-        if (response.status === 403 || response.status === 404) {
-          console.log("Keep API restricted to enterprise Workspace accounts. Activating premium local storage mode.");
-          setApiMode("fallback");
-          loadFallbackNotes();
-          return;
-        }
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setNotes(data.notes || []);
-      setApiMode("real");
-    } catch (err) {
-      console.error("Error fetching Keep notes:", err);
-      // Fallback
-      setApiMode("fallback");
-      loadFallbackNotes();
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loadFallbackNotes = () => {
     const cached = localStorage.getItem("zoya_keep_notes");
@@ -267,50 +126,23 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
       body: bodyPayload
     };
 
-    try {
-      if (apiMode === "real" && token) {
-        // Real API Call
-        const response = await fetch("https://keep.googleapis.com/v1/notes", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(notePayload)
-        });
+    const localNote: KeepNote = {
+      name: `notes/local-${Date.now()}`,
+      title: notePayload.title,
+      body: notePayload.body,
+      createTime: new Date().toISOString(),
+      updateTime: new Date().toISOString()
+    };
+    const updated = [localNote, ...notes];
+    saveFallbackNotesToStore(updated);
+    onToast("Note saved to secure local workspace!");
 
-        if (!response.ok) {
-          throw new Error("Failed to create note in Google Keep");
-        }
-
-        const data = await response.json();
-        setNotes(prev => [data, ...prev]);
-        onToast("Note created on Google Keep!");
-      } else {
-        // Fallback Local Mode
-        const localNote: KeepNote = {
-          name: `notes/local-${Date.now()}`,
-          title: notePayload.title,
-          body: notePayload.body,
-          createTime: new Date().toISOString(),
-          updateTime: new Date().toISOString()
-        };
-        const updated = [localNote, ...notes];
-        saveFallbackNotesToStore(updated);
-        onToast("Note saved to secure local workspace!");
-      }
-
-      // Reset
-      setNewTitle("");
-      setNewTextBody("");
-      setNewChecklistItems([""]);
-      setIsCreateOpen(false);
-    } catch (err) {
-      console.error("Error creating note:", err);
-      onToast("Could not save note. Activating backup storage.");
-    } finally {
-      setIsCreating(false);
-    }
+    // Reset
+    setNewTitle("");
+    setNewTextBody("");
+    setNewChecklistItems([""]);
+    setIsCreateOpen(false);
+    setIsCreating(false);
   };
 
   // Delete note
@@ -318,41 +150,17 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
     const confirmed = window.confirm("Are you sure you want to delete this note?");
     if (!confirmed) return;
 
-    try {
-      if (apiMode === "real" && token) {
-        // Real API Call
-        const response = await fetch(`https://keep.googleapis.com/v1/${noteName}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+    const updated = notes.filter(n => n.name !== noteName);
+    saveFallbackNotesToStore(updated);
+    onToast("Note removed from workspace.");
 
-        if (!response.ok) {
-          throw new Error("Failed to delete note");
-        }
-
-        setNotes(prev => prev.filter(n => n.name !== noteName));
-        onToast("Note deleted from Google Keep.");
-      } else {
-        // Fallback Local Mode
-        const updated = notes.filter(n => n.name !== noteName);
-        saveFallbackNotesToStore(updated);
-        onToast("Note removed from workspace.");
-      }
-
-      if (selectedNote?.name === noteName) {
-        setSelectedNote(null);
-      }
-    } catch (err) {
-      console.error("Error deleting note:", err);
-      onToast("Could not complete deletion.");
+    if (selectedNote?.name === noteName) {
+      setSelectedNote(null);
     }
   };
 
   // Toggle checklist item checked status
   const toggleChecklistItem = async (noteName: string, itemIndex: number) => {
-    // Clone and mutate locally first for fast UI responsiveness
     const noteIndex = notes.findIndex(n => n.name === noteName);
     if (noteIndex === -1) return;
 
@@ -371,28 +179,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
       };
       
       updatedNotes[noteIndex] = targetNote;
-      setNotes(updatedNotes);
-
-      // If we are in local mode, persist right away
-      if (apiMode === "fallback") {
-        saveFallbackNotesToStore(updatedNotes);
-      } else if (apiMode === "real" && token) {
-        // Optional: Send real update to Keep API if they support patching list items
-        try {
-          await fetch(`https://keep.googleapis.com/v1/${noteName}`, {
-            method: "PATCH",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              body: targetNote.body
-            })
-          });
-        } catch (e) {
-          console.error("Failed to patch checklist item in Keep API:", e);
-        }
-      }
+      saveFallbackNotesToStore(updatedNotes);
 
       // Sync active view
       if (selectedNote?.name === noteName) {
@@ -458,7 +245,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
 
         {/* Left Drawer */}
         <div className="w-full md:w-[260px] border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between h-full">
-          <div className="p-5 flex flex-col h-[calc(100%-70px)] overflow-y-auto space-y-5">
+          <div className="p-5 flex flex-col h-full overflow-y-auto space-y-5">
             {/* Header / Brand */}
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
@@ -483,23 +270,13 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
             </button>
 
             {/* Sync Mode Information */}
-            <div className={`p-3 rounded-xl border flex flex-col gap-1.5 ${
-              (isAuthenticated && apiMode === "real")
-                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" 
-                : "bg-amber-500/5 border-amber-500/20 text-amber-400"
-            }`}>
+            <div className="p-3 rounded-xl border flex flex-col gap-1.5 bg-amber-500/5 border-amber-500/20 text-amber-400">
               <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider font-semibold">
-                {(isAuthenticated && apiMode === "real") ? <Cloud size={11} /> : <CloudOff size={11} />}
-                <span>{(isAuthenticated && apiMode === "real") ? "GOOGLE CLOUD SYNC" : "LOCAL WORKSPACE"}</span>
+                <CloudOff size={11} />
+                <span>LOCAL WORKSPACE</span>
               </div>
               <p className="text-[9px] text-white/50 leading-relaxed font-sans">
-                {(isAuthenticated && apiMode === "real") 
-                  ? "Changes are mirrored in real-time to your Google Keep." 
-                  : scopeFailed
-                    ? "Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally."
-                    : !isAuthenticated
-                      ? "Connect your Google Account below to enable cloud synchronization."
-                      : "Running in local fallback mode. Enterprise scopes restricted on consumer accounts."}
+                Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.
               </p>
             </div>
 
@@ -537,51 +314,6 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
               </div>
             </div>
           </div>
-
-          {/* User profile footer */}
-          {isAuthenticated && firebaseUser ? (
-            <div className="p-4 border-t border-white/10 shrink-0 bg-white/2 flex flex-col space-y-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                {firebaseUser.photoURL ? (
-                  <img
-                    src={firebaseUser.photoURL}
-                    alt={firebaseUser.displayName || "Google User"}
-                    referrerPolicy="no-referrer"
-                    className="w-6.5 h-6.5 rounded-full border border-white/10"
-                  />
-                ) : (
-                  <div className="w-6.5 h-6.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-[10px] uppercase">
-                    {firebaseUser.displayName?.charAt(0) || "G"}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="text-[9px] text-white/30 leading-none">Logged In</p>
-                  <p className="text-[11px] font-medium text-white truncate mt-1">
-                    {firebaseUser.displayName || firebaseUser.email}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-full p-1.5 rounded-lg border border-white/10 hover:border-amber-500/30 text-white/60 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer text-[10px] font-mono flex items-center justify-center gap-1.5"
-              >
-                <LogOut size={11} />
-                <span>SIGN OUT</span>
-              </button>
-            </div>
-          ) : (
-            <div className="p-4 border-t border-white/10 shrink-0 bg-white/2 flex flex-col space-y-2">
-              <p className="text-[9px] text-white/30 leading-none">Workspace Auth</p>
-              <button
-                onClick={handleLogin}
-                disabled={isSigningIn || scopeFailed}
-                className="w-full p-2 rounded-lg border border-amber-500/20 hover:border-amber-500/40 text-amber-400 hover:text-amber-300 hover:bg-amber-500/5 transition-all cursor-pointer text-[10px] font-mono flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {isSigningIn ? <Loader2 size={11} className="animate-spin" /> : <Cloud size={11} />}
-                <span>{scopeFailed ? "CONNECT RESTRICTED" : "CONNECT ACCOUNT"}</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Center Panel */}
@@ -627,44 +359,24 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
             </button>
           </div>
 
-          {scopeFailed ? (
-            <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
-              <span className="flex items-center gap-2">
-                <CloudOff size={14} className="text-amber-400 animate-pulse" />
-                <span>Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.</span>
-              </span>
-            </div>
-          ) : !isAuthenticated ? (
-            <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
-              <span className="flex items-center gap-2">
-                <CloudOff size={14} className="text-amber-400" />
-                <span>Running in premium Offline-First local storage mode. Cloud sync is disabled.</span>
-              </span>
-              <button
-                onClick={handleLogin}
-                className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-200 px-3 py-1 rounded-lg transition-all text-[10px] uppercase font-mono cursor-pointer"
-              >
-                Connect Cloud
-              </button>
-            </div>
-          ) : null}
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
+            <span className="flex items-center gap-2">
+              <CloudOff size={14} className="text-amber-400 animate-pulse" />
+              <span>Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.</span>
+            </span>
+          </div>
 
           <div className="flex-1 overflow-y-auto p-5">
-            {isLoading ? (
-              <div className="h-full flex flex-col items-center justify-center text-white/50 space-y-3">
-                <Loader2 size={24} className="animate-spin text-amber-500" />
-                <p className="text-xs font-mono">Syncing Keep databases...</p>
-              </div>
-            ) : filteredNotes.length > 0 ? (
+            {filteredNotes.length > 0 ? (
               /* NOTES GRID */
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredNotes.map((note) => {
                   const isList = !!note.body?.list;
                   return (
-                    <div
+                     <div
                       key={note.name}
                       onClick={() => setSelectedNote(note)}
-                      className={`p-5 rounded-2xl border cursor-pointer relative group transition-all duration-300 flex flex-col justify-between h-[180px] bg-neutral-900/60 border-white/5 hover:border-amber-500/40 hover:shadow-[0_0_15px_rgba(245,158,11,0.08)]`}
+                      className="p-5 rounded-2xl border cursor-pointer relative group transition-all duration-300 flex flex-col justify-between h-[180px] bg-neutral-900/60 border-white/5 hover:border-amber-500/40 hover:shadow-[0_0_15px_rgba(245,158,11,0.08)]"
                     >
                       <div>
                         {/* Note Header Title & Action */}
@@ -686,59 +398,59 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                           </div>
                         </div>
 
-                          {/* Note Body Content */}
-                          <div className="mt-3 text-xs text-white/60 line-clamp-4 space-y-1">
-                            {!isList ? (
-                              <p className="leading-relaxed font-sans font-light">
-                                {note.body?.text?.text}
-                              </p>
-                            ) : (
-                              <div className="space-y-1">
-                                {(note.body?.list?.listItems || []).slice(0, 3).map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2 font-mono text-[10px]">
-                                    {item.checked ? (
-                                      <CheckSquare size={11} className="text-amber-500 shrink-0" />
-                                    ) : (
-                                      <Square size={11} className="text-white/30 shrink-0" />
-                                    )}
-                                    <span className={`truncate ${item.checked ? "line-through text-white/30" : ""}`}>
-                                      {item.text?.text}
-                                    </span>
-                                  </div>
-                                ))}
-                                {(note.body?.list?.listItems || []).length > 3 && (
-                                  <p className="text-[9px] font-mono text-amber-500/50 mt-1 pl-1">
-                                    + {(note.body?.list?.listItems || []).length - 3} more records
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Timestamp footer */}
-                        <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[9px] font-mono text-white/30 shrink-0">
-                          <span>{isList ? "CHECKLIST" : "TEXT MEMO"}</span>
-                          <span>
-                            {note.updateTime 
-                              ? new Date(note.updateTime).toLocaleDateString([], { month: "short", day: "numeric" }) 
-                              : "Local Record"}
-                          </span>
+                        {/* Note Body Content */}
+                        <div className="mt-3 text-xs text-white/60 line-clamp-4 space-y-1">
+                          {!isList ? (
+                            <p className="leading-relaxed font-sans font-light">
+                              {note.body?.text?.text}
+                            </p>
+                          ) : (
+                            <div className="space-y-1">
+                              {(note.body?.list?.listItems || []).slice(0, 3).map((item, i) => (
+                                <div key={i} className="flex items-center gap-2 font-mono text-[10px]">
+                                  {item.checked ? (
+                                    <CheckSquare size={11} className="text-amber-500 shrink-0" />
+                                  ) : (
+                                    <Square size={11} className="text-white/30 shrink-0" />
+                                  )}
+                                  <span className={`truncate ${item.checked ? "line-through text-white/30" : ""}`}>
+                                    {item.text?.text}
+                                  </span>
+                                </div>
+                              ))}
+                              {(note.body?.list?.listItems || []).length > 3 && (
+                                <p className="text-[9px] font-mono text-amber-500/50 mt-1 pl-1">
+                                  + {(note.body?.list?.listItems || []).length - 3} more records
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8 text-white/30">
-                  <StickyNote size={32} className="opacity-20 mb-2 text-amber-500/40 animate-pulse" />
-                  <p className="text-xs font-mono uppercase">No records found</p>
-                  <p className="text-[10px] mt-1 max-w-xs leading-normal">
-                    Create a text record or checklist dynamically in the sidebar.
-                  </p>
-                </div>
-              )}
-            </div>
+
+                      {/* Timestamp footer */}
+                      <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[9px] font-mono text-white/30 shrink-0">
+                        <span>{isList ? "CHECKLIST" : "TEXT MEMO"}</span>
+                        <span>
+                          {note.updateTime 
+                            ? new Date(note.updateTime).toLocaleDateString([], { month: "short", day: "numeric" }) 
+                            : "Local Record"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-8 text-white/30">
+                <StickyNote size={32} className="opacity-20 mb-2 text-amber-500/40 animate-pulse" />
+                <p className="text-xs font-mono uppercase">No records found</p>
+                <p className="text-[10px] mt-1 max-w-xs leading-normal">
+                  Create a text record or checklist dynamically in the sidebar.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Panel Composer */}
@@ -845,7 +557,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                       className="flex-1 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-600/30 text-white text-xs font-mono rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       {isCreating ? (
-                        <Loader2 size={13} className="animate-spin" />
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <>
                           <Save size={12} />
@@ -965,20 +677,18 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                       <div className="flex justify-between text-[11px] font-mono text-white/40">
                         <span>Database Mode</span>
                         <span className="text-white uppercase font-bold text-[10px]">
-                          {apiMode === "real" ? "Cloud Sync" : "Local Workspace"}
+                          Local Workspace
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {isAuthenticated && (
-                    <button
-                      onClick={() => setIsCreateOpen(true)}
-                      className="w-full bg-white/5 hover:bg-white/10 border border-white/10 py-2.5 rounded-xl font-mono text-xs text-white uppercase transition-colors cursor-pointer"
-                    >
-                      COMPOSE NEW RECORD
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setIsCreateOpen(true)}
+                    className="w-full bg-white/5 hover:bg-white/10 border border-white/10 py-2.5 rounded-xl font-mono text-xs text-white uppercase transition-colors cursor-pointer"
+                  >
+                    COMPOSE NEW RECORD
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
