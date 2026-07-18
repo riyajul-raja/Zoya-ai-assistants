@@ -173,7 +173,26 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
             const matchedContactPhoneNumber = match.phoneNumbers?.[0]?.value;
             if (matchedContactPhoneNumber) {
               onToast(`Dialing ${match.names?.[0]?.displayName}...`);
-              window.location.href = 'tel:' + matchedContactPhoneNumber;
+              const cleanNumber = matchedContactPhoneNumber.replace(/[\s\-\(\)]/g, '');
+              
+              // Try to bypass iframe sandboxing using anchor click
+              const a = document.createElement('a');
+              a.href = 'tel:' + cleanNumber;
+              a.target = '_top'; // Also try to open in top frame
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              
+              // Fallback just in case
+              try {
+                if (window.top) {
+                  window.top.location.href = 'tel:' + cleanNumber;
+                } else {
+                  window.location.href = 'tel:' + cleanNumber;
+                }
+              } catch (e) {
+                window.location.href = 'tel:' + cleanNumber;
+              }
             } else {
               onToast(`Found ${match.names?.[0]?.displayName}, but no phone number available.`);
             }
