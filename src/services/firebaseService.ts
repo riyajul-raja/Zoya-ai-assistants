@@ -126,9 +126,10 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
 
     const loadAndInit = () => {
       try {
-        const rawClientId = '866655994820-p1vng5399seSinnhu22gniatk5hlds57.apps.googleusercontent.com';
+        const rawClientId = '866655994820-p1vng5399ae5lnnhu22gniatk5hlds57.apps.googleusercontent.com';
         const finalClientId = rawClientId.trim();
         console.log("Using Google Client ID:", finalClientId);
+        alert('Current Client ID inside app: ' + finalClientId);
         
         const client = (window as any).google.accounts.oauth2.initTokenClient({
           client_id: finalClientId,
