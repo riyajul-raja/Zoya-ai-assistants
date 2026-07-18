@@ -1917,7 +1917,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[linear-gradient(-45deg,#4c1d95,#0891b2,#be185d)] animate-gradient text-white p-6 font-sans overflow-hidden"
+            className="fixed top-0 left-0 w-[100vw] h-[100dvh] m-0 p-0 overflow-hidden z-[99999] flex flex-col items-center justify-center bg-[linear-gradient(135deg,#0f0c29,#302b63,#24243e)] animate-gradient text-white font-sans"
           >
             {/* Sci-Fi Cinematic Grid & Glowing Nodes */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff04_1px,transparent_1px),linear-gradient(to_bottom,#ffffff04_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)] pointer-events-none" />
@@ -1928,7 +1928,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             </div>
 
             {/* Glassmorphism Container */}
-            <div className="z-10 flex flex-col items-center max-w-md w-full text-center space-y-10 bg-white/[0.03] backdrop-blur-3xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-10 rounded-[2.5rem] relative overflow-hidden">
+            <div className="z-10 flex flex-col items-center max-w-md w-[90%] text-center space-y-10 hyper-glass p-10 rounded-[2.5rem] relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
               {/* Top Lock Badge */}
               <motion.div 
@@ -1966,10 +1966,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                       setPasskeyInput(e.target.value);
                       if (passkeyError) setPasskeyError(false);
                     }}
-                    className={`w-full bg-white/5 backdrop-blur-md border border-white/20 shadow-lg focus:outline-none focus:ring-1 text-center font-sans font-medium text-sm tracking-widest py-3 px-4 rounded-xl transition-all duration-300 placeholder:text-white/30 placeholder:tracking-widest ${
+                    className={`w-full hyper-glass hyper-glass-input focus:outline-none focus:ring-0 text-center font-sans font-medium text-sm tracking-widest py-3 px-4 rounded-xl transition-all duration-300 placeholder:text-white/30 placeholder:tracking-widest ${
                       passkeyError 
                         ? "border-red-500/50 focus:ring-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]" 
-                        : "hover:border-white/30 focus:border-white/40 focus:ring-white/20 text-white focus:shadow-[0_0_20px_rgba(255,255,255,0.15)]"
+                        : "hover:border-white/30 focus:border-white/40 focus:ring-white/20 text-white"
                     }`}
                   />
                   <button 
@@ -2031,7 +2031,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={triggerBiometrics}
-                  className={`w-40 h-40 rounded-full flex flex-col items-center justify-center relative cursor-pointer select-none transition-all duration-500 shadow-xl backdrop-blur-md bg-white/5 border border-white/20 animate-glow-pulse ${
+                  className={`w-40 h-40 rounded-full flex flex-col items-center justify-center relative cursor-pointer select-none transition-all duration-500 hyper-glass animate-glow-pulse ${
                     unlockStatus === "granted"
                       ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.3)] !animate-none"
                       : unlockStatus === "failed" || unlockStatus === "unregistered"
