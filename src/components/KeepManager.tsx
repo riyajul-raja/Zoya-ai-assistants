@@ -37,7 +37,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
   // Notes state
   const [notes, setNotes] = useState<KeepNote[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "text" | "list">("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "text" | "checklist">("all");
 
   // Selection & detail state
   const [selectedNote, setSelectedNote] = useState<KeepNote | null>(null);
@@ -58,47 +58,65 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
   }, []);
 
   const loadFallbackNotes = () => {
-    const cached = localStorage.getItem("zoya_keep_notes");
-    if (cached) {
-      setNotes(JSON.parse(cached));
-    } else {
-      const initialNotes: KeepNote[] = [
-        {
-          name: "notes/zoya-welcome",
-          title: "Welcome to Zoya Keep",
-          body: {
-            text: {
-              text: "This is a secure, persistent note storage workspace. Manage critical operation logs, quick ideas, and checklists seamlessly."
-            }
-          },
-          createTime: new Date().toISOString(),
-          updateTime: new Date().toISOString()
-        },
-        {
-          name: "notes/zoya-launch-checklist",
-          title: "Zoya Launch Checklist",
-          body: {
-            list: {
-              listItems: [
-                { text: { text: "Verify satellite communication links" }, checked: true },
-                { text: { text: "Verify AI core neural parameters" }, checked: true },
-                { text: { text: "Secure Google Workspace authentications" }, checked: false },
-                { text: { text: "Launch orbit huddle room on Meet" }, checked: false }
-              ]
-            }
-          },
-          createTime: new Date().toISOString(),
-          updateTime: new Date().toISOString()
+    try {
+      const cached = localStorage.getItem("zoya_keep_notes");
+      if (cached) {
+        try {
+          setNotes(JSON.parse(cached));
+          return;
+        } catch (e) {
+          localStorage.removeItem("zoya_keep_notes");
         }
-      ];
-      setNotes(initialNotes);
+      }
+    } catch (e) {
+      console.warn("localStorage not available:", e);
+    }
+
+    // Fallback if no valid cache or localStorage failed
+    const initialNotes: KeepNote[] = [
+      {
+        name: "notes/zoya-welcome",
+        title: "Welcome to Zoya Keep",
+        body: {
+          text: {
+            text: "This is a secure, persistent note storage workspace. Manage critical operation logs, quick ideas, and checklists seamlessly."
+          }
+        },
+        createTime: new Date().toISOString(),
+        updateTime: new Date().toISOString()
+      },
+      {
+        name: "notes/zoya-launch-checklist",
+        title: "Zoya Launch Checklist",
+        body: {
+          list: {
+            listItems: [
+              { text: { text: "Verify satellite communication links" }, checked: true },
+              { text: { text: "Verify AI core neural parameters" }, checked: true },
+              { text: { text: "Secure Google Workspace authentications" }, checked: false },
+              { text: { text: "Launch orbit huddle room on Meet" }, checked: false }
+            ]
+          }
+        },
+        createTime: new Date().toISOString(),
+        updateTime: new Date().toISOString()
+      }
+    ];
+    setNotes(initialNotes);
+    try {
       localStorage.setItem("zoya_keep_notes", JSON.stringify(initialNotes));
+    } catch (e) {
+      // Ignore
     }
   };
 
   const saveFallbackNotesToStore = (updatedNotes: KeepNote[]) => {
     setNotes(updatedNotes);
-    localStorage.setItem("zoya_keep_notes", JSON.stringify(updatedNotes));
+    try {
+      localStorage.setItem("zoya_keep_notes", JSON.stringify(updatedNotes));
+    } catch (e) {
+      console.warn("Could not save to localStorage:", e);
+    }
   };
 
   // Create a note
@@ -216,8 +234,8 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
 
     if (!matchesSearch) return false;
 
-    if (filterType === "text") return !!n.body?.text;
-    if (filterType === "list") return !!n.body?.list;
+    if (activeFilter === "text") return !!n.body?.text;
+    if (activeFilter === "checklist") return !!n.body?.list;
     return true;
   });
 
@@ -279,84 +297,83 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                 Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.
               </p>
             </div>
-
-            {/* Filter Swapper */}
-            <div className="space-y-2">
-              <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest px-1">Filters</p>
-              <div className="space-y-1">
-                <button
-                  onClick={() => setFilterType("all")}
-                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all border ${
-                    filterType === "all" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "border-transparent text-white/40 hover:text-white"
-                  }`}
-                >
-                  <Sliders size={12} />
-                  <span>All Notes</span>
-                </button>
-                <button
-                  onClick={() => setFilterType("text")}
-                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all border ${
-                    filterType === "text" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "border-transparent text-white/40 hover:text-white"
-                  }`}
-                >
-                  <FileText size={12} />
-                  <span>Plain Text</span>
-                </button>
-                <button
-                  onClick={() => setFilterType("list")}
-                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left font-mono text-xs transition-all border ${
-                    filterType === "list" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "border-transparent text-white/40 hover:text-white"
-                  }`}
-                >
-                  <ListPlus size={12} />
-                  <span>Checklists</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Center Panel */}
         <div className={`flex-1 flex-col min-w-0 h-full bg-neutral-900/10 ${isCreateOpen || selectedNote ? "hidden md:flex" : "flex"}`}>
           {/* Header */}
-          <div className="p-5 border-b border-white/10 shrink-0 flex items-center justify-between">
-            <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5">
-                <StickyNote size={18} className="text-amber-500 animate-pulse" />
-                <h3 className="text-sm font-mono text-white uppercase tracking-widest">
-                  KEEP LOG CONSOLE
-                </h3>
+          <div className="p-5 border-b border-white/10 shrink-0 flex flex-col gap-4">
+            <div className="w-full flex items-center justify-between">
+              <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-2.5">
+                  <StickyNote size={18} className="text-amber-500 animate-pulse" />
+                  <h3 className="text-sm font-mono text-white uppercase tracking-widest">
+                    KEEP LOG CONSOLE
+                  </h3>
+                </div>
+
+                <div className="relative max-w-xs w-full md:w-64">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-white/35">
+                    <Search size={12} />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search operational records..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white text-xs pl-8.5 pr-3 py-1.5 rounded-xl font-mono focus:outline-none transition-all placeholder:text-white/30"
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery("")}
+                      className="absolute inset-y-0 right-3 flex items-center text-white/40 hover:text-white cursor-pointer"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="relative max-w-xs w-full md:w-64">
-                <span className="absolute inset-y-0 left-3 flex items-center text-white/35">
-                  <Search size={12} />
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search operational records..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white text-xs pl-8.5 pr-3 py-1.5 rounded-xl font-mono focus:outline-none transition-all placeholder:text-white/30"
-                />
-                {searchQuery && (
-                  <button 
-                    onClick={() => setSearchQuery("")}
-                    className="absolute inset-y-0 right-3 flex items-center text-white/40 hover:text-white cursor-pointer"
-                  >
-                    <X size={10} />
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 ml-4 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+                title="Close Panel"
+              >
+                <X size={14} />
+              </button>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-1.5 ml-4 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
-              title="Close Panel"
-            >
-              <X size={14} />
-            </button>
+            {/* Inline Filters */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveFilter("all")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs transition-all border ${
+                  activeFilter === "all" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "bg-white/5 border-transparent text-white/50 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <Sliders size={11} />
+                <span>All Notes</span>
+              </button>
+              <button
+                onClick={() => setActiveFilter("text")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs transition-all border ${
+                  activeFilter === "text" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "bg-white/5 border-transparent text-white/50 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <FileText size={11} />
+                <span>Plain Text</span>
+              </button>
+              <button
+                onClick={() => setActiveFilter("checklist")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs transition-all border ${
+                  activeFilter === "checklist" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "bg-white/5 border-transparent text-white/50 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <ListPlus size={11} />
+                <span>Checklists</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
