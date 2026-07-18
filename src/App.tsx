@@ -179,7 +179,7 @@ export default function App() {
 
   // Biometric Security Lock Screen states
   const [isUnlocked, setIsUnlocked] = useState(false);
-  const [unlockStatus, setUnlockStatus] = useState<"awaiting" | "granted" | "failed">("awaiting");
+  const [unlockStatus, setUnlockStatus] = useState<"awaiting" | "granted" | "failed" | "unregistered">("awaiting");
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimerRef = useRef<any>(null);
 
@@ -190,6 +190,7 @@ export default function App() {
     if (e) e.preventDefault();
     if (passkeyInput === "#zoya") {
       setPasskeyError(false);
+      localStorage.setItem("isRegisteredDevice", "true");
       setUnlockStatus("granted");
       setTimeout(() => {
         setIsUnlocked(true);
@@ -203,6 +204,13 @@ export default function App() {
 
   const triggerBiometrics = async () => {
     if (unlockStatus === "granted") return;
+    
+    const isRegistered = localStorage.getItem("isRegisteredDevice") === "true";
+    if (!isRegistered) {
+      setUnlockStatus("unregistered");
+      setTimeout(() => setUnlockStatus("awaiting"), 3000);
+      return;
+    }
     
     // Start scanning progress simulation
     setUnlockStatus("awaiting");
@@ -1909,7 +1917,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-gradient-to-br from-[#0B0118] via-[#1D063A] to-[#041126] animate-gradient text-white p-6 font-sans overflow-hidden"
+            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[linear-gradient(-45deg,#4c1d95,#0891b2,#be185d)] animate-gradient text-white p-6 font-sans overflow-hidden"
           >
             {/* Sci-Fi Cinematic Grid & Glowing Nodes */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff04_1px,transparent_1px),linear-gradient(to_bottom,#ffffff04_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)] pointer-events-none" />
@@ -1958,7 +1966,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                       setPasskeyInput(e.target.value);
                       if (passkeyError) setPasskeyError(false);
                     }}
-                    className={`w-full bg-white/[0.02] border focus:outline-none focus:ring-1 text-center font-mono text-sm tracking-[0.2em] py-3 px-4 rounded-xl transition-all duration-300 placeholder:text-white/20 ${
+                    className={`w-full bg-white/[0.02] border focus:outline-none focus:ring-1 text-center font-sans font-medium text-sm tracking-widest py-3 px-4 rounded-xl transition-all duration-300 placeholder:text-white/20 placeholder:tracking-widest ${
                       passkeyError 
                         ? "border-red-500/50 focus:ring-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" 
                         : "border-white/10 hover:border-violet-500/30 focus:border-violet-500/50 focus:ring-violet-500/50 text-violet-100 shadow-[0_0_15px_rgba(139,92,246,0.05)] focus:shadow-[0_0_20px_rgba(139,92,246,0.2)]"
@@ -2058,11 +2066,11 @@ In your very first response or greeting to the user, you MUST casually and natur
                   key={unlockStatus}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`text-lg md:text-xl font-mono tracking-[0.2em] uppercase font-bold transition-colors duration-300 ${
+                  className={`text-lg md:text-xl font-sans tracking-[0.15em] uppercase font-semibold transition-colors duration-300 ${
                     unlockStatus === "granted"
-                      ? "text-emerald-400 font-sans tracking-wide"
-                      : unlockStatus === "failed"
-                      ? "text-red-400"
+                      ? "text-emerald-400"
+                      : unlockStatus === "failed" || unlockStatus === "unregistered"
+                      ? "text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]"
                       : "text-violet-100"
                   }`}
                 >
@@ -2070,19 +2078,23 @@ In your very first response or greeting to the user, you MUST casually and natur
                     "ACCESS GRANTED - WELCOME BOSS"
                   ) : unlockStatus === "failed" ? (
                     "AUTHORIZATION FAILED"
+                  ) : unlockStatus === "unregistered" ? (
+                    "Unrecognized Device"
                   ) : holdProgress > 0 ? (
                     "SCANNING BIOMETRICS..."
                   ) : (
-                    "BIOMETRIC LOCK: AWAITING AUTHORIZATION"
+                    "BIOMETRIC LOCK"
                   )}
                 </motion.h2>
 
-                <p className="text-xs text-white/40 font-mono tracking-wide max-w-xs mx-auto leading-relaxed">
+                <p className={`text-xs ${unlockStatus === "unregistered" ? "text-red-400 font-medium drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]" : "text-white/40"} font-sans tracking-wide max-w-xs mx-auto leading-relaxed`}>
                   {unlockStatus === "granted"
                     ? "Syncing core subroutines and loading Zoya neural link..."
                     : unlockStatus === "failed"
                     ? "Verification failed. Tap icon to authenticate using native device security."
-                    : "Tap icon to authenticate using native device security."}
+                    : unlockStatus === "unregistered"
+                    ? "Override Passkey Required."
+                    : "Awaiting authorization. Tap icon to authenticate."}
                 </p>
               </div>
             </div>
