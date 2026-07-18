@@ -68,6 +68,15 @@ html, body, #root {
   animation: float-particles 8s ease-in-out infinite;
 }
 
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(255, 255, 255, 0.05); }
+  50% { box-shadow: 0 0 35px rgba(255, 255, 255, 0.2); }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
 @keyframes dot-bounce {
   0%, 100% {
     transform: translateY(0);

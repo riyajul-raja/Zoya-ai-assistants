@@ -1960,16 +1960,16 @@ In your very first response or greeting to the user, you MUST casually and natur
                 <div className="relative w-full group">
                   <input
                     type="password"
-                    placeholder="ENTER OVERRIDE PASSKEY"
+                    placeholder="ENTER PASSKEY"
                     value={passkeyInput}
                     onChange={(e) => {
                       setPasskeyInput(e.target.value);
                       if (passkeyError) setPasskeyError(false);
                     }}
-                    className={`w-full bg-white/[0.02] border focus:outline-none focus:ring-1 text-center font-sans font-medium text-sm tracking-widest py-3 px-4 rounded-xl transition-all duration-300 placeholder:text-white/20 placeholder:tracking-widest ${
+                    className={`w-full bg-white/5 backdrop-blur-md border border-white/20 shadow-lg focus:outline-none focus:ring-1 text-center font-sans font-medium text-sm tracking-widest py-3 px-4 rounded-xl transition-all duration-300 placeholder:text-white/30 placeholder:tracking-widest ${
                       passkeyError 
-                        ? "border-red-500/50 focus:ring-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" 
-                        : "border-white/10 hover:border-violet-500/30 focus:border-violet-500/50 focus:ring-violet-500/50 text-violet-100 shadow-[0_0_15px_rgba(139,92,246,0.05)] focus:shadow-[0_0_20px_rgba(139,92,246,0.2)]"
+                        ? "border-red-500/50 focus:ring-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]" 
+                        : "hover:border-white/30 focus:border-white/40 focus:ring-white/20 text-white focus:shadow-[0_0_20px_rgba(255,255,255,0.15)]"
                     }`}
                   />
                   <button 
@@ -2031,14 +2031,14 @@ In your very first response or greeting to the user, you MUST casually and natur
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={triggerBiometrics}
-                  className={`w-40 h-40 rounded-full flex flex-col items-center justify-center relative cursor-pointer select-none transition-all duration-500 shadow-2xl ${
+                  className={`w-40 h-40 rounded-full flex flex-col items-center justify-center relative cursor-pointer select-none transition-all duration-500 shadow-xl backdrop-blur-md bg-white/5 border border-white/20 animate-glow-pulse ${
                     unlockStatus === "granted"
-                      ? "bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.3)]"
-                      : unlockStatus === "failed"
-                      ? "bg-red-500/10 border border-red-500/50 text-red-400 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-shake"
+                      ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.3)] !animate-none"
+                      : unlockStatus === "failed" || unlockStatus === "unregistered"
+                      ? "bg-red-500/10 border-red-500/50 text-red-400 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-shake !animate-none"
                       : holdProgress > 0
-                      ? "bg-violet-600/20 border border-violet-500/40 text-violet-300 shadow-[0_0_40px_rgba(139,92,246,0.2)]"
-                      : "bg-white/[0.02] border border-white/10 hover:border-white/20 text-white/80 hover:text-white"
+                      ? "bg-violet-600/20 border-violet-500/40 text-violet-300 shadow-[0_0_40px_rgba(139,92,246,0.2)] !animate-none"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
                   }`}
                 >
                   {/* Sweeping Scanner laser line */}
