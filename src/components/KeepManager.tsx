@@ -243,247 +243,59 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
     <div id="keep-manager-overlay" className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in">
       <div 
         id="keep-manager-card"
-        className={`w-full max-w-5xl h-[85vh] rounded-3xl flex flex-col md:flex-row overflow-hidden border backdrop-blur-xl relative transition-all duration-300 ${
+        className={`w-full max-w-3xl h-[85vh] rounded-3xl flex flex-col overflow-hidden border backdrop-blur-xl relative transition-all duration-300 ${
           isGhostMode 
             ? "bg-black/95 border-amber-500/80 shadow-[0_0_30px_rgba(245,158,11,0.3)]" 
             : "bg-neutral-950/95 border-amber-500/60 shadow-[0_0_25px_rgba(245,158,11,0.2)]"
         }`}
       >
-        {/* Top glowing amber accent strip */}
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 animate-pulse" />
 
-        {/* Absolute Universal Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
-          title="Close Panel"
-        >
-          <X size={16} />
-        </button>
-
-        {/* Left Drawer */}
-        <div className={`w-full md:w-[260px] border-r border-white/10 shrink-0 bg-white/2 flex-col justify-between h-full ${isCreateOpen || selectedNote ? "hidden md:flex" : "flex"}`}>
-          <div className="p-5 flex flex-col h-full overflow-y-auto space-y-5">
-            {/* Header / Brand */}
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-              <div>
-                <h2 className="text-lg font-serif font-medium text-white tracking-wide">
-                  Zoya Keep
-                </h2>
-                <p className="text-[9px] font-mono text-white/40 uppercase">Operational Notes</p>
-              </div>
+        {/* 1. Top Header with Close */}
+        <div className="p-5 border-b border-white/10 shrink-0 flex items-center justify-between bg-neutral-900/40">
+          <div className="flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+            <div>
+              <h2 className="text-lg font-serif font-medium text-white tracking-wide">
+                Zoya Keep
+              </h2>
+              <p className="text-[9px] font-mono text-white/40 uppercase">Operational Notes</p>
             </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+            title="Close Panel"
+          >
+            <X size={16} />
+          </button>
+        </div>
 
-            {/* Quick Action Button */}
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6 relative">
+          
+          {/* 2. COMPOSE NOTE button (toggles form) */}
+          <div className="shrink-0 space-y-4">
             <button
               onClick={() => {
-                setIsCreateOpen(true);
-                setSelectedNote(null);
+                setIsCreateOpen(!isCreateOpen);
+                if (!isCreateOpen) setSelectedNote(null);
               }}
-              className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white py-2.5 px-4 rounded-xl font-mono text-xs tracking-wider uppercase shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white py-3.5 px-4 rounded-xl font-mono text-sm tracking-wider uppercase shadow-lg transition-all active:scale-95 duration-200 cursor-pointer flex items-center justify-center gap-2"
             >
-              <Plus size={14} />
-              <span>COMPOSE NOTE</span>
+              {isCreateOpen ? <X size={16} /> : <Plus size={16} />}
+              <span>{isCreateOpen ? "CANCEL COMPOSE" : "COMPOSE NOTE"}</span>
             </button>
 
-            {/* Sync Mode Information */}
-            <div className="p-3 rounded-xl border flex flex-col gap-1.5 bg-amber-500/5 border-amber-500/20 text-amber-400">
-              <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider font-semibold">
-                <CloudOff size={11} />
-                <span>LOCAL WORKSPACE</span>
-              </div>
-              <p className="text-[9px] text-white/50 leading-relaxed font-sans">
-                Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Center Panel */}
-        <div className={`flex-1 flex-col min-w-0 h-full bg-neutral-900/10 ${isCreateOpen || selectedNote ? "hidden md:flex" : "flex"}`}>
-          {/* Header */}
-          <div className="p-5 border-b border-white/10 shrink-0 flex flex-col gap-4">
-            <div className="w-full flex items-center justify-between">
-              <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-2.5">
-                  <StickyNote size={18} className="text-amber-500 animate-pulse" />
-                  <h3 className="text-sm font-mono text-white uppercase tracking-widest">
-                    KEEP LOG CONSOLE
-                  </h3>
-                </div>
-
-                <div className="relative max-w-xs w-full md:w-64">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-white/35">
-                    <Search size={12} />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search operational records..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white text-xs pl-8.5 pr-3 py-1.5 rounded-xl font-mono focus:outline-none transition-all placeholder:text-white/30"
-                  />
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="absolute inset-y-0 right-3 flex items-center text-white/40 hover:text-white cursor-pointer"
-                    >
-                      <X size={10} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <button
-                onClick={onClose}
-                className="p-1.5 ml-4 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
-                title="Close Panel"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            {/* Inline Filters */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveFilter("all")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs transition-all border ${
-                  activeFilter === "all" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "bg-white/5 border-transparent text-white/50 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <Sliders size={11} />
-                <span>All Notes</span>
-              </button>
-              <button
-                onClick={() => setActiveFilter("text")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs transition-all border ${
-                  activeFilter === "text" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "bg-white/5 border-transparent text-white/50 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <FileText size={11} />
-                <span>Plain Text</span>
-              </button>
-              <button
-                onClick={() => setActiveFilter("checklist")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs transition-all border ${
-                  activeFilter === "checklist" ? "bg-amber-500/10 border-amber-500/30 text-amber-400 font-medium" : "bg-white/5 border-transparent text-white/50 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <ListPlus size={11} />
-                <span>Checklists</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
-            <span className="flex items-center gap-2">
-              <CloudOff size={14} className="text-amber-400 animate-pulse" />
-              <span>Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.</span>
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-5">
-            {filteredNotes.length > 0 ? (
-              /* NOTES GRID */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredNotes.map((note) => {
-                  const isList = !!note.body?.list;
-                  return (
-                     <div
-                      key={note.name}
-                      onClick={() => setSelectedNote(note)}
-                      className="p-5 rounded-2xl border cursor-pointer relative group transition-all duration-300 flex flex-col justify-between h-[180px] bg-neutral-900/60 border-white/5 hover:border-amber-500/40 hover:shadow-[0_0_15px_rgba(245,158,11,0.08)]"
-                    >
-                      <div>
-                        {/* Note Header Title & Action */}
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-medium text-white line-clamp-1">
-                            {note.title || "Untitled Note"}
-                          </h4>
-                          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteNote(note.name);
-                              }}
-                              className="p-1 hover:bg-white/5 rounded-md text-white/30 hover:text-red-400 transition-colors cursor-pointer"
-                              title="Delete note"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Note Body Content */}
-                        <div className="mt-3 text-xs text-white/60 line-clamp-4 space-y-1">
-                          {!isList ? (
-                            <p className="leading-relaxed font-sans font-light">
-                              {note.body?.text?.text}
-                            </p>
-                          ) : (
-                            <div className="space-y-1">
-                              {(note.body?.list?.listItems || []).slice(0, 3).map((item, i) => (
-                                <div key={i} className="flex items-center gap-2 font-mono text-[10px]">
-                                  {item.checked ? (
-                                    <CheckSquare size={11} className="text-amber-500 shrink-0" />
-                                  ) : (
-                                    <Square size={11} className="text-white/30 shrink-0" />
-                                  )}
-                                  <span className={`truncate ${item.checked ? "line-through text-white/30" : ""}`}>
-                                    {item.text?.text}
-                                  </span>
-                                </div>
-                              ))}
-                              {(note.body?.list?.listItems || []).length > 3 && (
-                                <p className="text-[9px] font-mono text-amber-500/50 mt-1 pl-1">
-                                  + {(note.body?.list?.listItems || []).length - 3} more records
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Timestamp footer */}
-                      <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[9px] font-mono text-white/30 shrink-0">
-                        <span>{isList ? "CHECKLIST" : "TEXT MEMO"}</span>
-                        <span>
-                          {note.updateTime 
-                            ? new Date(note.updateTime).toLocaleDateString([], { month: "short", day: "numeric" }) 
-                            : "Local Record"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8 text-white/30">
-                <StickyNote size={32} className="opacity-20 mb-2 text-amber-500/40 animate-pulse" />
-                <p className="text-xs font-mono uppercase">No records found</p>
-                <p className="text-[10px] mt-1 max-w-xs leading-normal">
-                  Create a text record or checklist dynamically in the sidebar.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Panel Composer */}
-        <div className={`${isCreateOpen || selectedNote ? "flex absolute inset-0 z-20 bg-neutral-950 md:relative md:z-0 md:bg-white/1" : "hidden md:flex"} md:w-[360px] flex-col h-full border-l border-white/10`}>
-          <div className="flex-1 overflow-y-auto p-5 pt-16 h-full flex flex-col justify-between">
-            <AnimatePresence mode="wait">
-              {isCreateOpen ? (
-                /* COMPOSE COMPONENT */
+            {/* Compose Form */}
+            <AnimatePresence>
+              {isCreateOpen && (
                 <motion.div
-                  key="composer"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4 flex flex-col justify-between h-full"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
                 >
-                  <div className="space-y-4 flex-1 overflow-y-auto pb-4">
+                  <div className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-4">
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                       <h3 className="text-xs font-mono text-amber-500 font-bold uppercase tracking-wider">
@@ -491,20 +303,19 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                       </h3>
                     </div>
 
-                    {/* Note Type Selector */}
                     <div className="grid grid-cols-2 bg-white/5 border border-white/10 p-1 rounded-xl">
                       <button
                         onClick={() => setNewNoteType("text")}
-                        className={`py-1.5 rounded-lg text-[10px] font-mono tracking-wider transition-all ${
-                          newNoteType === "text" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                        className={`py-1.5 rounded-lg text-xs font-mono tracking-wider transition-all ${
+                          newNoteType === "text" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/40 hover:text-white"
                         }`}
                       >
                         TEXT MEMO
                       </button>
                       <button
                         onClick={() => setNewNoteType("list")}
-                        className={`py-1.5 rounded-lg text-[10px] font-mono tracking-wider transition-all ${
-                          newNoteType === "list" ? "bg-white/10 text-white font-medium" : "text-white/40 hover:text-white"
+                        className={`py-1.5 rounded-lg text-xs font-mono tracking-wider transition-all ${
+                          newNoteType === "list" ? "bg-white/10 text-white font-medium shadow-sm" : "text-white/40 hover:text-white"
                         }`}
                       >
                         CHECKLIST
@@ -512,204 +323,318 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                     </div>
 
                     <div>
-                      <label className="block text-[9px] font-mono text-white/50 uppercase mb-1">Title</label>
+                      <label className="block text-[10px] font-mono text-white/50 uppercase mb-1.5">Title</label>
                       <input
                         type="text"
                         placeholder="Log name or title..."
                         value={newTitle}
                         onChange={(e) => setNewTitle(e.target.value)}
-                        className="w-full bg-neutral-900 border border-white/10 text-white text-xs rounded-xl p-2.5 focus:outline-none focus:border-amber-500/50 font-mono"
+                        className="w-full bg-neutral-900 border border-white/10 text-white text-sm rounded-xl p-3 focus:outline-none focus:border-amber-500/50 font-mono"
                       />
                     </div>
 
                     {newNoteType === "text" ? (
                       <div>
-                        <label className="block text-[9px] font-mono text-white/50 uppercase mb-1">Content Body</label>
+                        <label className="block text-[10px] font-mono text-white/50 uppercase mb-1.5">Note Body</label>
                         <textarea
                           placeholder="Type technical notes, parameters, or logs..."
-                          rows={8}
+                          rows={6}
                           value={newTextBody}
                           onChange={(e) => setNewTextBody(e.target.value)}
-                          className="w-full bg-neutral-900 border border-white/10 text-white text-xs rounded-xl p-2.5 focus:outline-none focus:border-amber-500/50 font-sans resize-none leading-relaxed"
+                          className="w-full bg-neutral-900 border border-white/10 text-white text-sm rounded-xl p-3 focus:outline-none focus:border-amber-500/50 font-sans resize-none leading-relaxed"
                         />
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <label className="block text-[9px] font-mono text-white/50 uppercase mb-1">List Records</label>
-                        <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                      <div className="space-y-3">
+                        <label className="block text-[10px] font-mono text-white/50 uppercase mb-1.5">List Records</label>
+                        <div className="space-y-2">
                           {newChecklistItems.map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-1.5">
+                            <div key={idx} className="flex items-center gap-2">
                               <input
                                 type="text"
                                 placeholder={`Item ${idx + 1}`}
                                 value={item}
                                 onChange={(e) => handleChecklistItemChange(idx, e.target.value)}
-                                className="flex-1 bg-neutral-900 border border-white/10 text-white text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-amber-500/50 font-mono"
+                                className="flex-1 bg-neutral-900 border border-white/10 text-white text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500/50 font-mono"
                               />
                               <button
                                 onClick={() => removeChecklistItemField(idx)}
-                                className="p-1 hover:bg-white/5 text-white/30 hover:text-red-400 transition-colors cursor-pointer shrink-0"
+                                className="p-2 hover:bg-white/5 text-white/30 hover:text-red-400 transition-colors cursor-pointer rounded-lg"
                                 title="Remove item"
                               >
-                                <Trash2 size={11} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           ))}
                         </div>
                         <button
                           onClick={addChecklistItemField}
-                          className="text-[10px] font-mono text-amber-500 hover:text-amber-400 flex items-center gap-1 pt-1.5 cursor-pointer"
+                          className="text-xs font-mono text-amber-500 hover:text-amber-400 flex items-center gap-1.5 cursor-pointer"
                         >
-                          <Plus size={10} />
+                          <Plus size={12} />
                           <span>ADD ITEM ROW</span>
                         </button>
                       </div>
                     )}
-                  </div>
 
-                  <div className="flex gap-2 pt-6 shrink-0">
-                    <button
-                      onClick={createNote}
-                      disabled={isCreating}
-                      className="flex-1 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-600/30 text-white text-xs font-mono rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {isCreating ? (
-                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Save size={12} />
-                          <span>SAVE RECORD</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsCreateOpen(false);
-                        setNewTitle("");
-                        setNewTextBody("");
-                        setNewChecklistItems([""]);
-                      }}
-                      className="py-2.5 px-4 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 text-xs font-mono rounded-xl transition-colors cursor-pointer"
-                    >
-                      CANCEL
-                    </button>
-                  </div>
-                </motion.div>
-              ) : selectedNote ? (
-                /* DETAIL COMPONENT */
-                <motion.div
-                  key="detail-view"
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  className="flex flex-col h-full justify-between"
-                >
-                  <div className="space-y-5 overflow-y-auto flex-1 pr-1 pb-4">
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-mono text-amber-500 uppercase tracking-widest">
-                        {selectedNote.body?.list ? "CHECKLIST LOG" : "MEMO RECORD"}
-                      </span>
-                      <h3 className="text-base font-serif font-semibold text-white leading-relaxed break-words">
-                        {selectedNote.title || "Untitled Note"}
-                      </h3>
-                      <p className="text-[9px] font-mono text-white/30">
-                        ID: {selectedNote.name}
-                      </p>
-                    </div>
-
-                    <div className="p-4 rounded-xl border border-white/5 bg-white/1 mt-4">
-                      {!selectedNote.body?.list ? (
-                        <p className="text-xs text-white/70 leading-relaxed font-sans whitespace-pre-wrap">
-                          {selectedNote.body?.text?.text}
-                        </p>
-                      ) : (
-                        <div className="space-y-3">
-                          {(selectedNote.body.list.listItems || []).map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => toggleChecklistItem(selectedNote.name, idx)}
-                              className="flex items-center gap-3 font-mono text-xs cursor-pointer group/item select-none text-left"
-                            >
-                              <span className="shrink-0 text-amber-500">
-                                {item.checked ? (
-                                  <CheckSquare size={14} />
-                                ) : (
-                                  <Square size={14} className="group-hover/item:text-white/60 text-white/30" />
-                                )}
-                              </span>
-                              <span className={`text-xs ${item.checked ? "line-through text-white/35" : "text-white/85"}`}>
-                                {item.text?.text}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={createNote}
+                        disabled={isCreating}
+                        className="flex-1 py-3 px-4 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-600/30 text-white text-sm font-mono rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isCreating ? (
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Save size={14} />
+                            <span>SAVE NOTE</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsCreateOpen(false);
+                          setNewTitle("");
+                          setNewTextBody("");
+                          setNewChecklistItems([""]);
+                        }}
+                        className="py-3 px-6 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 text-sm font-mono rounded-xl transition-colors cursor-pointer"
+                      >
+                        CANCEL
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions footer */}
-                  <div className="pt-4 border-t border-white/10 shrink-0 flex gap-2">
-                    <button
-                      onClick={() => deleteNote(selectedNote.name)}
-                      className="flex-1 py-2.5 px-3 bg-red-950/40 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 font-mono rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Trash2 size={12} />
-                      <span>DELETE RECORD</span>
-                    </button>
-                    <button
-                      onClick={() => setSelectedNote(null)}
-                      className="py-2.5 px-4 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 text-xs font-mono rounded-xl transition-colors cursor-pointer"
-                    >
-                      BACK
-                    </button>
-                  </div>
-                </motion.div>
-              ) : (
-                /* WELCOME INFO */
-                <motion.div
-                  key="welcome"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-col h-full justify-between"
-                >
-                  <div className="space-y-5">
-                    <div className="flex items-center gap-2">
-                      <Info size={14} className="text-amber-400" />
-                      <h3 className="text-xs font-mono text-white uppercase tracking-wider">
-                        Workspace Guidelines
-                      </h3>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-white/2 border border-white/5 space-y-3">
-                      <p className="text-xs text-white/70 leading-relaxed font-sans">
-                        Use Keep logs to manage dynamic, custom launch requirements, persistent team parameters, and fast notes.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-[11px] font-mono text-white/40">
-                        <span>Total Tracked Notes</span>
-                        <span className="text-white">{notes.length}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px] font-mono text-white/40">
-                        <span>Database Mode</span>
-                        <span className="text-white uppercase font-bold text-[10px]">
-                          Local Workspace
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setIsCreateOpen(true)}
-                    className="w-full bg-white/5 hover:bg-white/10 border border-white/10 py-2.5 rounded-xl font-mono text-xs text-white uppercase transition-colors cursor-pointer"
-                  >
-                    COMPOSE NEW RECORD
-                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
+
+          <AnimatePresence mode="wait">
+            {selectedNote ? (
+              /* DETAIL COMPONENT */
+              <motion.div
+                key="detail-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col gap-4"
+              >
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest">
+                    {selectedNote.body?.list ? "CHECKLIST LOG" : "MEMO RECORD"}
+                  </span>
+                  <h3 className="text-xl font-serif font-semibold text-white leading-relaxed break-words">
+                    {selectedNote.title || "Untitled Note"}
+                  </h3>
+                  <p className="text-[10px] font-mono text-white/30">
+                    ID: {selectedNote.name}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-neutral-900 border border-white/5">
+                  {!selectedNote.body?.list ? (
+                    <p className="text-sm text-white/80 leading-relaxed font-sans whitespace-pre-wrap">
+                      {selectedNote.body?.text?.text}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(selectedNote.body.list.listItems || []).map((item, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => toggleChecklistItem(selectedNote.name, idx)}
+                          className="flex items-start gap-3 font-mono text-sm cursor-pointer group/item select-none text-left"
+                        >
+                          <span className="shrink-0 text-amber-500 mt-0.5">
+                            {item.checked ? (
+                              <CheckSquare size={16} />
+                            ) : (
+                              <Square size={16} className="group-hover/item:text-white/60 text-white/30" />
+                            )}
+                          </span>
+                          <span className={`${item.checked ? "line-through text-white/35" : "text-white/90"}`}>
+                            {item.text?.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions footer */}
+                <div className="pt-2 flex gap-3">
+                  <button
+                    onClick={() => deleteNote(selectedNote.name)}
+                    className="flex-1 py-3 px-3 bg-red-950/40 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 font-mono rounded-xl text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                    <span>DELETE RECORD</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedNote(null)}
+                    className="py-3 px-6 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 text-xs font-mono rounded-xl transition-colors cursor-pointer"
+                  >
+                    BACK TO LIST
+                  </button>
+                </div>
+              </motion.div>
+            ) : !isCreateOpen ? (
+              <motion.div
+                key="list-view"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col gap-6"
+              >
+                {/* 3. Local Workspace warning banner */}
+                <div className="p-4 rounded-xl border flex items-center gap-3 bg-amber-500/10 border-amber-500/20 text-amber-300 shrink-0 shadow-inner">
+                  <CloudOff size={18} className="text-amber-400 animate-pulse shrink-0" />
+                  <p className="text-xs leading-relaxed font-sans">
+                    <strong className="font-semibold mr-1">Local Workspace:</strong> 
+                    Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.
+                  </p>
+                </div>
+
+                {/* 4. FILTERS */}
+                <div className="space-y-3 shrink-0">
+                  <h3 className="text-[10px] font-mono text-white/40 uppercase tracking-widest pl-1">Filters</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setActiveFilter("all")}
+                      className={`flex items-center gap-2 rounded-xl px-4 py-2 font-mono text-xs transition-all border ${
+                        activeFilter === "all" ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-sm" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      <Sliders size={14} />
+                      <span>All Notes</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveFilter("text")}
+                      className={`flex items-center gap-2 rounded-xl px-4 py-2 font-mono text-xs transition-all border ${
+                        activeFilter === "text" ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-sm" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      <FileText size={14} />
+                      <span>Plain Text</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveFilter("checklist")}
+                      className={`flex items-center gap-2 rounded-xl px-4 py-2 font-mono text-xs transition-all border ${
+                        activeFilter === "checklist" ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-sm" : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      <ListPlus size={14} />
+                      <span>Checklists</span>
+                    </button>
+                    
+                    {/* Search inside filters row */}
+                    <div className="relative flex-1 min-w-[200px] ml-auto">
+                      <span className="absolute inset-y-0 left-3 flex items-center text-white/35">
+                        <Search size={14} />
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Search records..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white text-xs pl-9 pr-3 py-2 rounded-xl font-mono focus:outline-none transition-all placeholder:text-white/30"
+                      />
+                      {searchQuery && (
+                        <button 
+                          onClick={() => setSearchQuery("")}
+                          className="absolute inset-y-0 right-3 flex items-center text-white/40 hover:text-white cursor-pointer"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. THE NOTES LIST */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredNotes.length > 0 ? (
+                    filteredNotes.map((note) => {
+                      const isList = !!note.body?.list;
+                      return (
+                        <div
+                          key={note.name}
+                          onClick={() => setSelectedNote(note)}
+                          className="p-5 rounded-2xl border cursor-pointer relative group transition-all duration-300 flex flex-col justify-between h-[180px] bg-neutral-900/80 border-white/10 hover:border-amber-500/40 hover:shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="text-sm font-medium text-white line-clamp-1 pr-6">
+                                {note.title || "Untitled Note"}
+                              </h4>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNote(note.name);
+                                }}
+                                className="absolute top-4 right-4 p-1.5 bg-neutral-800 hover:bg-red-500/20 rounded-lg text-white/30 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shadow-sm"
+                                title="Delete note"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+
+                            <div className="mt-3 text-xs text-white/60 line-clamp-4">
+                              {!isList ? (
+                                <p className="leading-relaxed font-sans font-light">
+                                  {note.body?.text?.text}
+                                </p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {(note.body?.list?.listItems || []).slice(0, 3).map((item, i) => (
+                                    <div key={i} className="flex items-center gap-2 font-mono text-[11px]">
+                                      {item.checked ? (
+                                        <CheckSquare size={12} className="text-amber-500 shrink-0" />
+                                      ) : (
+                                        <Square size={12} className="text-white/30 shrink-0" />
+                                      )}
+                                      <span className={`truncate ${item.checked ? "line-through text-white/30" : ""}`}>
+                                        {item.text?.text}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {(note.body?.list?.listItems || []).length > 3 && (
+                                    <p className="text-[10px] font-mono text-amber-500/50 mt-1.5 pl-1">
+                                      + {(note.body?.list?.listItems || []).length - 3} more
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-white/30 shrink-0">
+                            <span className="flex items-center gap-1.5">
+                              {isList ? <ListPlus size={12} /> : <FileText size={12} />}
+                              {isList ? "CHECKLIST" : "TEXT MEMO"}
+                            </span>
+                            <span>
+                              {note.updateTime 
+                                ? new Date(note.updateTime).toLocaleDateString([], { month: "short", day: "numeric" }) 
+                                : "Local Record"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center text-center p-12 bg-white/2 border border-white/5 rounded-2xl border-dashed">
+                      <StickyNote size={32} className="opacity-20 mb-3 text-amber-500/40 animate-pulse" />
+                      <p className="text-sm font-mono uppercase text-white/40">No notes found</p>
+                      <p className="text-xs mt-1 max-w-xs text-white/30 leading-normal">
+                        Create a text record or checklist using the 'Compose Note' button above.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       </div>
     </div>
