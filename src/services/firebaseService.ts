@@ -127,7 +127,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
     const loadAndInit = () => {
       try {
         const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: '866655994820-p1vng5399ae5lnnhu22gniatk5hlds57.apps.googleusercontent.com',
+          client_id: '866655994820-p1vng5399ae5lnnhu22gniatk5hlda57.apps.googleusercontent.com',
           scope: scopes,
           callback: handleSuccess,
           error_callback: (error: any) => {
