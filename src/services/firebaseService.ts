@@ -55,88 +55,19 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: 'consent' });
+provider.setCustomParameters({ 
+  prompt: 'consent',
+  client_id: '866655994820-p1vng5399ae5lnnhu22gniatk5hlda57.apps.googleusercontent.com'
+});
 
-// Add contacts scopes
-provider.addScope('https://www.googleapis.com/auth/contacts');
-provider.addScope('https://www.googleapis.com/auth/contacts.other.readonly');
-provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
-provider.addScope('https://www.googleapis.com/auth/directory.readonly');
-provider.addScope('https://www.googleapis.com/auth/user.addresses.read');
-provider.addScope('https://www.googleapis.com/auth/user.birthday.read');
-provider.addScope('https://www.googleapis.com/auth/user.emails.read');
-provider.addScope('https://www.googleapis.com/auth/user.gender.read');
-provider.addScope('https://www.googleapis.com/auth/user.organization.read');
-provider.addScope('https://www.googleapis.com/auth/user.phonenumbers.read');
-
-// Add Google Drive scopes
-provider.addScope('https://www.googleapis.com/auth/drive');
-provider.addScope('https://www.googleapis.com/auth/drive.file');
-provider.addScope('https://www.googleapis.com/auth/drive.readonly');
-provider.addScope('https://www.googleapis.com/auth/drive.metadata.readonly');
-
-// Add Gmail scopes
-provider.addScope('https://mail.google.com/');
-provider.addScope('https://www.googleapis.com/auth/gmail.modify');
+// Add requested scopes
 provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-provider.addScope('https://www.googleapis.com/auth/gmail.send');
-provider.addScope('https://www.googleapis.com/auth/gmail.compose');
-provider.addScope('https://www.googleapis.com/auth/gmail.labels');
-
-// Add Calendar scopes
-provider.addScope('https://www.googleapis.com/auth/calendar');
-provider.addScope('https://www.googleapis.com/auth/calendar.events');
-
-// Add Tasks scopes
-provider.addScope('https://www.googleapis.com/auth/tasks');
-provider.addScope('https://www.googleapis.com/auth/tasks.readonly');
-
-// Add Google Slides & Sheets scopes
-provider.addScope('https://www.googleapis.com/auth/presentations');
-provider.addScope('https://www.googleapis.com/auth/presentations.readonly');
-provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
-
-// Add Google Chat scopes
-provider.addScope('https://www.googleapis.com/auth/chat.spaces');
-provider.addScope('https://www.googleapis.com/auth/chat.spaces.readonly');
-provider.addScope('https://www.googleapis.com/auth/chat.messages');
-provider.addScope('https://www.googleapis.com/auth/chat.messages.create');
-provider.addScope('https://www.googleapis.com/auth/chat.messages.readonly');
-provider.addScope('https://www.googleapis.com/auth/chat.memberships');
-provider.addScope('https://www.googleapis.com/auth/chat.memberships.readonly');
-
-// Add Google Docs scopes
-provider.addScope('https://www.googleapis.com/auth/documents');
-provider.addScope('https://www.googleapis.com/auth/documents.readonly');
-
-// Add Google Forms scopes
-provider.addScope('https://www.googleapis.com/auth/forms.body');
-provider.addScope('https://www.googleapis.com/auth/forms.body.readonly');
-provider.addScope('https://www.googleapis.com/auth/forms.responses.readonly');
-
-// Add Google Meet scopes
-provider.addScope('https://www.googleapis.com/auth/meetings.space.created');
-provider.addScope('https://www.googleapis.com/auth/meetings.space.readonly');
-provider.addScope('https://www.googleapis.com/auth/meetings.space.settings');
-
-// Add Google Classroom scopes
-provider.addScope('https://www.googleapis.com/auth/classroom.courses.readonly');
-provider.addScope('https://www.googleapis.com/auth/classroom.coursework.me');
-provider.addScope('https://www.googleapis.com/auth/classroom.coursework.me.readonly');
-provider.addScope('https://www.googleapis.com/auth/classroom.coursework.students');
-provider.addScope('https://www.googleapis.com/auth/classroom.coursework.students.readonly');
-provider.addScope('https://www.googleapis.com/auth/classroom.announcements');
-provider.addScope('https://www.googleapis.com/auth/classroom.announcements.readonly');
-provider.addScope('https://www.googleapis.com/auth/classroom.rosters.readonly');
-provider.addScope('https://www.googleapis.com/auth/classroom.topics.readonly');
-provider.addScope('https://www.googleapis.com/auth/classroom.student-submissions.me.readonly');
-provider.addScope('https://www.googleapis.com/auth/classroom.student-submissions.students.readonly');
+provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
 
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
-// Cache the access token in memory
-let cachedAccessToken: string | null = null;
+// Cache the access token in memory and local storage
+let cachedAccessToken: string | null = localStorage.getItem('zoya_google_token');
 
 // Initialize auth state listener. Call this on app load.
 export const initAuth = (
@@ -145,16 +76,20 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
+      // Re-read from localStorage just in case
+      cachedAccessToken = localStorage.getItem('zoya_google_token');
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
         // We have a user session but no fresh token in memory yet.
         // It's safer to prompt a re-auth or clear cached state.
         cachedAccessToken = null;
+        localStorage.removeItem('zoya_google_token');
         if (onAuthFailure) onAuthFailure();
       }
     } else {
       cachedAccessToken = null;
+      localStorage.removeItem('zoya_google_token');
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -167,7 +102,10 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
     
     if (customScopes && customScopes.length > 0) {
       const activeProvider = new GoogleAuthProvider();
-      activeProvider.setCustomParameters({ prompt: 'consent' });
+      activeProvider.setCustomParameters({ 
+        prompt: 'consent',
+        client_id: '866655994820-p1vng5399ae5lnnhu22gniatk5hlda57.apps.googleusercontent.com'
+      });
       customScopes.forEach(scope => activeProvider.addScope(scope));
       const result = await signInWithPopup(auth, activeProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -175,6 +113,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
         throw new Error('Failed to get access token from Firebase Auth');
       }
       cachedAccessToken = credential.accessToken;
+      localStorage.setItem('zoya_google_token', cachedAccessToken);
       return { user: result.user, accessToken: cachedAccessToken };
     } else {
       const result = await signInWithPopup(auth, provider);
@@ -183,6 +122,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
         throw new Error('Failed to get access token from Firebase Auth');
       }
       cachedAccessToken = credential.accessToken;
+      localStorage.setItem('zoya_google_token', cachedAccessToken);
       return { user: result.user, accessToken: cachedAccessToken };
     }
   } catch (error: any) {
@@ -194,14 +134,16 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  return cachedAccessToken || localStorage.getItem('zoya_google_token');
 };
 
 export const setAccessToken = (token: string) => {
   cachedAccessToken = token;
+  localStorage.setItem('zoya_google_token', token);
 };
 
 export const logout = async () => {
   await auth.signOut();
   cachedAccessToken = null;
+  localStorage.removeItem('zoya_google_token');
 };
