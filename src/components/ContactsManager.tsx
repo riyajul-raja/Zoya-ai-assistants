@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Search, Plus, Trash2, Edit2, X, Loader2, Mail, Phone, 
-  Building, MapPin, Cake, User, LogOut, ChevronRight, RefreshCw, UserPlus
+  Building, MapPin, Cake, User, LogOut, ChevronRight, RefreshCw, UserPlus, Mic
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { User as FirebaseUser } from "firebase/auth";
@@ -65,6 +65,7 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContact, setSelectedContact] = useState<ContactPerson | null>(null);
+  const [isListening, setIsListening] = useState(false);
 
   // Form modals state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -133,6 +134,67 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
     } catch (err) {
       console.error("Logout failed:", err);
     }
+  };
+
+  // Initialize Speech Recognition
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      onToast("Speech Recognition is not supported in your browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      onToast("Listening for voice command...");
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript.toLowerCase();
+      
+      if (transcript.includes('call ')) {
+        const nameToCall = transcript.split('call ')[1].trim();
+        if (nameToCall) {
+          const match = contacts.find((c) => {
+            const contactName = (c.names?.[0]?.displayName || "").toLowerCase();
+            return contactName.includes(nameToCall) || nameToCall.includes(contactName);
+          });
+
+          if (match) {
+            const phone = match.phoneNumbers?.[0]?.value;
+            if (phone) {
+              onToast(`Calling ${match.names?.[0]?.displayName}...`);
+              setTimeout(() => {
+                window.location.href = `tel:${phone}`;
+              }, 1500);
+            } else {
+              onToast(`Found ${match.names?.[0]?.displayName}, but no phone number available.`);
+            }
+          } else {
+            onToast(`Contact "${nameToCall}" not found.`);
+          }
+        }
+      } else {
+        onToast(`Recognized: "${transcript}". Say "Call [Name]".`);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+      onToast(`Microphone error: ${event.error}`);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   const fetchContacts = async (accessToken: string) => {
@@ -495,23 +557,36 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
             <>
               {/* Search input bar */}
               <div className="p-3 border-b border-white/10 shrink-0 bg-white/2">
-                <div className="relative flex items-center">
-                  <Search size={14} className="absolute left-3 text-white/30" />
-                  <input
-                    type="text"
-                    placeholder="Search contacts by name, email, or company..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50"
-                  />
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 text-white/40 hover:text-white"
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                    <input
+                      type="text"
+                      placeholder="Search contacts by name, email, or company..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50"
+                    />
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={startListening}
+                    className={`p-2 rounded-xl flex items-center justify-center transition-all ${
+                      isListening
+                        ? "bg-red-500/20 text-red-400 border border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse"
+                        : "bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white"
+                    }`}
+                    title="Voice Command"
+                  >
+                    <Mic size={16} />
+                  </button>
                 </div>
               </div>
 
