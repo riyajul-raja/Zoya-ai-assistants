@@ -132,10 +132,6 @@ provider.addScope('https://www.googleapis.com/auth/meetings.space.created');
 provider.addScope('https://www.googleapis.com/auth/meetings.space.readonly');
 provider.addScope('https://www.googleapis.com/auth/meetings.space.settings');
 
-// Add Google Keep scopes
-provider.addScope('https://www.googleapis.com/auth/keep');
-provider.addScope('https://www.googleapis.com/auth/keep.readonly');
-
 // Add Google Classroom scopes
 provider.addScope('https://www.googleapis.com/auth/classroom.courses.readonly');
 provider.addScope('https://www.googleapis.com/auth/classroom.coursework.me');

@@ -50,6 +50,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "text" | "list">("all");
   const [apiMode, setApiMode] = useState<"real" | "fallback">("real");
+  const [scopeFailed, setScopeFailed] = useState(false);
 
   // Selection & detail state
   const [selectedNote, setSelectedNote] = useState<KeepNote | null>(null);
@@ -72,7 +73,14 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
         setToken(cachedToken);
         setIsAuthenticated(true);
         setIsAuthChecking(false);
-        fetchNotes(cachedToken);
+        
+        if (user.email?.endsWith("@gmail.com")) {
+          setScopeFailed(true);
+          setApiMode("fallback");
+          loadFallbackNotes();
+        } else {
+          fetchNotes(cachedToken);
+        }
       },
       () => {
         setIsAuthenticated(false);
@@ -88,6 +96,17 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
 
   const handleLogin = async () => {
     setIsSigningIn(true);
+    
+    // Check if user has a standard @gmail.com consumer account
+    if (firebaseUser?.email?.endsWith("@gmail.com")) {
+      onToast("Google Keep API is restricted to Google Workspace accounts. Zoya is saving your notes locally.");
+      setScopeFailed(true);
+      setApiMode("fallback");
+      loadFallbackNotes();
+      setIsSigningIn(false);
+      return;
+    }
+
     try {
       const result = await googleSignIn([
         "https://www.googleapis.com/auth/keep",
@@ -97,12 +116,28 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
         setToken(result.accessToken);
         setFirebaseUser(result.user);
         setIsAuthenticated(true);
+        setScopeFailed(false);
         onToast("Google Keep access authorized!");
         fetchNotes(result.accessToken);
       }
     } catch (err: any) {
-      console.error("Login failed:", err);
-      onToast("Authentication failed. Ensure Google Keep scopes are approved.");
+      console.error("Login failed with Keep scopes:", err);
+      // Attempt login WITHOUT Google Keep scopes as a fallback
+      try {
+        const result = await googleSignIn([]);
+        if (result) {
+          setToken(result.accessToken);
+          setFirebaseUser(result.user);
+          setIsAuthenticated(true);
+          setScopeFailed(true);
+          setApiMode("fallback");
+          loadFallbackNotes();
+          onToast("Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.");
+        }
+      } catch (fallbackErr: any) {
+        console.error("Fallback login failed:", fallbackErr);
+        onToast("Authentication failed.");
+      }
     } finally {
       setIsSigningIn(false);
     }
@@ -460,9 +495,11 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
               <p className="text-[9px] text-white/50 leading-relaxed font-sans">
                 {(isAuthenticated && apiMode === "real") 
                   ? "Changes are mirrored in real-time to your Google Keep." 
-                  : !isAuthenticated
-                    ? "Connect your Google Account below to enable cloud synchronization."
-                    : "Running in local fallback mode. Enterprise scopes restricted on consumer accounts."}
+                  : scopeFailed
+                    ? "Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally."
+                    : !isAuthenticated
+                      ? "Connect your Google Account below to enable cloud synchronization."
+                      : "Running in local fallback mode. Enterprise scopes restricted on consumer accounts."}
               </p>
             </div>
 
@@ -537,11 +574,11 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
               <p className="text-[9px] text-white/30 leading-none">Workspace Auth</p>
               <button
                 onClick={handleLogin}
-                disabled={isSigningIn}
-                className="w-full p-2 rounded-lg border border-amber-500/20 hover:border-amber-500/40 text-amber-400 hover:text-amber-300 hover:bg-amber-500/5 transition-all cursor-pointer text-[10px] font-mono flex items-center justify-center gap-1.5"
+                disabled={isSigningIn || scopeFailed}
+                className="w-full p-2 rounded-lg border border-amber-500/20 hover:border-amber-500/40 text-amber-400 hover:text-amber-300 hover:bg-amber-500/5 transition-all cursor-pointer text-[10px] font-mono flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isSigningIn ? <Loader2 size={11} className="animate-spin" /> : <Cloud size={11} />}
-                <span>CONNECT ACCOUNT</span>
+                <span>{scopeFailed ? "CONNECT RESTRICTED" : "CONNECT ACCOUNT"}</span>
               </button>
             </div>
           )}
@@ -590,7 +627,14 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
             </button>
           </div>
 
-          {!isAuthenticated && (
+          {scopeFailed ? (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
+              <span className="flex items-center gap-2">
+                <CloudOff size={14} className="text-amber-400 animate-pulse" />
+                <span>Cloud Sync requires a Google Workspace account. Zoya is saving your notes locally.</span>
+              </span>
+            </div>
+          ) : !isAuthenticated ? (
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-amber-300 shrink-0">
               <span className="flex items-center gap-2">
                 <CloudOff size={14} className="text-amber-400" />
@@ -603,7 +647,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                 Connect Cloud
               </button>
             </div>
-          )}
+          ) : null}
 
           <div className="flex-1 overflow-y-auto p-5">
             {isLoading ? (
