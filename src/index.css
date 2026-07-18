@@ -60,20 +60,20 @@ html, body, #root {
 }
 
 .animate-gradient {
-  animation: gradient-shift 12s ease infinite;
-  background-size: 300% 300%;
+  background-size: 400% 400%;
+  animation: gradient-shift 3s ease-in-out infinite;
 }
 
 .hyper-glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
 .hyper-glass-input:focus {
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(236, 72, 153, 0.4);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 

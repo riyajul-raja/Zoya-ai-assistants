@@ -1909,7 +1909,7 @@ In your very first response or greeting to the user, you MUST casually and natur
   };
 
   return (
-    <div className="h-[100dvh] w-screen bg-[#050505] text-white flex flex-col items-center justify-between font-sans relative overflow-hidden m-0 p-0">
+    <div className="fixed top-0 left-0 w-[100vw] h-[100dvh] m-0 p-0 overflow-hidden bg-[#050505] text-white flex flex-col items-center justify-between font-sans bg-[length:400%_400%]">
       <AnimatePresence mode="wait">
         {!isUnlocked ? (
           <motion.div
@@ -1917,11 +1917,14 @@ In your very first response or greeting to the user, you MUST casually and natur
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-0 left-0 w-[100vw] h-[100dvh] m-0 p-0 overflow-hidden z-[99999] flex flex-col items-center justify-center bg-[linear-gradient(135deg,#0f0c29,#302b63,#24243e)] animate-gradient text-white font-sans"
+            className="fixed inset-0 w-[100vw] h-[100dvh] m-0 p-0 overflow-hidden z-0 flex flex-col items-center justify-center text-white font-sans"
           >
+            {/* Absolute background gradient container */}
+            <div className="absolute inset-0 z-[-1] bg-[linear-gradient(135deg,#312e81,#4a044e,#0f172a,#134e4a)] animate-gradient" />
+            
             {/* Sci-Fi Cinematic Grid & Glowing Nodes */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff04_1px,transparent_1px),linear-gradient(to_bottom,#ffffff04_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)] pointer-events-none" />
-            <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-80 mix-blend-screen animate-float">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff04_1px,transparent_1px),linear-gradient(to_bottom,#ffffff04_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)] pointer-events-none z-[-1]" />
+            <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-80 mix-blend-screen animate-float z-[-1]">
               <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-pink-600/20 blur-[120px] rounded-full mix-blend-screen" />
               <div className="absolute bottom-[10%] right-[10%] w-[600px] h-[600px] bg-cyan-600/15 blur-[150px] rounded-full mix-blend-screen delay-1000" />
               <div className="absolute top-[40%] left-[60%] w-[400px] h-[400px] bg-violet-600/20 blur-[120px] rounded-full mix-blend-screen delay-500" />
@@ -2005,6 +2008,14 @@ In your very first response or greeting to the user, you MUST casually and natur
 
               {/* Pulsing Fingerprint Container with Hold Progress Circle */}
               <div className="relative flex items-center justify-center">
+                
+                {/* 3 Orbital Rings */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="absolute w-[180px] h-[180px] rounded-full border border-white/5 border-t-white/20 animate-[spin_4s_linear_infinite]" />
+                  <div className="absolute w-[210px] h-[210px] rounded-full border border-white/5 border-r-white/20 animate-[spin_6s_linear_infinite_reverse]" />
+                  <div className="absolute w-[240px] h-[240px] rounded-full border border-white/5 border-b-white/20 animate-[spin_8s_linear_infinite]" />
+                </div>
+
                 {/* Radial progress ring */}
                 <svg className="w-56 h-56 absolute transform -rotate-90 pointer-events-none">
                   <circle
