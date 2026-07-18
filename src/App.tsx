@@ -1909,16 +1909,19 @@ In your very first response or greeting to the user, you MUST casually and natur
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black text-white p-6 font-sans overflow-hidden"
+            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-gradient-to-br from-[#0B0118] via-[#1D063A] to-[#041126] animate-gradient text-white p-6 font-sans overflow-hidden"
           >
             {/* Sci-Fi Cinematic Grid & Glowing Nodes */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[350px] h-[350px] bg-violet-600/10 blur-[100px] rounded-full" />
-              <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 w-[350px] h-[350px] bg-pink-600/10 blur-[100px] rounded-full" />
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff04_1px,transparent_1px),linear-gradient(to_bottom,#ffffff04_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)] pointer-events-none" />
+            <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-80 mix-blend-screen animate-float">
+              <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-pink-600/20 blur-[120px] rounded-full mix-blend-screen" />
+              <div className="absolute bottom-[10%] right-[10%] w-[600px] h-[600px] bg-cyan-600/15 blur-[150px] rounded-full mix-blend-screen delay-1000" />
+              <div className="absolute top-[40%] left-[60%] w-[400px] h-[400px] bg-violet-600/20 blur-[120px] rounded-full mix-blend-screen delay-500" />
             </div>
 
-            <div className="z-10 flex flex-col items-center max-w-md w-full text-center space-y-12">
+            {/* Glassmorphism Container */}
+            <div className="z-10 flex flex-col items-center max-w-md w-full text-center space-y-10 bg-white/[0.03] backdrop-blur-3xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-10 rounded-[2.5rem] relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
               {/* Top Lock Badge */}
               <motion.div 
                 initial={{ y: -20, opacity: 0 }}
@@ -1963,7 +1966,11 @@ In your very first response or greeting to the user, you MUST casually and natur
                   />
                   <button 
                     type="submit" 
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-white/5 hover:bg-violet-500/20 text-white/40 hover:text-violet-300 transition-colors cursor-pointer"
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      passkeyInput.length > 0
+                        ? "bg-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)] hover:bg-cyan-500/30"
+                        : "bg-white/5 text-white/20 hover:text-white/40"
+                    }`}
                   >
                     <ArrowRight size={16} />
                   </button>
