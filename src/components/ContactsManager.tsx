@@ -66,6 +66,7 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContact, setSelectedContact] = useState<ContactPerson | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [voiceAction, setVoiceAction] = useState<{ type: 'call' | 'whatsapp'; name: string; number: string; } | null>(null);
 
   // Form modals state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -157,10 +158,19 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript.toLowerCase();
       
-      const callIndex = transcript.indexOf('call ');
-      if (callIndex !== -1) {
-        const rawNameToCall = transcript.substring(callIndex + 5).trim();
-        const nameToCall = rawNameToCall.replace(/\s+/g, '');
+      let actionType: 'call' | 'whatsapp' | null = null;
+      let nameToCallRaw = '';
+
+      if (transcript.includes('call ')) {
+        actionType = 'call';
+        nameToCallRaw = transcript.substring(transcript.indexOf('call ') + 5).trim();
+      } else if (transcript.includes('whatsapp ')) {
+        actionType = 'whatsapp';
+        nameToCallRaw = transcript.substring(transcript.indexOf('whatsapp ') + 9).trim();
+      }
+      
+      if (actionType && nameToCallRaw) {
+        const nameToCall = nameToCallRaw.replace(/\s+/g, '');
         
         if (nameToCall) {
           const match = contacts.find((c) => {
@@ -172,27 +182,14 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
           if (match) {
             const matchedContactPhoneNumber = match.phoneNumbers?.[0]?.value;
             if (matchedContactPhoneNumber) {
-              onToast(`Dialing ${match.names?.[0]?.displayName}...`);
               const cleanNumber = matchedContactPhoneNumber.replace(/[\s\-\(\)]/g, '');
               
-              // Try to bypass iframe sandboxing using anchor click
-              const a = document.createElement('a');
-              a.href = 'tel:' + cleanNumber;
-              a.target = '_top'; // Also try to open in top frame
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              
-              // Fallback just in case
-              try {
-                if (window.top) {
-                  window.top.location.href = 'tel:' + cleanNumber;
-                } else {
-                  window.location.href = 'tel:' + cleanNumber;
-                }
-              } catch (e) {
-                window.location.href = 'tel:' + cleanNumber;
-              }
+              setVoiceAction({
+                type: actionType,
+                name: match.names?.[0]?.displayName || "Unknown",
+                number: cleanNumber
+              });
+              onToast(`Tap to ${actionType === 'call' ? 'Call' : 'WhatsApp'} ${match.names?.[0]?.displayName}`);
             } else {
               onToast(`Found ${match.names?.[0]?.displayName}, but no phone number available.`);
             }
@@ -201,7 +198,7 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
           }
         }
       } else {
-        onToast(`Recognized: "${transcript}". Say "Call [Name]".`);
+        onToast(`Recognized: "${transcript}". Say "Call [Name]" or "WhatsApp [Name]".`);
       }
     };
 
@@ -472,6 +469,53 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
   });
 
   return (
+    <>
+      <AnimatePresence>
+        {voiceAction && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="w-full max-w-sm bg-neutral-900 border border-red-500/30 rounded-2xl p-6 shadow-[0_0_40px_rgba(239,68,68,0.2)] text-center relative"
+            >
+              <button
+                onClick={() => setVoiceAction(null)}
+                className="absolute top-3 right-3 p-1.5 text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X size={16} />
+              </button>
+              
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                {voiceAction.type === 'call' ? <Phone size={28} className="text-red-400" /> : <Mail size={28} className="text-green-400" />}
+              </div>
+              
+              <h3 className="text-xl font-medium text-white mb-1">
+                {voiceAction.type === 'call' ? 'Call' : 'WhatsApp'} {voiceAction.name}
+              </h3>
+              <p className="text-white/50 text-sm mb-6 font-mono">{voiceAction.number}</p>
+              
+              <a
+                href={voiceAction.type === 'call' ? `tel:${voiceAction.number}` : `whatsapp://send?phone=${voiceAction.number}`}
+                onClick={() => setTimeout(() => setVoiceAction(null), 1000)}
+                className={`block w-full py-3.5 rounded-xl text-white font-medium tracking-wide transition-all shadow-lg active:scale-95 ${
+                  voiceAction.type === 'call' 
+                    ? 'bg-red-600 hover:bg-red-500 shadow-red-600/20' 
+                    : 'bg-green-600 hover:bg-green-500 shadow-green-600/20'
+                }`}
+              >
+                TAP TO {voiceAction.type === 'call' ? 'CALL' : 'WHATSAPP'}
+              </a>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     <div id="contacts-manager-overlay" className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
       <div 
         id="contacts-manager-card"
@@ -1038,5 +1082,6 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
         </div>
       </div>
     </div>
+      </>
   );
 }
