@@ -30,6 +30,7 @@ interface ChatMessage {
   text: string;
   image?: string;
   isError?: boolean;
+  isHighThinking?: boolean;
 }
 
 declare global {
@@ -1302,10 +1303,12 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsTyping(true);
       setIsLoading(true);
       
+      const isHighThinking = /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(finalTranscript);
+      
       // Append an initial message for Zoya with empty text so that the UI updates in real-time
       setMessages((prev) => [
         ...prev,
-        { id: responseMessageId, sender: "zoya", role: "model", text: "" }
+        { id: responseMessageId, sender: "zoya", role: "model", text: "", isHighThinking }
       ]);
 
       try {
@@ -2674,6 +2677,12 @@ In your very first response or greeting to the user, you MUST casually and natur
                                 className="max-w-[120px] max-h-[80px] rounded-lg mb-1 border border-white/20 object-cover shadow h-fit w-fit min-h-0"
                                 referrerPolicy="no-referrer"
                               />
+                            )}
+                            {msg.sender === "zoya" && msg.isHighThinking && (
+                              <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-white/5 border border-white/10 w-fit backdrop-blur-md shadow-sm">
+                                <Brain size={12} className="text-pink-400 animate-pulse" />
+                                <span className="text-[9px] font-mono uppercase tracking-wider text-pink-300">Deep Thinking</span>
+                              </div>
                             )}
                             <div className="whitespace-pre-wrap">{msg.text}</div>
                             {msg.sender === "zoya" && !msg.isError && msg.text && (
