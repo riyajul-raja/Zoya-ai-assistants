@@ -60,40 +60,6 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
   // Action States
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  const loadFallbackEvents = () => {
-    setApiMode("fallback");
-    const cached = localStorage.getItem("zoya_calendar_events");
-    if (cached) {
-      setEvents(JSON.parse(cached));
-    } else {
-      const initialEvents: CalendarEvent[] = [
-        {
-          id: "local-ev-1",
-          summary: "Zoya Orbital Sync Meeting",
-          description: "Routine calibration check of AI server arrays and telemetry streams.",
-          location: "Deep Space Platform Sector 7",
-          start: { dateTime: new Date(Date.now() + 3600000).toISOString() }, // in 1 hour
-          end: { dateTime: new Date(Date.now() + 7200000).toISOString() }
-        },
-        {
-          id: "local-ev-2",
-          summary: "Database Backup Operations",
-          description: "Encrypted memory backup to persistent cold storage volumes.",
-          location: "Zoya Lunar Server Farm",
-          start: { dateTime: new Date(Date.now() + 86400000).toISOString() }, // tomorrow
-          end: { dateTime: new Date(Date.now() + 90000000).toISOString() }
-        }
-      ];
-      setEvents(initialEvents);
-      localStorage.setItem("zoya_calendar_events", JSON.stringify(initialEvents));
-    }
-  };
-
-  const saveFallbackEventsToStore = (updated: CalendarEvent[]) => {
-    setEvents(updated);
-    localStorage.setItem("zoya_calendar_events", JSON.stringify(updated));
-  };
-
   // Initialize Auth & Load
   useEffect(() => {
     const unsubscribe = initAuth(
@@ -110,7 +76,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
         setFirebaseUser(null);
         setToken(null);
         setIsAuthChecking(false);
-        loadFallbackEvents();
+        setEvents([]);
       }
     );
     return () => unsubscribe();
@@ -153,7 +119,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
   // Fetch upcoming events from primary calendar
   const fetchEvents = async (accessToken: string, queryStr = "") => {
     if (!accessToken) {
-      loadFallbackEvents();
+      setEvents([]);
       return;
     }
     setIsLoading(true);
@@ -178,7 +144,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
       setApiMode("real");
     } catch (err) {
       console.error("Error loading calendar events, falling back:", err);
-      loadFallbackEvents();
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -190,13 +156,8 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
     const confirmed = window.confirm(`Permanently delete "${event.summary}" from your Calendar? This action cannot be undone.`);
     if (!confirmed) return;
 
-    if (!token || apiMode === "fallback") {
-      const updated = events.filter((ev) => ev.id !== event.id);
-      saveFallbackEventsToStore(updated);
-      onToast("Event deleted from local workspace.");
-      if (selectedEvent?.id === event.id) {
-        setSelectedEvent(null);
-      }
+    if (!token) {
+      onToast("You must be signed in to delete events.");
       return;
     }
 
@@ -248,27 +209,8 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
     const confirmed = window.confirm(`Create event "${summary}" scheduled for ${startDate} at ${startTime}?`);
     if (!confirmed) return;
 
-    if (!token || apiMode === "fallback") {
-      const newEvent: CalendarEvent = {
-        id: `local-ev-${Date.now()}`,
-        summary: summary.trim(),
-        description: description.trim(),
-        location: location.trim(),
-        start: { dateTime: startDateTime },
-        end: { dateTime: endDateTime }
-      };
-
-      const updated = [newEvent, ...events];
-      saveFallbackEventsToStore(updated);
-      onToast("Event saved to local workspace.");
-      setIsCreateOpen(false);
-      setSummary("");
-      setDescription("");
-      setLocation("");
-      setStartDate("");
-      setStartTime("");
-      setEndDate("");
-      setEndTime("");
+    if (!token) {
+      onToast("You must be signed in to create events.");
       return;
     }
 
@@ -328,7 +270,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
     const startVal = event.start.dateTime || event.start.date;
     const endVal = event.end.dateTime || event.end.date;
     
-    if (!startVal) return "All Day";
+    if (!startVal) return { dateString: "Unknown Date", timeString: "Unknown Time" };
     
     const startDateObj = new Date(startVal);
     
@@ -488,7 +430,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
                   if (token) {
                     fetchEvents(token, searchQuery);
                   } else {
-                    loadFallbackEvents();
+                    setEvents([]);
                   }
                 }}
                 disabled={isLoading}
@@ -508,20 +450,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
             </button>
           </div>
 
-          {!isAuthenticated && (
-            <div className="bg-red-500/10 border-b border-red-500/20 px-5 py-2.5 flex items-center justify-between text-xs text-red-300 shrink-0">
-              <span className="flex items-center gap-2">
-                <CloudOff size={14} className="text-red-400" />
-                <span>Running in premium Offline-First local storage mode. Cloud sync is disabled.</span>
-              </span>
-              <button
-                onClick={handleLogin}
-                className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-200 px-3 py-1 rounded-lg transition-all text-[10px] uppercase font-mono cursor-pointer"
-              >
-                Connect Cloud
-              </button>
-            </div>
-          )}
+
 
           {/* Search bar */}
           <form onSubmit={handleSearch} className="p-3 border-b border-white/10 shrink-0 bg-white/1 flex gap-2">
