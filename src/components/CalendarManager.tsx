@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Calendar, Clock, MapPin, Search, Trash2, Plus, X, Loader2, LogOut, 
   RefreshCw, Check, Send, AlertCircle, CalendarRange, User, AlignLeft,
-  CloudOff, Cloud
+  CloudOff, Cloud, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { User as FirebaseUser } from "firebase/auth";
@@ -42,6 +42,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
 
   // Calendar States
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -60,6 +61,13 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
   // Action States
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
+  // Effect for changing months
+  useEffect(() => {
+    if (token && isAuthenticated) {
+      fetchEvents(token, searchQuery, currentMonth);
+    }
+  }, [currentMonth]);
+
   // Initialize Auth & Load
   useEffect(() => {
     const unsubscribe = initAuth(
@@ -69,7 +77,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
         setIsAuthenticated(true);
         setIsAuthChecking(false);
         setApiMode("real");
-        fetchEvents(cachedToken);
+        fetchEvents(cachedToken, "", currentMonth);
       },
       () => {
         setIsAuthenticated(false);
@@ -117,15 +125,21 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
   };
 
   // Fetch upcoming events from primary calendar
-  const fetchEvents = async (accessToken: string, queryStr = "") => {
+  const fetchEvents = async (accessToken: string, queryStr = "", targetMonth?: Date) => {
     if (!accessToken) {
       setEvents([]);
       return;
     }
     setIsLoading(true);
     try {
-      const timeMin = new Date().toISOString();
-      let url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&singleEvents=true&orderBy=startTime&maxResults=5`;
+      const monthToUse = targetMonth || currentMonth;
+      const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1);
+      const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59);
+      
+      const timeMin = startOfMonth.toISOString();
+      const timeMax = endOfMonth.toISOString();
+      
+      let url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=100`;
       
       if (queryStr) {
         url += `&q=${encodeURIComponent(queryStr)}`;
@@ -307,7 +321,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
         </button>
 
         {/* Left Side: Navigation Drawer and User Profile */}
-        <div className="w-full md:w-[240px] border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between h-full overflow-hidden">
+        <div className="w-full md:w-[240px] border-b md:border-b-0 md:border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between max-h-[35vh] md:max-h-full md:h-full overflow-hidden hidden md:flex">
           <div className="p-5 space-y-6 flex flex-col flex-1 min-h-0">
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
@@ -343,10 +357,21 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {isLoading && events.length === 0 ? (
                    <div className="flex justify-center p-4"><Loader2 className="animate-spin text-red-500" size={16} /></div>
-                ) : events.length === 0 ? (
+                ) : events.filter(event => {
+                      const evStart = event.start.dateTime || event.start.date;
+                      if (!evStart) return false;
+                      return new Date(evStart).getTime() + 86400000 >= new Date().getTime(); // Include today
+                    }).length === 0 ? (
                    <p className="text-[10px] text-white/30 text-center px-2 py-4 font-mono uppercase">No upcoming events</p>
                 ) : (
-                  events.slice(0, 5).map(event => (
+                  events
+                    .filter(event => {
+                      const evStart = event.start.dateTime || event.start.date;
+                      if (!evStart) return false;
+                      return new Date(evStart).getTime() + 86400000 >= new Date().getTime();
+                    })
+                    .slice(0, 5)
+                    .map(event => (
                     <div 
                       key={event.id}
                       onClick={() => { setSelectedEvent(event); setIsCreateOpen(false); }}
@@ -416,143 +441,156 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
           )}
         </div>
 
-        {/* Center Pane: Events listing */}
+        {/* Center Pane: Events Month Grid */}
         <div className="flex-1 flex flex-col min-w-0 h-full">
           {/* Header */}
-          <div className="p-5 border-b border-white/10 shrink-0 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Calendar size={18} className="text-red-500 animate-pulse" />
-              <h3 className="text-sm font-mono text-white uppercase tracking-widest">
-                UPCOMING AGENDA
-              </h3>
+          <div className="p-4 border-b border-white/10 shrink-0 flex items-center justify-between bg-white/2">
+            <div className="flex items-center gap-2">
+              <Calendar size={18} className="text-red-500 animate-pulse hidden md:block" />
+              <div className="flex items-center gap-1 md:gap-2">
+                <button 
+                  onClick={() => {
+                    const prev = new Date(currentMonth);
+                    prev.setMonth(prev.getMonth() - 1);
+                    setCurrentMonth(prev);
+                  }}
+                  className="p-1 md:p-1.5 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <h3 className="text-[11px] md:text-sm font-mono text-white uppercase tracking-widest w-20 md:w-28 text-center truncate">
+                  {currentMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                </h3>
+                <button 
+                  onClick={() => {
+                    const next = new Date(currentMonth);
+                    next.setMonth(next.getMonth() + 1);
+                    setCurrentMonth(next);
+                  }}
+                  className="p-1 md:p-1.5 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors cursor-pointer"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   if (token) {
-                    fetchEvents(token, searchQuery);
-                  } else {
-                    setEvents([]);
+                    fetchEvents(token, searchQuery, currentMonth);
                   }
                 }}
                 disabled={isLoading}
-                className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white transition-colors cursor-pointer"
+                className="p-1.5 rounded hover:bg-white/5 text-white/40 hover:text-white transition-colors cursor-pointer"
                 title="Reload Schedule"
               >
-                <RefreshCw size={11} className={isLoading ? "animate-spin" : ""} />
+                <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+              </button>
+              {/* Mobile Auth Button */}
+              <div className="md:hidden flex items-center">
+                {!isAuthenticated ? (
+                  <button
+                    onClick={handleLogin}
+                    disabled={isSigningIn}
+                    className="p-1.5 rounded bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer text-[10px] font-mono flex items-center gap-1 border border-red-500/20"
+                  >
+                    {isSigningIn ? <Loader2 size={12} className="animate-spin" /> : <User size={12} />}
+                    <span className="hidden sm:inline">LOGIN</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                       setIsCreateOpen(true);
+                       setSelectedEvent(null);
+                    }}
+                    className="p-1.5 rounded bg-white/5 text-white/70 hover:text-white transition-colors cursor-pointer mr-1"
+                    title="Add Event"
+                  >
+                    <Plus size={14} />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white transition-colors cursor-pointer md:hidden"
+                title="Close Panel"
+              >
+                <X size={14} />
               </button>
             </div>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
-              title="Close Panel"
-            >
-              <X size={14} />
-            </button>
           </div>
 
-
-
-          {/* Search bar */}
-          <form onSubmit={handleSearch} className="p-3 border-b border-white/10 shrink-0 bg-white/1 flex gap-2">
-            <div className="relative flex-1 flex items-center">
-              <Search size={13} className="absolute left-3 text-white/30" />
-              <input
-                type="text"
-                placeholder="Search calendar events..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50"
-              />
-              {searchQuery && (
-                <button 
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 text-white/40 hover:text-white"
-                >
-                  <X size={13} />
-                </button>
-              )}
+          {/* Calendar Grid */}
+          <div className="flex-1 overflow-y-auto p-2 md:p-4 flex flex-col bg-black/20 custom-scrollbar">
+            {/* Days Header */}
+            <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 shrink-0">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-[9px] md:text-[10px] font-mono text-white/40 uppercase py-1">
+                  {day}
+                </div>
+              ))}
             </div>
-            <button
-              type="submit"
-              className="bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 text-xs text-white hover:bg-white/10 hover:text-white font-mono"
-            >
-              FILTER
-            </button>
-          </form>
-
-          {/* Events list */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+            
+            {/* Grid */}
             {isLoading && events.length === 0 ? (
-              <div className="h-64 flex items-center justify-center">
-                <Loader2 className="animate-spin text-red-500" size={28} />
-              </div>
-            ) : events.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-white/30">
-                <Calendar size={32} className="opacity-35 mb-2 text-red-500/40" />
-                <p className="text-xs font-mono uppercase tracking-wider">No Events scheduled</p>
-                <p className="text-[10px] mt-1 max-w-xs leading-normal">
-                  Schedule a new meeting or event from the side panel to see it displayed here.
-                </p>
-              </div>
+               <div className="flex-1 flex items-center justify-center">
+                 <Loader2 className="animate-spin text-red-500" size={28} />
+               </div>
             ) : (
-              <div className="space-y-2">
-                {events.map((evt) => {
-                  const { dateString, timeString } = formatEventTime(evt) as any;
+              <div className="grid grid-cols-7 gap-1 md:gap-2 auto-rows-fr flex-1">
+                {Array.from({ length: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay() }, (_, i) => i).map(blank => (
+                  <div key={`blank-${blank}`} className="min-h-[60px] md:min-h-[90px] p-1 rounded-lg bg-white/5 border border-transparent opacity-50" />
+                ))}
+                
+                {Array.from({ length: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate() }, (_, i) => i + 1).map(day => {
+                  const dateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                  // Ensure local timezone doesn't mess up YYYY-MM-DD
+                  const dateStr = dateObj.getFullYear() + "-" + String(dateObj.getMonth() + 1).padStart(2, '0') + "-" + String(dateObj.getDate()).padStart(2, '0');
+                  
+                  // Find events for this day
+                  const dayEvents = events.filter(ev => {
+                    const evStart = ev.start.dateTime || ev.start.date;
+                    if (!evStart) return false;
+                    return evStart.startsWith(dateStr);
+                  });
+                  
+                  const todayObj = new Date();
+                  const todayStr = todayObj.getFullYear() + "-" + String(todayObj.getMonth() + 1).padStart(2, '0') + "-" + String(todayObj.getDate()).padStart(2, '0');
+                  const isToday = todayStr === dateStr;
+
                   return (
-                    <div
-                      key={evt.id}
-                      onClick={() => {
-                        setSelectedEvent(evt);
-                        setIsCreateOpen(false);
-                      }}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col relative overflow-hidden group hover:border-white/10 hover:bg-white/4 ${
-                        selectedEvent?.id === evt.id
-                          ? "bg-red-500/10 border-red-500/50 shadow-[0_0_12px_rgba(239,68,68,0.15)]"
-                          : "bg-white/2 border-white/5"
+                    <div 
+                      key={day} 
+                      className={`min-h-[60px] md:min-h-[90px] p-1 md:p-1.5 rounded-lg border flex flex-col gap-1 transition-colors overflow-hidden ${
+                        isToday 
+                          ? 'bg-red-500/10 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]' 
+                          : 'bg-white/5 border-white/5 hover:border-white/20'
                       }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="min-w-0 flex-1">
-                          {/* Event Name */}
-                          <h4 className="text-xs font-medium text-white truncate leading-snug">
-                            {evt.summary || "(No Title)"}
-                          </h4>
-                          
-                          {/* Event Details Row */}
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] font-mono text-white/40">
-                            <div className="flex items-center gap-1">
-                              <Clock size={10} className="text-red-400" />
-                              <span>{timeString}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span>{dateString}</span>
-                            </div>
-                            {evt.location && (
-                              <div className="flex items-center gap-1 max-w-[200px] truncate">
-                                <MapPin size={10} className="text-rose-400" />
-                                <span>{evt.location}</span>
-                              </div>
-                            )}
+                      <div className={`text-[9px] md:text-xs font-mono font-medium ${isToday ? 'text-red-400' : 'text-white/60'} text-right mb-0.5`}>
+                        {day}
+                      </div>
+                      
+                      <div className="flex-1 flex flex-col gap-0.5 overflow-y-auto custom-scrollbar scrollbar-hide">
+                        {dayEvents.map(ev => (
+                          <div 
+                            key={ev.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(ev);
+                              setIsCreateOpen(false);
+                            }}
+                            className={`text-[8px] md:text-[9px] truncate px-1 py-0.5 rounded cursor-pointer transition-colors ${
+                              selectedEvent?.id === ev.id
+                                ? "bg-red-500 text-white font-medium shadow-sm"
+                                : "bg-white/10 hover:bg-red-500/30 text-white/80 hover:text-white"
+                            }`}
+                            title={ev.summary || "Untitled Event"}
+                          >
+                            {ev.summary || "Untitled Event"}
                           </div>
-                        </div>
-
-                        {/* Delete Event Trigger Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteEvent(evt);
-                          }}
-                          disabled={isDeleting === evt.id}
-                          className="p-1 rounded hover:bg-red-500/25 text-white/40 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Delete Event"
-                        >
-                          {isDeleting === evt.id ? (
-                            <Loader2 size={10} className="animate-spin text-red-500" />
-                          ) : (
-                            <Trash2 size={11} />
-                          )}
-                        </button>
+                        ))}
                       </div>
                     </div>
                   );
@@ -561,9 +599,16 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
             )}
           </div>
         </div>
-
         {/* Right Pane: Selected Event Details View OR Scheduling Composer */}
-        <div className="hidden md:flex md:w-[400px] flex-col h-full bg-white/1 border-l border-white/10 relative">
+        <div className={`${selectedEvent || isCreateOpen ? 'flex' : 'hidden'} md:flex absolute md:relative inset-0 z-40 md:w-[400px] flex-col h-full bg-neutral-950/95 md:bg-white/1 border-l border-white/10`}>
+          
+          {/* Mobile Back Button */}
+          <button 
+            onClick={() => { setSelectedEvent(null); setIsCreateOpen(false); }}
+            className="md:hidden absolute top-4 left-4 z-50 p-2 rounded-full bg-white/10 text-white"
+          >
+            <ChevronLeft size={16} />
+          </button>
           <div className="flex-1 overflow-y-auto p-5 space-y-6 pt-16 h-full flex flex-col justify-between">
             <AnimatePresence mode="wait">
               {isCreateOpen ? (
