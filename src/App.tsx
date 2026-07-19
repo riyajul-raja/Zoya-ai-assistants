@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -177,6 +177,20 @@ export default function App() {
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setSelectedImageBase64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
   const [chatHeight, setChatHeight] = useState(150);
   const chatContainerRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1246,16 +1260,16 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   }, []);
 
-  const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false) => {
-    if (!finalTranscript.trim()) {
+  const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false, attachedImageBase64: string | null = null) => {
+    if (!finalTranscript.trim() && !attachedImageBase64) {
       setAppState("idle");
       return;
     }
 
     autoTriggerUIFromText(finalTranscript);
 
-    let capturedImageBase64: string | undefined = undefined;
-    if (isCameraActive) {
+    let capturedImageBase64: string | undefined = attachedImageBase64 || undefined;
+    if (isCameraActive && !capturedImageBase64) {
       const video = videoRef.current;
       if (video && !video.paused && !video.ended) {
         try {
@@ -1303,7 +1317,8 @@ In your very first response or greeting to the user, you MUST casually and natur
     ]);
     
     // If live session is active (either because voice is active or camera is ON), send text through it
-    if (liveSessionRef.current) {
+    // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
+    if (liveSessionRef.current && !attachedImageBase64) {
       liveSessionRef.current.sendText(finalTranscript);
       return;
     }
@@ -1337,7 +1352,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsTyping(true);
       setIsLoading(true);
       
-      const isHighThinking = /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(finalTranscript);
+      const isHighThinking = !!capturedImageBase64 || /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(finalTranscript);
       
       // Append an initial message for Zoya with empty text so that the UI updates in real-time
       setMessages((prev) => [
@@ -2765,6 +2780,19 @@ In your very first response or greeting to the user, you MUST casually and natur
                 </div>
               </div>
 
+              {/* Image Preview */}
+              {selectedImageBase64 && (
+                <div className="relative mt-2 p-2 border border-white/10 rounded-lg bg-black/20 w-fit">
+                  <img src={`data:image/jpeg;base64,${selectedImageBase64}`} className="h-16 w-16 object-cover rounded-md" alt="Attached" />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedImageBase64(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:scale-110 transition-transform shadow-lg"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              )}
               {/* Compact Input Bar */}
               <div className="flex items-center gap-1.5 mt-1 pt-1.5 border-t border-white/10 shrink-0">
                 <textarea
@@ -2784,6 +2812,21 @@ In your very first response or greeting to the user, you MUST casually and natur
                 />
                 
                 <div className="flex items-center gap-1 shrink-0">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-all duration-300 cursor-pointer"
+                    title="Attach Image"
+                  >
+                    <ImagePlus size={13} />
+                  </button>
                   <button
                     type="button"
                     onClick={toggleInputDictation}
@@ -2798,7 +2841,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   </button>
                   <button 
                     type="submit"
-                    disabled={!textInput.trim()}
+                    disabled={!textInput.trim() && !selectedImageBase64}
                     className={`p-1.5 rounded-md disabled:opacity-50 transition-all duration-300 cursor-pointer ${
                       isGhostMode
                         ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 text-white"

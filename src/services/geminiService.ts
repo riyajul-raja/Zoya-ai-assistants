@@ -133,7 +133,8 @@ export async function getZoyaResponseStream(
  
       const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
  
-      const isHighThinking = /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
+      const isImageAnalysis = !!imageFrame;
+      const isHighThinking = isImageAnalysis || /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
       const isSearch = /search|latest|news|today|current|weather|who is|what is|time|date|live/i.test(prompt) && !isHighThinking;
 
       let targetModel = "gemini-3.5-flash";
