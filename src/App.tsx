@@ -219,9 +219,11 @@ export default function App() {
   }, [isInputMicActive]);
 
   // Biometric Security Lock Screen states
-  const [isUnlocked, setIsUnlocked] = useState(() => {
-    return sessionStorage.getItem('isZoyaUnlocked') === 'true';
-  });
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  
+  useEffect(() => {
+    sessionStorage.removeItem('isZoyaUnlocked');
+  }, []);
   const [unlockStatus, setUnlockStatus] = useState<"awaiting" | "granted" | "failed" | "unregistered">("awaiting");
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimerRef = useRef<any>(null);
@@ -1966,6 +1968,23 @@ In your very first response or greeting to the user, you MUST casually and natur
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 w-[100vw] h-[100dvh] m-0 p-0 overflow-hidden z-0 flex flex-col items-center justify-center text-white font-sans"
           >
+            {/* Update Successful Toast Overlay (Lock Screen) */}
+            <AnimatePresence>
+              {showUpdateToast && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="fixed top-16 left-1/2 -translate-x-1/2 z-[10000] px-4 py-2.5 bg-black/40 border border-white/10 text-white rounded-full shadow-lg backdrop-blur-md flex items-center gap-3 pointer-events-none"
+                >
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-[10px]">
+                    Z
+                  </div>
+                  <span className="text-sm font-medium tracking-wide">Update Successful</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {/* Absolute background gradient container */}
             <div className="absolute inset-0 z-[-1] bg-[linear-gradient(135deg,#312e81,#4a044e,#0f172a,#134e4a)] animate-gradient" />
             
@@ -2924,23 +2943,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         )}
       </AnimatePresence>
 
-      {/* Update Successful Toast Overlay */}
-      <AnimatePresence>
-        {showUpdateToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[10000] px-4 py-2.5 bg-black/40 border border-white/10 text-white rounded-full shadow-lg backdrop-blur-md flex items-center gap-3 pointer-events-none"
-          >
-            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-[10px]">
-              Z
-            </div>
-            <span className="text-sm font-medium tracking-wide">Update Successful</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {/* Google Contacts Manager Overlay */}
       {showContacts && (
