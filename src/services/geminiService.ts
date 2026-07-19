@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 const systemInstruction = `Your name is Zoya. You are an Indian female AI assistant. Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting your creator, Riyajul, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).
 
@@ -131,11 +131,24 @@ export async function getZoyaResponseStream(
  
       const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
  
+      const isHighThinking = /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
+      const isSearch = /search|latest|news|today|current|weather|who is|what is|time|date|live/i.test(prompt) && !isHighThinking;
+
+      let targetModel = "gemini-3.5-flash";
+      let targetConfig: any = {
+        systemInstruction: activeSystemInstruction,
+      };
+
+      if (isHighThinking) {
+        targetModel = "gemini-3.1-pro-preview";
+        targetConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+      } else if (isSearch) {
+        targetConfig.tools = [{ googleSearch: {} }];
+      }
+
       chatSession = ai.chats.create({
-        model: "gemini-3.5-flash",
-        config: {
-          systemInstruction: activeSystemInstruction,
-        },
+        model: targetModel,
+        config: targetConfig,
         history: formattedHistory,
       });
     }
@@ -243,11 +256,24 @@ export async function getZoyaResponse(
 
       const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
 
+      const isHighThinking = /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
+      const isSearch = /search|latest|news|today|current|weather|who is|what is|time|date|live/i.test(prompt) && !isHighThinking;
+
+      let targetModel = "gemini-3.5-flash";
+      let targetConfig: any = {
+        systemInstruction: activeSystemInstruction,
+      };
+
+      if (isHighThinking) {
+        targetModel = "gemini-3.1-pro-preview";
+        targetConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+      } else if (isSearch) {
+        targetConfig.tools = [{ googleSearch: {} }];
+      }
+
       chatSession = ai.chats.create({
-        model: "gemini-3.5-flash",
-        config: {
-          systemInstruction: activeSystemInstruction,
-        },
+        model: targetModel,
+        config: targetConfig,
         history: formattedHistory,
       });
     }
