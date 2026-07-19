@@ -140,19 +140,14 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
       const timeMin = startOfMonth.toISOString();
       const timeMax = endOfMonth.toISOString();
       
-      // 1. Fetch calendar list
-      const calendarListRes = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      
-      if (!calendarListRes.ok) throw new Error("Failed to fetch calendar list");
-      const calendarList = await calendarListRes.json();
-      const calendars = calendarList.items || [];
-      
-      // 2. Fetch events for each calendar
       const allEvents: CalendarEvent[] = [];
       
-      await Promise.all(calendars.map(async (cal: any) => {
+      const calendarIds = [
+        { id: 'primary', isPrimary: true },
+        { id: 'en.indian#holiday@group.v.calendar.google.com', isPrimary: false }
+      ];
+      
+      await Promise.all(calendarIds.map(async (cal) => {
         let url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=100`;
         if (queryStr) {
           url += `&q=${encodeURIComponent(queryStr)}`;
@@ -165,9 +160,8 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
           if (eventsRes.ok) {
             const eventsData = await eventsRes.json();
             const items = eventsData.items || [];
-            // tag items with primary or not
             items.forEach((item: any) => {
-               item.isPrimary = cal.primary || false;
+               item.isPrimary = cal.isPrimary;
             });
             allEvents.push(...items);
           }
@@ -608,8 +602,8 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
                               selectedEvent?.id === ev.id
                                 ? "bg-red-500 text-white font-medium shadow-sm"
                                 : ev.isPrimary 
-                                    ? "bg-white/10 hover:bg-red-500/30 text-white/80 hover:text-white"
-                                    : "bg-teal-600/50 hover:bg-teal-500/70 text-teal-100"
+                                    ? "bg-white/10 hover:bg-white/20 text-white/80 hover:text-white"
+                                    : "bg-teal-500 hover:bg-teal-400 text-white font-medium shadow-sm"
                             }`}
                             title={ev.summary || "Untitled Event"}
                           >
