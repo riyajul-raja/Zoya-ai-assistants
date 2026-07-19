@@ -90,7 +90,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
   const handleLogin = async () => {
     setIsSigningIn(true);
     try {
-      const result = await googleSignIn();
+      const result = await googleSignIn(['https://www.googleapis.com/auth/keep'], 'zoya_google_keep_token');
       if (result) {
         setToken(result.accessToken);
         setFirebaseUser(result.user);
@@ -109,7 +109,7 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await logout('zoya_google_keep_token');
       setIsAuthenticated(false);
       setFirebaseUser(null);
       setToken(null);
@@ -133,8 +133,8 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
           setToken(null);
           setApiMode("fallback");
           loadFallbackNotes();
-          onToast("Please sign in again to grant Keep permissions.");
-          throw new Error("Insufficient scopes or invalid token.");
+          // Silently fail auth instead of error toast
+          return;
         }
         throw new Error(`Keep API error: ${response.status} ${response.statusText}`);
       }
@@ -405,13 +405,33 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
               <p className="text-[9px] font-mono text-white/40 uppercase">Operational Notes</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+          <div className="flex items-center gap-2">
+            {!isAuthenticated ? (
+              <button
+                onClick={handleLogin}
+                disabled={isSigningIn}
+                className="mr-2 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 font-mono text-[10px] uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer"
+              >
+                {isSigningIn ? <Loader2 size={12} className="animate-spin" /> : <CloudOff size={12} />}
+                <span>Reconnect Google</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="mr-2 p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                title="Disconnect Google Keep"
+              >
+                <LogOut size={14} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
             title="Close Panel"
           >
             <X size={16} />
           </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6 relative">
@@ -788,10 +808,21 @@ export default function KeepManager({ onClose, isGhostMode = false, onToast }: K
                   ) : (
                     <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center text-center p-12 bg-white/2 border border-white/5 rounded-2xl border-dashed">
                       <StickyNote size={32} className="opacity-20 mb-3 text-amber-500/40 animate-pulse" />
-                      <p className="text-sm font-mono uppercase text-white/40">No notes found</p>
-                      <p className="text-xs mt-1 max-w-xs text-white/30 leading-normal">
-                        Create a text record or checklist using the 'Compose Note' button above.
-                      </p>
+                      {isAuthenticated ? (
+                        <>
+                          <p className="text-sm font-mono uppercase text-white/40">No notes found</p>
+                          <p className="text-xs mt-1 max-w-xs text-white/30 leading-normal">
+                            Create a text record or checklist using the 'Compose Note' button above.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-mono uppercase text-amber-500/70">Please log in to sync</p>
+                          <p className="text-xs mt-1 max-w-xs text-white/30 leading-normal">
+                            Reconnect your Google account to access your Keep notes.
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

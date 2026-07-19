@@ -62,11 +62,12 @@ let cachedAccessToken: string | null = localStorage.getItem('zoya_google_token_v
 // Initialize auth state listener. Call this on app load.
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
-  onAuthFailure?: () => void
+  onAuthFailure?: () => void,
+  tokenKey: string = 'zoya_google_token_v2'
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     // Re-read from localStorage just in case
-    cachedAccessToken = localStorage.getItem('zoya_google_token_v2');
+    cachedAccessToken = localStorage.getItem(tokenKey);
     
     // In our new GIS flow, we bypass Firebase Auth for Google, so 'user' might be null here
     // but if we have a valid cachedAccessToken, we consider it authenticated for API usage.
@@ -82,19 +83,19 @@ export const initAuth = (
         if (onAuthSuccess) onAuthSuccess(activeUser, cachedAccessToken);
       } else if (!isSigningIn) {
         cachedAccessToken = null;
-        localStorage.removeItem('zoya_google_token_v2');
+        localStorage.removeItem(tokenKey);
         if (onAuthFailure) onAuthFailure();
       }
     } else {
       cachedAccessToken = null;
-      localStorage.removeItem('zoya_google_token_v2');
+      localStorage.removeItem(tokenKey);
       if (onAuthFailure) onAuthFailure();
     }
   });
 };
 
 // Must be called from a button click or user interaction
-export const googleSignIn = async (customScopes?: string[]): Promise<{ user: User; accessToken: string } | null> => {
+export const googleSignIn = async (customScopes?: string[], tokenKey: string = 'zoya_google_token_v2'): Promise<{ user: User; accessToken: string } | null> => {
   return new Promise((resolve, reject) => {
     isSigningIn = true;
     
@@ -106,7 +107,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
     const handleSuccess = (tokenResponse: any) => {
       if (tokenResponse && tokenResponse.access_token) {
         cachedAccessToken = tokenResponse.access_token;
-        localStorage.setItem('zoya_google_token_v2', tokenResponse.access_token);
+        localStorage.setItem(tokenKey, tokenResponse.access_token);
         
         // Mock user object to satisfy the expected return type without Firebase
         const mockUser = {
@@ -164,17 +165,17 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
   });
 };
 
-export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken || localStorage.getItem('zoya_google_token_v2');
+export const getAccessToken = async (tokenKey: string = 'zoya_google_token_v2'): Promise<string | null> => {
+  return cachedAccessToken || localStorage.getItem(tokenKey);
 };
 
-export const setAccessToken = (token: string) => {
+export const setAccessToken = (token: string, tokenKey: string = 'zoya_google_token_v2') => {
   cachedAccessToken = token;
-  localStorage.setItem('zoya_google_token_v2', token);
+  localStorage.setItem(tokenKey, token);
 };
 
-export const logout = async () => {
+export const logout = async (tokenKey: string = 'zoya_google_token_v2') => {
   await auth.signOut();
   cachedAccessToken = null;
-  localStorage.removeItem('zoya_google_token_v2');
+  localStorage.removeItem(tokenKey);
 };

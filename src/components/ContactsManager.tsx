@@ -99,7 +99,8 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
         setFirebaseUser(null);
         setToken(null);
         setIsAuthChecking(false);
-      }
+      },
+      'zoya_google_contacts_token'
     );
     return () => unsubscribe();
   }, []);
@@ -107,7 +108,7 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
   const handleLogin = async () => {
     setIsSigningIn(true);
     try {
-      const result = await googleSignIn();
+      const result = await googleSignIn(['https://www.googleapis.com/auth/contacts.readonly'], 'zoya_google_contacts_token');
       if (result) {
         setToken(result.accessToken);
         setFirebaseUser(result.user);
@@ -125,7 +126,7 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await logout('zoya_google_contacts_token');
       setIsAuthenticated(false);
       setFirebaseUser(null);
       setToken(null);
@@ -227,13 +228,18 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
         }
       );
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          setIsAuthenticated(false);
+          setToken(null);
+          return;
+        }
         throw new Error("Failed to fetch contacts");
       }
       const data = await response.json();
       setContacts(data.connections || []);
     } catch (err) {
       console.error("Error fetching contacts:", err);
-      onToast("Error loading contacts. Try logging in again.");
+      // Removed red toast since user might just need to log in
     } finally {
       setIsLoadingContacts(false);
     }
@@ -615,7 +621,7 @@ export default function ContactsManager({ onClose, isGhostMode = false, onToast 
                     <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
                   </svg>
                 )}
-                <span>Sign in with Google</span>
+                <span>Reconnect Google</span>
               </button>
             </div>
           ) : (
