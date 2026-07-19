@@ -304,14 +304,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
         {/* Hologram top strip bar */}
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-red-600 via-rose-500 to-red-600 animate-pulse" />
 
-        {/* Absolute Universal Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
-          title="Close Panel"
-        >
-          <X size={16} />
-        </button>
+        
 
         {/* Left Side: Navigation Drawer and User Profile */}
         <div className="w-full md:w-[240px] border-b md:border-b-0 md:border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between max-h-[35vh] md:max-h-full md:h-full overflow-hidden hidden md:flex">
@@ -446,6 +439,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
                     const prev = new Date(currentMonth);
                     prev.setMonth(prev.getMonth() - 1);
                     setCurrentMonth(prev);
+                    if (token) fetchEvents(token, searchQuery, prev);
                   }}
                   className="p-1 md:p-1.5 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors cursor-pointer"
                 >
@@ -459,6 +453,7 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
                     const next = new Date(currentMonth);
                     next.setMonth(next.getMonth() + 1);
                     setCurrentMonth(next);
+                    if (token) fetchEvents(token, searchQuery, next);
                   }}
                   className="p-1 md:p-1.5 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors cursor-pointer"
                 >
@@ -480,43 +475,55 @@ export default function CalendarManager({ onClose, isGhostMode = false, onToast 
               >
                 <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
               </button>
-              {/* Mobile Auth Button */}
-              <div className="md:hidden flex items-center">
-                {!isAuthenticated ? (
-                  <button
-                    onClick={handleLogin}
-                    disabled={isSigningIn}
-                    className="p-1.5 rounded bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer text-[10px] font-mono flex items-center gap-1 border border-red-500/20"
-                  >
-                    {isSigningIn ? <Loader2 size={12} className="animate-spin" /> : <User size={12} />}
-                    <span className="hidden sm:inline">LOGIN</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                       setIsCreateOpen(true);
-                       setSelectedEvent(null);
-                    }}
-                    className="p-1.5 rounded bg-white/5 text-white/70 hover:text-white transition-colors cursor-pointer mr-1"
-                    title="Add Event"
-                  >
-                    <Plus size={14} />
-                  </button>
-                )}
-              </div>
+              
+              <div className="flex flex-row items-center justify-end gap-4">
+                {/* Mobile Auth Button / Add Event */}
+                <div className="md:hidden flex items-center">
+                  {!isAuthenticated ? (
+                    <button
+                      onClick={handleLogin}
+                      disabled={isSigningIn}
+                      className="p-1.5 rounded bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer text-[10px] font-mono flex items-center gap-1 border border-red-500/20"
+                    >
+                      {isSigningIn ? <Loader2 size={12} className="animate-spin" /> : <User size={12} />}
+                      <span className="hidden sm:inline">LOGIN</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { 
+                         setIsCreateOpen(true); 
+                         setSelectedEvent(null);
+                      }}
+                      className="p-1.5 rounded bg-white/5 text-white/70 hover:text-white transition-colors cursor-pointer"
+                      title="Add Event"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
+                </div>
 
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all cursor-pointer flex items-center justify-center"
+                  title="Close Panel"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
           </div>
-
           {/* Calendar Grid */}
           <div className="flex-1 overflow-y-auto p-2 md:p-4 flex flex-col bg-black/20 custom-scrollbar">
             {/* Days Header */}
             <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 shrink-0">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center text-[9px] md:text-[10px] font-mono text-white/40 uppercase py-1">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
+                const isCurrentDayOfWeek = new Date().getDay() === idx;
+                return (
+                <div key={day} className={`text-center text-[9px] md:text-[10px] font-mono uppercase py-1 ${isCurrentDayOfWeek ? 'text-red-500 font-bold' : 'text-white/40'}`}>
                   {day}
                 </div>
-              ))}
+                );
+              })}
             </div>
             
             {/* Grid */}

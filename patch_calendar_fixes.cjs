@@ -1,104 +1,88 @@
 const fs = require('fs');
 let code = fs.readFileSync('src/components/CalendarManager.tsx', 'utf8');
 
-// 1. DUPLICATE CLOSE BUTTON
-const oldCloseBtn = `              <button
-                onClick={onClose}
-                className="p-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white transition-colors cursor-pointer md:hidden"
-                title="Close Panel"
+// 1. Remove absolute X button
+const absoluteBtnRegex = /\{\/\*\s*Absolute Universal Close Button\s*\*\/.*?<\/button>/s;
+code = code.replace(absoluteBtnRegex, "");
+
+// 2. Add X button to the flex container and fix overlap
+const rightControlsRegex = /<div className="flex items-center gap-2">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/s;
+// We'll replace the header structure slightly to ensure flex row items-center justify-end gap-4
+const newHeader = `<div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (token) {
+                    fetchEvents(token, searchQuery, currentMonth);
+                  }
+                }}
+                disabled={isLoading}
+                className="p-1.5 rounded hover:bg-white/5 text-white/40 hover:text-white transition-colors cursor-pointer"
+                title="Reload Schedule"
               >
-                <X size={14} />
-              </button>`;
-code = code.replace(oldCloseBtn, "");
-
-// 2 & 3. CENTER DATES AND RENDER EVENTS (FIX MAPPING)
-const oldGridCell = `                    <div 
-                      key={day} 
-                      className={\`min-h-[60px] md:min-h-[90px] p-1 md:p-1.5 rounded-lg border flex flex-col gap-1 transition-colors overflow-hidden \${
-                        isToday 
-                          ? 'bg-red-500/10 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]' 
-                          : 'bg-white/5 border-white/5 hover:border-white/20'
-                      }\`}
+                <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+              </button>
+              
+              <div className="flex flex-row items-center justify-end gap-4">
+                {/* Mobile Auth Button / Add Event */}
+                <div className="md:hidden flex items-center">
+                  {!isAuthenticated ? (
+                    <button
+                      onClick={handleLogin}
+                      disabled={isSigningIn}
+                      className="p-1.5 rounded bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer text-[10px] font-mono flex items-center gap-1 border border-red-500/20"
                     >
-                      <div className={\`text-[9px] md:text-xs font-mono font-medium \${isToday ? 'text-red-400' : 'text-white/60'} text-right mb-0.5\`}>
-                        {day}
-                      </div>
-                      
-                      <div className="flex-1 flex flex-col gap-0.5 overflow-y-auto custom-scrollbar scrollbar-hide">
-                        {dayEvents.map(ev => (
-                          <div 
-                            key={ev.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEvent(ev);
-                              setIsCreateOpen(false);
-                            }}
-                            className={\`text-[8px] md:text-[9px] truncate px-1 py-0.5 rounded cursor-pointer transition-colors \${
-                              selectedEvent?.id === ev.id
-                                ? "bg-red-500 text-white font-medium shadow-sm"
-                                : "bg-white/10 hover:bg-red-500/30 text-white/80 hover:text-white"
-                            }\`}
-                            title={ev.summary || "Untitled Event"}
-                          >
-                            {ev.summary || "Untitled Event"}
-                          </div>
-                        ))}
-                      </div>
-                    </div>`;
-
-const newGridCell = `                    <div 
-                      key={day} 
-                      className={\`min-h-[60px] md:min-h-[90px] p-1 md:p-1.5 rounded-lg border flex flex-col items-center justify-center gap-1 transition-colors overflow-hidden \${
-                        isToday 
-                          ? 'bg-red-500/10 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]' 
-                          : 'bg-white/5 border-white/5 hover:border-white/20'
-                      }\`}
+                      {isSigningIn ? <Loader2 size={12} className="animate-spin" /> : <User size={12} />}
+                      <span className="hidden sm:inline">LOGIN</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { 
+                         setIsCreateOpen(true); 
+                         setSelectedEvent(null);
+                      }}
+                      className="p-1.5 rounded bg-white/5 text-white/70 hover:text-white transition-colors cursor-pointer"
+                      title="Add Event"
                     >
-                      <div className={\`text-lg md:text-xl font-mono font-medium \${isToday ? 'text-red-400' : 'text-white/60'} text-center\`}>
-                        {day}
-                      </div>
-                      
-                      <div className="flex-1 flex flex-col gap-0.5 overflow-y-auto w-full items-center custom-scrollbar scrollbar-hide">
-                        {dayEvents.map(ev => (
-                          <div 
-                            key={ev.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEvent(ev);
-                              setIsCreateOpen(false);
-                            }}
-                            className={\`text-[9px] md:text-[10px] text-center w-full truncate px-1.5 py-0.5 rounded cursor-pointer transition-colors \${
-                              selectedEvent?.id === ev.id
-                                ? "bg-red-500 text-white font-medium shadow-sm"
-                                : "bg-white/10 hover:bg-red-500/30 text-white/80 hover:text-white"
-                            }\`}
-                            title={ev.summary || "Untitled Event"}
-                          >
-                            {ev.summary || "Untitled Event"}
-                          </div>
-                        ))}
-                      </div>
-                    </div>`;
+                      <Plus size={14} />
+                    </button>
+                  )}
+                </div>
 
-code = code.replace(oldGridCell, newGridCell);
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all cursor-pointer flex items-center justify-center"
+                  title="Close Panel"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          </div>`;
+// Replace the old right controls with the new one
+code = code.replace(/<div className="flex items-center gap-2">\s*<button\s*onClick=\{\(\) => \{\s*if \(token\) \{\s*fetchEvents\(token, searchQuery, currentMonth\);\s*\}\s*\}\}[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*\{?\/\* Calendar Grid \*\//, newHeader + "\n          {/* Calendar Grid */");
 
-const oldEventFilter = `                  // Find events for this day
-                  const dayEvents = events.filter(ev => {
-                    const evStart = ev.start.dateTime || ev.start.date;
-                    if (!evStart) return false;
-                    return evStart.startsWith(dateStr);
-                  });`;
+// 3. Fix the arrows
+const prevArrowRegex = /const prev = new Date\(currentMonth\);\s*prev\.setMonth\(prev\.getMonth\(\) - 1\);\s*setCurrentMonth\(prev\);/s;
+code = code.replace(prevArrowRegex, "const prev = new Date(currentMonth);\n                    prev.setMonth(prev.getMonth() - 1);\n                    setCurrentMonth(prev);\n                    if (token) fetchEvents(token, searchQuery, prev);");
 
-const newEventFilter = `                  // Find events for this day
-                  const dayEvents = events.filter(ev => {
-                    const evStart = ev.start.dateTime || ev.start.date;
-                    if (!evStart) return false;
-                    const evDateObj = new Date(evStart);
-                    const evDateStr = evDateObj.getFullYear() + "-" + String(evDateObj.getMonth() + 1).padStart(2, '0') + "-" + String(evDateObj.getDate()).padStart(2, '0');
-                    return evDateStr === dateStr;
-                  });`;
+const nextArrowRegex = /const next = new Date\(currentMonth\);\s*next\.setMonth\(next\.getMonth\(\) \+ 1\);\s*setCurrentMonth\(next\);/s;
+code = code.replace(nextArrowRegex, "const next = new Date(currentMonth);\n                    next.setMonth(next.getMonth() + 1);\n                    setCurrentMonth(next);\n                    if (token) fetchEvents(token, searchQuery, next);");
 
-code = code.replace(oldEventFilter, newEventFilter);
+// 4. Highlight current day header
+const oldDaysHeader = `{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-[9px] md:text-[10px] font-mono text-white/40 uppercase py-1">
+                  {day}
+                </div>
+              ))}`;
+const newDaysHeader = `{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
+                const isCurrentDayOfWeek = new Date().getDay() === idx;
+                return (
+                <div key={day} className={\`text-center text-[9px] md:text-[10px] font-mono uppercase py-1 \${isCurrentDayOfWeek ? 'text-red-500 font-bold' : 'text-white/40'}\`}>
+                  {day}
+                </div>
+                );
+              })}`;
+code = code.replace(oldDaysHeader, newDaysHeader);
 
 fs.writeFileSync('src/components/CalendarManager.tsx', code);
-console.log('Patched');
+console.log("Patched fixes!");
