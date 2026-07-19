@@ -1117,7 +1117,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         };
 
-        await session.start(requiredMic, isProfessionalMode, environmentContext);
+        await session.start(requiredMic, isProfessionalMode, environmentContext, messagesRef.current);
       } catch (err) {
         console.error("Failed to start synchronized live session:", err);
         liveSessionRef.current = null;

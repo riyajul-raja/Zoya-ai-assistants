@@ -49,7 +49,12 @@ export class LiveSessionManager {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
-  async start(useMic: boolean = true, isProfessionalMode: boolean = false, environmentContext: string = "") {
+  async start(
+    useMic: boolean = true, 
+    isProfessionalMode: boolean = false, 
+    environmentContext: string = "",
+    history: { sender: "user" | "zoya"; text: string; image?: string }[] = []
+  ) {
     try {
       this.onStateChange("processing");
       
@@ -121,6 +126,12 @@ export class LiveSessionManager {
 
       if (environmentContext) {
         activeSystemInstruction = `${environmentContext}\n\n${activeSystemInstruction}`;
+      }
+      
+      // Inject text chat history into the Live API context if available
+      if (history && history.length > 0) {
+        const historyText = history.slice(-6).map(msg => `${msg.sender.toUpperCase()}: ${msg.text}`).join('\n');
+        activeSystemInstruction = `${activeSystemInstruction}\n\nHere is the recent conversation history for context:\n${historyText}`;
       }
 
       // Connect to Live API
