@@ -256,7 +256,7 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
       if (queryStr) {
         q = `${queryStr}`;
       }
-      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=5`;
+      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=20`;
       
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -468,6 +468,8 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
   };
 
   const cleanLabelValue = (label: string) => {
+    setIsComposeOpen(false);
+    setSelectedEmail(null);
     setCurrentLabel(label);
     setSearchQuery("");
     if (token && apiMode === "real") {
@@ -479,6 +481,14 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
 
   return (
     <div id="gmail-manager-overlay" className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in pointer-events-auto">
+      {/* Absolute Universal Close Button */}
+      <button
+        onClick={onClose}
+        className="absolute top-6 right-6 z-[9999] p-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+        title="Close Panel"
+      >
+        <X size={18} />
+      </button>
       <div 
         id="gmail-manager-card"
         className={`w-full max-w-5xl h-[85vh] rounded-3xl flex flex-col md:flex-row overflow-hidden border backdrop-blur-xl relative transition-all duration-300 pointer-events-auto ${
@@ -490,14 +500,7 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
         {/* Hologram top strip bar */}
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-red-600 via-rose-500 to-red-600 animate-pulse" />
 
-        {/* Absolute Universal Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
-          title="Close Panel"
-        >
-          <X size={16} />
-        </button>
+
 
         {/* Left Drawer Navigation: Label selector & quick details */}
         <div className="w-full md:w-[240px] border-r border-white/10 shrink-0 bg-white/2 flex flex-col justify-between h-full">
@@ -739,9 +742,12 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
         {/* Right Pane: Selected Email Viewer OR Composer */}
         <div className={`w-full md:w-[400px] flex-col h-full bg-white/1 md:border-l border-white/10 relative ${ (isComposeOpen || selectedEmail) ? "flex" : "hidden md:flex" }`}>
           <div className="flex-1 overflow-y-auto p-5 space-y-6 pt-16 h-full flex flex-col justify-between">
-            <div className="md:hidden mb-2">
-              <button onClick={() => { setIsComposeOpen(false); setSelectedEmail(null); }} className="text-white/70 hover:text-white flex items-center gap-1 font-mono text-xs">
+            <div className="mb-2 flex justify-between items-center w-full">
+              <button onClick={() => { setIsComposeOpen(false); setSelectedEmail(null); }} className="md:hidden text-white/70 hover:text-white flex items-center gap-1 font-mono text-xs">
                 <ChevronRight className="rotate-180" size={14} /> Back
+              </button>
+              <button onClick={() => { setIsComposeOpen(false); setSelectedEmail(null); }} className="hidden md:flex ml-auto p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors" title="Close">
+                <X size={16} />
               </button>
             </div>
             <AnimatePresence mode="wait">
