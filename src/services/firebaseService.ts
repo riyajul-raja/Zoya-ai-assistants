@@ -57,7 +57,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
 // Cache the access token in memory and local storage
-let cachedAccessToken: string | null = localStorage.getItem('zoya_google_token');
+let cachedAccessToken: string | null = localStorage.getItem('zoya_google_token_v2');
 
 // Initialize auth state listener. Call this on app load.
 export const initAuth = (
@@ -66,7 +66,7 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     // Re-read from localStorage just in case
-    cachedAccessToken = localStorage.getItem('zoya_google_token');
+    cachedAccessToken = localStorage.getItem('zoya_google_token_v2');
     
     // In our new GIS flow, we bypass Firebase Auth for Google, so 'user' might be null here
     // but if we have a valid cachedAccessToken, we consider it authenticated for API usage.
@@ -82,12 +82,12 @@ export const initAuth = (
         if (onAuthSuccess) onAuthSuccess(activeUser, cachedAccessToken);
       } else if (!isSigningIn) {
         cachedAccessToken = null;
-        localStorage.removeItem('zoya_google_token');
+        localStorage.removeItem('zoya_google_token_v2');
         if (onAuthFailure) onAuthFailure();
       }
     } else {
       cachedAccessToken = null;
-      localStorage.removeItem('zoya_google_token');
+      localStorage.removeItem('zoya_google_token_v2');
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -98,7 +98,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
   return new Promise((resolve, reject) => {
     isSigningIn = true;
     
-    const defaultScopes = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/calendar.readonly';
+    const defaultScopes = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/calendar.events';
     const scopes = customScopes && customScopes.length > 0 
       ? customScopes.join(' ') 
       : defaultScopes;
@@ -106,7 +106,7 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
     const handleSuccess = (tokenResponse: any) => {
       if (tokenResponse && tokenResponse.access_token) {
         cachedAccessToken = tokenResponse.access_token;
-        localStorage.setItem('zoya_google_token', tokenResponse.access_token);
+        localStorage.setItem('zoya_google_token_v2', tokenResponse.access_token);
         
         // Mock user object to satisfy the expected return type without Firebase
         const mockUser = {
@@ -165,16 +165,16 @@ export const googleSignIn = async (customScopes?: string[]): Promise<{ user: Use
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken || localStorage.getItem('zoya_google_token');
+  return cachedAccessToken || localStorage.getItem('zoya_google_token_v2');
 };
 
 export const setAccessToken = (token: string) => {
   cachedAccessToken = token;
-  localStorage.setItem('zoya_google_token', token);
+  localStorage.setItem('zoya_google_token_v2', token);
 };
 
 export const logout = async () => {
   await auth.signOut();
   cachedAccessToken = null;
-  localStorage.removeItem('zoya_google_token');
+  localStorage.removeItem('zoya_google_token_v2');
 };
