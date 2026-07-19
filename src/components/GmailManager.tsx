@@ -201,9 +201,8 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
 
   const decodeBase64Url = (base64UrlStr: string) => {
     let base64 = base64UrlStr.replace(/-/g, "+").replace(/_/g, "/");
-    while (base64.length % 4) {
-      base64 += "=";
-    }
+    const padLength = (4 - (base64.length % 4)) % 4;
+    if (padLength > 0) base64 += "=".repeat(padLength);
     try {
       return decodeURIComponent(escape(atob(base64)));
     } catch (e) {
@@ -475,10 +474,10 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
   };
 
   return (
-    <div id="gmail-manager-overlay" className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in">
+    <div id="gmail-manager-overlay" className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in pointer-events-auto">
       <div 
         id="gmail-manager-card"
-        className={`w-full max-w-5xl h-[85vh] rounded-3xl flex flex-col md:flex-row overflow-hidden border backdrop-blur-xl relative transition-all duration-300 ${
+        className={`w-full max-w-5xl h-[85vh] rounded-3xl flex flex-col md:flex-row overflow-hidden border backdrop-blur-xl relative transition-all duration-300 pointer-events-auto ${
           isGhostMode 
             ? "bg-black/95 border-red-500/80 shadow-[0_0_30px_rgba(239,68,68,0.3)]" 
             : "bg-neutral-950/95 border-red-500/60 shadow-[0_0_25px_rgba(239,68,68,0.2)]"
