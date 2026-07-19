@@ -256,7 +256,7 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
       if (queryStr) {
         q = `${queryStr}`;
       }
-      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=20`;
+      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=5`;
       
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -662,8 +662,9 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
               {/* Emails Content List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {isLoading && emails.length === 0 ? (
-                  <div className="h-64 flex items-center justify-center">
-                    <Loader2 className="animate-spin text-red-500" size={28} />
+                  <div className="h-64 flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="animate-spin text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] rounded-full" size={28} />
+                    <p className="text-xs font-mono uppercase tracking-wider text-red-400 animate-pulse">Fetching secure emails...</p>
                   </div>
                 ) : emails.length === 0 ? (
                   <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-white/30">
