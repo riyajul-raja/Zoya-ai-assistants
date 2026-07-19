@@ -84,6 +84,7 @@ export default function App() {
   });
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const messagesRef = useRef(messages);
   const activeUtterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
@@ -178,7 +179,9 @@ export default function App() {
   }, [isInputMicActive]);
 
   // Biometric Security Lock Screen states
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    return sessionStorage.getItem('isZoyaUnlocked') === 'true';
+  });
   const [unlockStatus, setUnlockStatus] = useState<"awaiting" | "granted" | "failed" | "unregistered">("awaiting");
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimerRef = useRef<any>(null);
@@ -193,6 +196,7 @@ export default function App() {
       localStorage.setItem("isRegisteredDevice", "true");
       setUnlockStatus("granted");
       setTimeout(() => {
+        sessionStorage.setItem('isZoyaUnlocked', 'true');
         setIsUnlocked(true);
       }, 1000);
     } else {
@@ -265,6 +269,7 @@ export default function App() {
         setHoldProgress(100);
         setUnlockStatus("granted");
         setTimeout(() => {
+          sessionStorage.setItem('isZoyaUnlocked', 'true');
           setIsUnlocked(true);
         }, 1000);
       } catch (err: any) {
@@ -2235,11 +2240,16 @@ In your very first response or greeting to the user, you MUST casually and natur
 
           {/* Sync / Refresh Button */}
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              setIsSyncing(true);
+              setTimeout(() => {
+                window.location.reload();
+              }, 500);
+            }}
             className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center hover:text-violet-400 hover:border-violet-500/30"
             title="Hard Refresh"
           >
-            <RefreshCw size={18} className="transition-transform duration-300 hover:rotate-180" />
+            <RefreshCw size={18} className={`transition-transform duration-300 ${isSyncing ? "animate-spin" : "hover:rotate-180"}`} />
           </button>
 
           {/* Hamburger Menu (Dropdown with Tool Labels) */}
