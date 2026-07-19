@@ -2233,10 +2233,14 @@ In your very first response or greeting to the user, you MUST casually and natur
             </button>
           )}
 
-          
-          
-
-          
+          {/* Sync / Refresh Button */}
+          <button
+            onClick={() => window.location.reload()}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center hover:text-violet-400 hover:border-violet-500/30"
+            title="Hard Refresh"
+          >
+            <RefreshCw size={18} className="transition-transform duration-300 hover:rotate-180" />
+          </button>
 
           {/* Hamburger Menu (Dropdown with Tool Labels) */}
           <div className="relative flex items-center justify-center" ref={toolMenuRef}>
