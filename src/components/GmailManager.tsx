@@ -250,6 +250,7 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
       return;
     }
     setIsLoading(true);
+    setEmails([]);
     try {
       let q = `label:${label}`;
       if (queryStr) {
@@ -262,7 +263,10 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
       });
       
       if (!response.ok) {
-        throw new Error("Failed to list messages");
+        if (response.status === 401 || response.status === 403) {
+          onToast("Gmail access expired or missing permissions. Please sign out and sign in again.");
+        }
+        throw new Error("Failed to list messages: " + response.status);
       }
       
       const data = await response.json();
@@ -733,8 +737,13 @@ export default function GmailManager({ onClose, isGhostMode = false, onToast }: 
           </div>
 
         {/* Right Pane: Selected Email Viewer OR Composer */}
-        <div className="hidden md:flex md:w-[400px] flex-col h-full bg-white/1 border-l border-white/10 relative">
+        <div className={`w-full md:w-[400px] flex-col h-full bg-white/1 md:border-l border-white/10 relative ${ (isComposeOpen || selectedEmail) ? "flex" : "hidden md:flex" }`}>
           <div className="flex-1 overflow-y-auto p-5 space-y-6 pt-16 h-full flex flex-col justify-between">
+            <div className="md:hidden mb-2">
+              <button onClick={() => { setIsComposeOpen(false); setSelectedEmail(null); }} className="text-white/70 hover:text-white flex items-center gap-1 font-mono text-xs">
+                <ChevronRight className="rotate-180" size={14} /> Back
+              </button>
+            </div>
             <AnimatePresence mode="wait">
               {isComposeOpen ? (
                 /* Email Compose Panel Form */
