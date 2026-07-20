@@ -186,6 +186,7 @@ export default function App() {
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
+  const [isDeepThinking, setIsDeepThinking] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1495,8 +1496,13 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         };
 
+        let promptToSend = finalTranscript;
+        if (isDeepThinking) {
+          promptToSend = `[SYSTEM CONTEXT: Engage Deep Thinking Mode. Provide highly advanced, professional, and step-by-step analytical reasoning. Be strictly mindful of token limits—avoid fluff and deliver maximum high-value information.]\n\n${finalTranscript}`;
+        }
+
         responseText = await getZoyaResponseStream(
-          finalTranscript,
+          promptToSend,
           messagesRef.current,
           capturedImageBase64s,
           isProfessionalMode,
@@ -1629,7 +1635,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       }
       setAppState("idle");
     }
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
 
   useEffect(() => {
     return () => {
@@ -3029,6 +3035,11 @@ In your very first response or greeting to the user, you MUST casually and natur
                 </div>
               ) : (
               <div className="flex items-center gap-1.5 mt-1 pt-1.5 border-t border-white/10 shrink-0">
+                {isDeepThinking && (
+                  <div className="pl-1 shrink-0" title="Deep Thinking Mode Active">
+                    <Brain className="text-purple-400 animate-pulse w-5 h-5" />
+                  </div>
+                )}
                 <textarea
                   ref={textareaRef}
                   autoFocus={false}
@@ -3393,6 +3404,24 @@ In your very first response or greeting to the user, you MUST casually and natur
                 <div>
                   <div className="text-white font-medium">Create Image</div>
                   <div className="text-white/50 text-sm">Generate with AI</div>
+                </div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPlusMenuOpen(false);
+                  setIsDeepThinking(prev => !prev);
+                  setTimeout(() => textareaRef.current?.focus(), 100);
+                }}
+                className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/10 transition-colors text-left"
+              >
+                <div className={`p-3 rounded-full ${isDeepThinking ? 'bg-indigo-500/40 text-indigo-300' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                  <Brain size={24} />
+                </div>
+                <div>
+                  <div className="text-white font-medium">Deep Thinking {isDeepThinking ? '(On)' : ''}</div>
+                  <div className="text-white/50 text-sm">Advanced, focused reasoning</div>
                 </div>
               </button>
             </motion.div>
