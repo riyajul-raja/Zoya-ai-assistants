@@ -1,25 +1,42 @@
 const fs = require('fs');
-let code = fs.readFileSync('src/components/TypingIndicator.tsx', 'utf8');
 
-const target = `export default function TypingIndicator({ isGhostMode = false }: { isGhostMode?: boolean }) {`;
-const replacement = `export default function TypingIndicator({ isGhostMode = false, thought = null }: { isGhostMode?: boolean, thought?: string | null }) {`;
+const code = `import React from "react";
+import { motion } from "motion/react";
 
-code = code.replace(target, replacement);
+interface TypingIndicatorProps {
+  isGhostMode?: boolean;
+}
 
-const target2 = `        </span>
-      </div>
-    </motion.div>
-  );`;
-
-const replacement2 = `        </span>
-      </div>
-      {thought && (
-        <div className="mt-2 text-[10px] md:text-xs text-white/60 font-mono leading-relaxed border-l-2 border-white/20 pl-2 opacity-80 max-w-full overflow-hidden break-words whitespace-pre-wrap">
-          {thought}
+export default function TypingIndicator({ isGhostMode = false }: TypingIndicatorProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2 }}
+      className="flex flex-col max-w-[85%] self-start items-start"
+    >
+      <div
+        className={\`px-4 py-3 rounded-2xl border backdrop-blur-md shadow-lg flex items-center gap-3 \${
+          isGhostMode
+            ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+            : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none shadow-[0_0_12px_rgba(236,72,153,0.15)]"
+        }\`}
+      >
+        <div className="relative flex items-center justify-center p-[2px]">
+          <div className="absolute inset-0 rounded-full border-t-2 border-white/50 animate-spin"></div>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-sm text-white">
+            Z
+          </div>
         </div>
-      )}
+        <div className="text-sm font-medium opacity-90 flex items-center">
+          Zoya is Thinking
+          <span className="animate-pulse tracking-widest ml-0.5">...</span>
+        </div>
+      </div>
     </motion.div>
-  );`;
+  );
+}
+`;
 
-code = code.replace(target2, replacement2);
 fs.writeFileSync('src/components/TypingIndicator.tsx', code);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, Plus, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
@@ -1828,7 +1828,7 @@ In your very first response or greeting to the user, you MUST casually and natur
   const toggleListening = async () => {
     if (isSessionActive) {
       setIsSessionActive(false);
-      resetZoyaSession();
+      
       if (isListening && recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -1856,7 +1856,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
         // Now that permission is granted, toggle state to trigger our centralized Live Session manager
         setIsSessionActive(true);
-        resetZoyaSession();
+        
       } catch (e: any) {
         console.error("Failed to start session", e);
         
@@ -2833,7 +2833,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                         if (confirm("Are you sure you want to clear all chat history?")) {
                           setMessages([]);
                           localStorage.removeItem("zoya_chat_history");
-                          resetZoyaSession();
+                          
                         }
                       }}
                       className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10 animate-fade-in"
