@@ -1,4 +1,6 @@
-import React from "react";
+const fs = require('fs');
+
+const code = `import React from "react";
 import { motion } from "motion/react";
 import { Brain } from "lucide-react";
 
@@ -18,35 +20,35 @@ export default function TypingIndicator({ isGhostMode, thought = null }: TypingI
     >
       {!thought && (
         <div
-          className={`px-5 py-3.5 rounded-2xl border backdrop-blur-md shadow-lg flex items-center gap-1.5 ${
+          className={\`px-5 py-3.5 rounded-2xl border backdrop-blur-md shadow-lg flex items-center gap-1.5 \${
             isGhostMode
               ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none shadow-[0_0_12px_rgba(244,63,94,0.15)]"
               : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none shadow-[0_0_12px_rgba(236,72,153,0.15)]"
-          }`}
+          }\`}
         >
           <div
-            className={`w-2 h-2 rounded-full dot-bounce-1 ${
+            className={\`w-2 h-2 rounded-full dot-bounce-1 \${
               isGhostMode ? "bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.7)]" : "bg-pink-400 shadow-[0_0_8px_rgba(236,72,153,0.7)]"
-            }`}
+            }\`}
           />
           <div
-            className={`w-2 h-2 rounded-full dot-bounce-2 ${
+            className={\`w-2 h-2 rounded-full dot-bounce-2 \${
               isGhostMode ? "bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.7)]" : "bg-pink-400 shadow-[0_0_8px_rgba(236,72,153,0.7)]"
-            }`}
+            }\`}
           />
           <div
-            className={`w-2 h-2 rounded-full dot-bounce-3 ${
+            className={\`w-2 h-2 rounded-full dot-bounce-3 \${
               isGhostMode ? "bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.7)]" : "bg-pink-400 shadow-[0_0_8px_rgba(236,72,153,0.7)]"
-            }`}
+            }\`}
           />
         </div>
       )}
       
       {!thought && (
         <span
-          className={`text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest ${
+          className={\`text-[10px] opacity-40 mt-1 px-2 font-mono uppercase tracking-widest \${
             isGhostMode ? "text-rose-400" : ""
-          }`}
+          }\`}
         >
           Zoya
         </span>
@@ -66,3 +68,6 @@ export default function TypingIndicator({ isGhostMode, thought = null }: TypingI
     </motion.div>
   );
 }
+\`;
+
+fs.writeFileSync('src/components/TypingIndicator.tsx', code);
