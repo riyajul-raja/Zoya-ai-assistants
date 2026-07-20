@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, Plus, Sparkles, Image as ImageIcon } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, Plus, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -233,6 +233,7 @@ export default function App() {
   }, [showChat]);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
 
@@ -1956,6 +1957,53 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
+  const handleCopyMessage = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(id);
+      if (navigator.vibrate) navigator.vibrate(20);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleRegenerateMessage = (msgId: string) => {
+    const msgIndex = messages.findIndex(m => m.id === msgId);
+    if (msgIndex === -1) return;
+    
+    let userMsg: any = null;
+    let userMsgIndex = -1;
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (messages[i].sender === "user") {
+        userMsg = messages[i];
+        userMsgIndex = i;
+        break;
+      }
+    }
+    
+    if (userMsg) {
+      if (navigator.vibrate) navigator.vibrate(20);
+      setMessages(prev => prev.slice(0, userMsgIndex));
+      
+      const images = [];
+      if (userMsg.images) {
+        images.push(...userMsg.images);
+      } else if (userMsg.image) {
+        images.push(userMsg.image);
+      }
+      
+      const base64Images = images.map((img: string) => {
+        if (img.startsWith('data:image')) {
+          return img.split(',')[1] || "";
+        }
+        return "";
+      }).filter(Boolean);
+      
+      handleTextCommand(userMsg.text, true, base64Images);
+    }
+  };
+
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!textInput.trim() && selectedImages.length === 0) return;
@@ -2853,8 +2901,8 @@ In your very first response or greeting to the user, you MUST casually and natur
                                   ? "bg-red-950/45 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
                                   : "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans" 
                                 : isGhostMode
-                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)] pr-8"
-                                  : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide pr-8"
+                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)] pb-8"
+                                  : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide pb-8"
                           }`}>
                             {Array.isArray(msg.images) && msg.images.length > 0 ? (
                               <div className="flex flex-wrap gap-2 mb-2">
@@ -2925,14 +2973,32 @@ In your very first response or greeting to the user, you MUST casually and natur
                             )}
                             <div className="whitespace-pre-wrap break-words overflow-hidden max-w-full">{msg.text}</div>
                             {msg.sender === "zoya" && !msg.isError && msg.text && (
-                              <button
-                                type="button"
-                                onClick={() => speakMessageText(msg.text)}
-                                className="absolute bottom-1.5 right-1.5 p-1 rounded bg-white/5 hover:bg-white/15 text-pink-300/70 hover:text-pink-100 transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
-                                title="Speak message"
-                              >
-                                <Volume2 size={11} />
-                              </button>
+                              <div className="absolute bottom-1.5 right-1.5 flex gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyMessage(msg.text, msg.id)}
+                                  className="p-1 rounded bg-white/5 hover:bg-white/15 text-white/50 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
+                                  title="Copy message"
+                                >
+                                  {copiedMessageId === msg.id ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => speakMessageText(msg.text)}
+                                  className="p-1 rounded bg-white/5 hover:bg-white/15 text-pink-300/70 hover:text-pink-100 transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
+                                  title="Speak message"
+                                >
+                                  <Volume2 size={11} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRegenerateMessage(msg.id)}
+                                  className="p-1 rounded bg-white/5 hover:bg-white/15 text-purple-300/70 hover:text-purple-100 transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
+                                  title="Regenerate message"
+                                >
+                                  <RefreshCw size={11} />
+                                </button>
+                              </div>
                             )}
                           </div>
                           <span className={`text-[8px] opacity-40 mt-0.5 px-1.5 font-mono uppercase tracking-widest ${
