@@ -234,7 +234,6 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [activeThought, setActiveThought] = useState<string | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
 
@@ -3013,7 +3012,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   </AnimatePresence>
                   <AnimatePresence>
                     {(isTyping || isLoading) && (
-                      <TypingIndicator isGhostMode={isGhostMode} thought={activeThought} />
+                      <TypingIndicator isGhostMode={isGhostMode} />
                     )}
                   </AnimatePresence>
                   <div ref={messagesEndRef} />
