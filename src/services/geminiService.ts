@@ -144,7 +144,7 @@ export async function getZoyaResponseStream(
       currentMessageParts = normalizedImageFrames.map((frame) => ({
         inlineData: {
           mimeType: "image/jpeg",
-          data: frame,
+          data: frame.includes(',') ? frame.split(',')[1] : frame,
         }
       }));
       currentMessageParts.push({ text: `${hiddenContext}${prompt}` });
@@ -273,7 +273,7 @@ export async function getZoyaResponse(
       currentMessageParts = normalizedImageFrames.map((frame) => ({
         inlineData: {
           mimeType: "image/jpeg",
-          data: frame,
+          data: frame.includes(',') ? frame.split(',')[1] : frame,
         }
       }));
       currentMessageParts.push({ text: `${hiddenContext}${prompt}` });

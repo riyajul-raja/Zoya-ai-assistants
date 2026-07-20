@@ -2776,7 +2776,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                             msg.sender === "user" ? "self-end items-end" : "self-start items-start"
                           }`}
                         >
-                          <div className={`relative px-3.5 py-2 md:px-4 md:py-2.5 rounded-xl text-xs md:text-[13px] border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 leading-relaxed ${
+                          <div className={`relative px-3.5 py-2 md:px-4 md:py-2.5 rounded-xl text-xs md:text-[13px] border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 leading-relaxed max-w-full overflow-hidden break-words ${
                             msg.isError
                               ? "bg-red-950/85 border-red-500/50 text-red-200 font-sans shadow-[0_0_12px_rgba(239,68,68,0.25)]"
                               : msg.sender === "user" 
@@ -2819,7 +2819,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                                 <span className="text-[9px] font-mono uppercase tracking-wider text-pink-300">Deep Thinking</span>
                               </div>
                             )}
-                            <div className="whitespace-pre-wrap">{msg.text}</div>
+                            <div className="whitespace-pre-wrap break-words break-all overflow-hidden max-w-full">{msg.text}</div>
                             {msg.sender === "zoya" && !msg.isError && msg.text && (
                               <button
                                 type="button"
