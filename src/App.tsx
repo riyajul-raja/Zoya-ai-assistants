@@ -151,7 +151,7 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error("Update check failed", err);
+        // Silently ignore update check errors in preview environments
       }
     };
 
@@ -1892,7 +1892,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!textInput.trim()) return;
+    if (!textInput.trim() && selectedImages.length === 0) return;
     
     // Stop voice dictation if active
     if (isInputMicActive && recognitionRef.current) {
@@ -1902,8 +1902,9 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsInputMicActive(false);
     }
 
-    handleTextCommand(textInput, true);
+    handleTextCommand(textInput, true, selectedImages);
     setTextInput("");
+    setSelectedImages([]);
   };
 
   // Calculate spatial tracking offset for AR holographic anchor
