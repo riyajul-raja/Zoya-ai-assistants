@@ -32,6 +32,8 @@ interface ChatMessage {
   images?: string[];
   isError?: boolean;
   isHighThinking?: boolean;
+  generatedImageUrl?: string;
+  generatedImagePrompt?: string;
 }
 
 declare global {
@@ -1270,6 +1272,39 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   }, []);
 
+  const handleDownloadImage = async (url: string, prompt: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `zoya_${prompt.substring(0,20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'generated'}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to download image", err);
+    }
+  };
+
+  const handleRegenerateImage = (messageId: string, prompt: string) => {
+    const seed = Math.floor(Math.random() * 1000000);
+    const encodedPrompt = encodeURIComponent(prompt || "a beautiful abstract landscape");
+    const newImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=1024&height=1024&nologo=true`;
+    
+    setMessages(prev => prev.map(msg => {
+      if (msg.id === messageId) {
+        return {
+          ...msg,
+          generatedImageUrl: newImageUrl
+        };
+      }
+      return msg;
+    }));
+  };
+
   const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false, attachedImageBase64s: string[] = []) => {
     if (!finalTranscript.trim() && attachedImageBase64s.length === 0) {
       setAppState("idle");
@@ -1346,6 +1381,42 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
 
     setAppState("processing");
+
+    // 0. Check for image generation intent
+    const isImageGen = /\b(generate|create|draw|make|render)\b.*(?:image|picture|photo|art|drawing|portrait|illustration|wallpaper)/i.test(finalTranscript);
+    if (isImageGen && attachedImageBase64s.length === 0) {
+      setIsLoading(true);
+      const responseMessageId = Date.now().toString() + "-z";
+      
+      const promptToEncode = finalTranscript
+        .replace(/\b(can you|please|generate|create|draw|make|render)\b/gi, '')
+        .replace(/\b(an image|a picture|a photo|art|a drawing|a portrait|an illustration|a wallpaper|of)\b/gi, '')
+        .replace(/\b(image|picture|photo|art|drawing|portrait|illustration|wallpaper)\b/gi, '')
+        .trim() || finalTranscript;
+        
+      const seed = Math.floor(Math.random() * 1000000);
+      const encodedPrompt = encodeURIComponent(promptToEncode || "a beautiful abstract landscape");
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=1024&height=1024&nologo=true`;
+      
+      setMessages((prev) => [
+        ...prev,
+        { 
+          id: responseMessageId, 
+          sender: "zoya", 
+          role: "model", 
+          text: `Here is the image you requested:`,
+          generatedImageUrl: imageUrl,
+          generatedImagePrompt: promptToEncode
+        }
+      ]);
+      setAppState("idle");
+      setIsLoading(false);
+      
+      if (!isMuted && !skipSpeech) {
+        speakMessageText("Here is the image you requested");
+      }
+      return;
+    }
 
     // 1. Check for browser commands
     const commandResult = processCommand(finalTranscript);
@@ -2779,7 +2850,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <AnimatePresence initial={false}>
                     {messages.map((msg) => {
                       const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
-                      const hasImage = !!((Array.isArray(msg.images) && msg.images.length > 0) || msg.image || (msg as any).imageUrl);
+                      const hasImage = !!((Array.isArray(msg.images) && msg.images.length > 0) || msg.image || (msg as any).imageUrl || msg.generatedImageUrl);
                       if (!hasText && !hasImage) return null;
                       return (
                         <motion.div
@@ -2829,6 +2900,41 @@ In your very first response or greeting to the user, you MUST casually and natur
                                 />
                               </div>
                             ) : null}
+                            {msg.generatedImageUrl && (
+                              <div className="relative group mt-2 mb-2 w-full max-w-sm">
+                                <img
+                                  src={msg.generatedImageUrl}
+                                  alt={msg.generatedImagePrompt || "Generated image"}
+                                  className="w-full h-auto rounded-2xl object-cover cursor-pointer shadow-lg border border-white/10"
+                                  referrerPolicy="no-referrer"
+                                  onClick={() => setLightboxImage(msg.generatedImageUrl!)}
+                                />
+                                <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDownloadImage(msg.generatedImageUrl!, msg.generatedImagePrompt || "zoya_image");
+                                    }}
+                                    className="p-2 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:text-cyan-300 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] cursor-pointer"
+                                    title="Download Image"
+                                  >
+                                    <Download size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRegenerateImage(msg.id, msg.generatedImagePrompt || "");
+                                    }}
+                                    className="p-2 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:text-purple-400 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] cursor-pointer"
+                                    title="Regenerate Image"
+                                  >
+                                    <RefreshCw size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                             {msg.sender === "zoya" && msg.isHighThinking && (
                               <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-white/5 border border-white/10 w-fit backdrop-blur-md shadow-sm">
                                 <Brain size={12} className="text-pink-400 animate-pulse" />
