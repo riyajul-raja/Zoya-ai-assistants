@@ -87,6 +87,7 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const messagesRef = useRef(messages);
   const activeUtterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
@@ -147,7 +148,10 @@ export default function App() {
           if (storedEtag && storedEtag !== etag) {
             localStorage.setItem('justUpdated', 'true');
             localStorage.setItem('appVersionHeader', etag);
-            window.location.reload();
+            setIsUpdating(true);
+            setTimeout(() => {
+              window.location.reload();
+            }, 2500);
           } else if (!storedEtag) {
             localStorage.setItem('appVersionHeader', etag);
           }
@@ -2008,6 +2012,17 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   return (
     <div className="fixed top-0 left-0 w-[100vw] h-[100dvh] m-0 p-0 overflow-hidden bg-[#050505] text-white flex flex-col items-center justify-between font-sans bg-[length:400%_400%]">
+      {isUpdating && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
+          <div className="relative w-32 h-32 flex items-center justify-center rounded-full animate-pulse border-4 border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.4)]">
+            <div className="absolute inset-0 rounded-full bg-purple-500/20 blur-xl"></div>
+            <span className="text-5xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-purple-400 to-fuchsia-300 drop-shadow-[0_0_15px_rgba(192,132,252,0.8)] z-10">Z</span>
+          </div>
+          <p className="mt-8 text-sm font-mono tracking-widest text-purple-200/70 animate-pulse">
+            Updating Zoya. Please wait...
+          </p>
+        </div>
+      )}
       <AnimatePresence mode="wait">
         {!isUnlocked ? (
           <motion.div
@@ -2369,9 +2384,10 @@ In your very first response or greeting to the user, you MUST casually and natur
           <button
             onClick={() => {
               setIsSyncing(true);
+              setIsUpdating(true);
               setTimeout(() => {
                 window.location.reload();
-              }, 500);
+              }, 2500);
             }}
             className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center hover:text-violet-400 hover:border-violet-500/30"
             title="Hard Refresh"
