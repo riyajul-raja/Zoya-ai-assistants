@@ -1274,16 +1274,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   const handleDownloadImage = async (url: string, prompt: string) => {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `zoya_${prompt.substring(0,20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'generated'}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      window.open(url, '_blank');
     } catch (err) {
       console.error("Failed to download image", err);
     }
