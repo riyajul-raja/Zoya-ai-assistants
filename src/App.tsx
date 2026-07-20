@@ -29,6 +29,7 @@ interface ChatMessage {
   role?: "user" | "model";
   text: string;
   image?: string;
+  images?: string[];
   isError?: boolean;
   isHighThinking?: boolean;
 }
@@ -121,6 +122,7 @@ export default function App() {
     }
   }, [isMuted]);
 
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
   const [showUpdateToast, setShowUpdateToast] = useState(false);
@@ -1317,6 +1319,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         role: "user",
         text: finalTranscript,
         image: capturedImageBase64s.length > 0 ? `data:image/jpeg;base64,${capturedImageBase64s[0]}` : undefined,
+        images: capturedImageBase64s.length > 0 ? capturedImageBase64s.map(b64 => `data:image/jpeg;base64,${b64}`) : undefined,
       },
     ]);
     
@@ -2209,6 +2212,23 @@ In your very first response or greeting to the user, you MUST casually and natur
                 onClose={() => setShowPermissionModal(false)} 
               />
             )}
+            
+            {lightboxImage && (
+              <div 
+                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all"
+                onClick={() => setLightboxImage(null)}
+              >
+                <div className="relative w-full h-full p-6 md:p-12 flex flex-col items-center justify-center">
+                  <button 
+                    className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-50 backdrop-blur-md"
+                    onClick={(e) => { e.stopPropagation(); setLightboxImage(null); }}
+                  >
+                    <X size={24} />
+                  </button>
+                  <img src={lightboxImage} className="max-w-full max-h-[90vh] rounded-2xl object-contain shadow-2xl border border-white/10" alt="Lightbox" />
+                </div>
+              </div>
+            )}
 
       {/* Cinematic Background Gradients */}
       <div 
@@ -2717,7 +2737,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <AnimatePresence initial={false}>
                     {messages.map((msg) => {
                       const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
-                      const hasImage = !!(msg.image || (msg as any).imageUrl);
+                      const hasImage = !!(msg.images?.length || msg.image || (msg as any).imageUrl);
                       if (!hasText && !hasImage) return null;
                       return (
                         <motion.div
@@ -2741,14 +2761,24 @@ In your very first response or greeting to the user, you MUST casually and natur
                                   ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)] pr-8"
                                   : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide pr-8"
                           }`}>
-                            {(msg.image || (msg as any).imageUrl) && (
-                              <img 
-                                src={msg.image || (msg as any).imageUrl} 
-                                alt="Camera snap" 
-                                className="max-w-[120px] max-h-[80px] rounded-lg mb-1 border border-white/20 object-cover shadow h-fit w-fit min-h-0"
-                                referrerPolicy="no-referrer"
-                              />
-                            )}
+                            {(() => {
+                              const imageList = msg.images || (msg.image ? [msg.image] : ((msg as any).imageUrl ? [(msg as any).imageUrl] : []));
+                              if (imageList.length === 0) return null;
+                              return (
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  {imageList.map((imgSrc, idx) => (
+                                    <img
+                                      key={idx}
+                                      src={imgSrc}
+                                      alt={`Attached ${idx + 1}`}
+                                      className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                      referrerPolicy="no-referrer"
+                                      onClick={() => setLightboxImage(imgSrc)}
+                                    />
+                                  ))}
+                                </div>
+                              );
+                            })()}
                             {msg.sender === "zoya" && msg.isHighThinking && (
                               <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-white/5 border border-white/10 w-fit backdrop-blur-md shadow-sm">
                                 <Brain size={12} className="text-pink-400 animate-pulse" />
