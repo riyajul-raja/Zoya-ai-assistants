@@ -2002,7 +2002,6 @@ In your very first response or greeting to the user, you MUST casually and natur
     let commandText = textInput;
     if (isImageMode) {
       commandText = `generate image of ${textInput}`;
-      setIsImageMode(false);
     }
 
     handleTextCommand(commandText, true, safeImageStrings);
@@ -2991,11 +2990,13 @@ In your very first response or greeting to the user, you MUST casually and natur
               {isImageMode ? (
                 <div className="flex flex-col mt-1 pt-1.5 border-t border-white/10 shrink-0 bg-[#1a1a1a]/95 rounded-2xl p-2 gap-2 shadow-lg">
                   <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-1.5 bg-purple-500/20 text-purple-300 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold w-fit border border-purple-500/30">
-                      <ImageIcon size={12} />
-                      Images
-                    </div>
-                    <button type="button" onClick={() => setIsImageMode(false)} className="text-white/50 hover:text-white p-1 transition-colors cursor-pointer rounded-full hover:bg-white/10">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsImageMode(false)}
+                      className="bg-purple-900/40 text-purple-200 px-3 py-1.5 rounded-full flex items-center gap-2 text-sm font-semibold hover:bg-purple-900/60 transition-colors cursor-pointer"
+                    >
+                      <ImageIcon size={14} />
+                      IMAGES
                       <X size={14} />
                     </button>
                   </div>
