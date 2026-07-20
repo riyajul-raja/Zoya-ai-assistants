@@ -2819,7 +2819,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                                 <span className="text-[9px] font-mono uppercase tracking-wider text-pink-300">Deep Thinking</span>
                               </div>
                             )}
-                            <div className="whitespace-pre-wrap break-words break-all overflow-hidden max-w-full">{msg.text}</div>
+                            <div className="whitespace-pre-wrap break-words overflow-hidden max-w-full">{msg.text}</div>
                             {msg.sender === "zoya" && !msg.isError && msg.text && (
                               <button
                                 type="button"
