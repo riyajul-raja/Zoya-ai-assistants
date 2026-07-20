@@ -1356,7 +1356,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsTyping(true);
       setIsLoading(true);
       
-      const isHighThinking = (capturedImageBase64s.length > 0) || /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(finalTranscript);
+      const isHighThinking = capturedImageBase64s.length === 0 && /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(finalTranscript);
       
       // Append an initial message for Zoya with empty text so that the UI updates in real-time
       setMessages((prev) => [

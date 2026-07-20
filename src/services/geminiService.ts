@@ -135,7 +135,7 @@ export async function getZoyaResponseStream(
       targetConfig.tools = [{ googleSearch: {} }];
     } else if (isImageAnalysis) {
       // If we have an image, we MUST use a model that supports multimodal input (3.5-flash is fine, or 3.1-pro-preview but WITHOUT thinkingConfig)
-      targetModel = "gemini-3.1-pro-preview"; // We can use pro for better image analysis
+      targetModel = "gemini-3.5-flash"; // Use lightweight vision to conserve API quota and prevent 429
     }
 
     const hiddenContext = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n`;
@@ -264,7 +264,7 @@ export async function getZoyaResponse(
     } else if (isSearch) {
       targetConfig.tools = [{ googleSearch: {} }];
     } else if (isImageAnalysis) {
-      targetModel = "gemini-3.1-pro-preview";
+      targetModel = "gemini-3.5-flash"; // Use lightweight vision
     }
 
     const hiddenContext = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n`;
