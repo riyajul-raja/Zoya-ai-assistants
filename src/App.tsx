@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, Plus, Sparkles, Image as ImageIcon } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream, resetZoyaSession } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -184,6 +184,7 @@ export default function App() {
   const [showClassroom, setShowClassroom] = useState(false);
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -3004,11 +3005,11 @@ In your very first response or greeting to the user, you MUST casually and natur
                   />
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => setIsPlusMenuOpen(true)}
                     className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-all duration-300 cursor-pointer"
-                    title="Attach Image"
+                    title="Media Options"
                   >
-                    <ImagePlus size={13} />
+                    <Plus size={13} />
                   </button>
                   <button
                     type="button"
@@ -3288,6 +3289,65 @@ In your very first response or greeting to the user, you MUST casually and natur
         />
       )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Plus Menu Bottom Sheet Overlay */}
+      <AnimatePresence>
+        {isPlusMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPlusMenuOpen(false)}
+              className="fixed inset-0 bg-black/60 z-40"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 inset-x-0 z-50 rounded-t-3xl bg-[#1a1a1a] p-4 pb-8 shadow-2xl flex flex-col gap-2 border-t border-white/10"
+            >
+              <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-4" />
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPlusMenuOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/10 transition-colors text-left"
+              >
+                <div className="p-3 rounded-full bg-blue-500/20 text-blue-400">
+                  <ImageIcon size={24} />
+                </div>
+                <div>
+                  <div className="text-white font-medium">Upload Photo</div>
+                  <div className="text-white/50 text-sm">Analyze with Zoya</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPlusMenuOpen(false);
+                  setTextInput("/generate ");
+                  setTimeout(() => textareaRef.current?.focus(), 100);
+                }}
+                className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/10 transition-colors text-left"
+              >
+                <div className="p-3 rounded-full bg-purple-500/20 text-purple-400">
+                  <Sparkles size={24} />
+                </div>
+                <div>
+                  <div className="text-white font-medium">Create Image</div>
+                  <div className="text-white/50 text-sm">Generate with AI</div>
+                </div>
+              </button>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
