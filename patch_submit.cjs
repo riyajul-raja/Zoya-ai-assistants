@@ -2,39 +2,40 @@ const fs = require('fs');
 
 let code = fs.readFileSync('src/App.tsx', 'utf8');
 
-const oldSubmit = `  const handleTextSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!textInput.trim()) return;
-    
-    // Stop voice dictation if active
-    if (isInputMicActive && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (err) {}
-      setIsInputMicActive(false);
-    }
+const target = `    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: "user",
+        role: "user",
+        text: finalTranscript,
+        image: capturedImageBase64s.length > 0 ? \`data:image/jpeg;base64,\${capturedImageBase64s[0]}\` : undefined,
+        images: capturedImageBase64s.length > 0 ? capturedImageBase64s.map(b64 => \`data:image/jpeg;base64,\${b64}\`) : undefined,
+      },
+    ]);`;
 
-    handleTextCommand(textInput, true);
-    setTextInput("");
-  };`;
+const replacement = `    // 1. SAFE URL CREATION
+    const safeImages = capturedImageBase64s.map(img => {
+      if (typeof img === 'string') {
+        return img.startsWith('data:') ? img : \`data:image/jpeg;base64,\${img}\`;
+      }
+      if (img instanceof File || img instanceof Blob) {
+        return URL.createObjectURL(img);
+      }
+      return "";
+    }).filter(Boolean);
 
-const newSubmit = `  const handleTextSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!textInput.trim() && selectedImages.length === 0) return;
-    
-    // Stop voice dictation if active
-    if (isInputMicActive && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (err) {}
-      setIsInputMicActive(false);
-    }
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: "user",
+        role: "user",
+        text: finalTranscript,
+        image: safeImages.length > 0 ? safeImages[0] : undefined,
+        images: safeImages.length > 0 ? safeImages : undefined,
+      },
+    ]);`;
 
-    handleTextCommand(textInput, true, selectedImages);
-    setTextInput("");
-    setSelectedImages([]);
-  };`;
-
-code = code.replace(oldSubmit, newSubmit);
-
+code = code.replace(target, replacement);
 fs.writeFileSync('src/App.tsx', code);
