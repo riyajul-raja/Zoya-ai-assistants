@@ -1916,7 +1916,22 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsInputMicActive(false);
     }
 
-    handleTextCommand(textInput, true, selectedImages);
+    // STRICT STATE SANITIZATION: ensure selectedImages is purely strings
+    const safeImageStrings = selectedImages.map((img: any) => {
+      if (typeof img === 'string') {
+        return img.startsWith('data:') || img.startsWith('blob:') || img.startsWith('http') ? img : `data:image/jpeg;base64,${img}`;
+      }
+      if (img instanceof File || img instanceof Blob) {
+        try {
+          return URL.createObjectURL(img);
+        } catch (e) {
+          return "";
+        }
+      }
+      return "";
+    }).filter(Boolean);
+
+    handleTextCommand(textInput, true, safeImageStrings);
     setTextInput("");
     setSelectedImages([]);
   };
@@ -2772,48 +2787,32 @@ In your very first response or greeting to the user, you MUST casually and natur
                                   ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)] pr-8"
                                   : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide pr-8"
                           }`}>
-                            {(() => {
-                              try {
-                                const imageList = Array.isArray(msg.images) && msg.images.length > 0 ? msg.images : (msg.image ? [msg.image] : ((msg as any).imageUrl ? [(msg as any).imageUrl] : []));
-                                if (!imageList || !Array.isArray(imageList) || imageList.length === 0) return null;
-                                
-                                return (
-                                  <div className="flex flex-wrap gap-2 mb-2">
-                                    {imageList.map((imgSrc, idx) => {
-                                      if (!imgSrc || typeof imgSrc !== 'string') return null;
-                                      return (
-                                        <div key={idx} className="relative group">
-                                          <img
-                                            src={imgSrc}
-                                            alt={`Attached ${idx + 1}`}
-                                            className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                            referrerPolicy="no-referrer"
-                                            onClick={() => setLightboxImage(imgSrc)}
-                                            onError={(e) => {
-                                              const target = e.target as HTMLImageElement;
-                                              target.style.display = 'none';
-                                              if (target.nextElementSibling) {
-                                                (target.nextElementSibling as HTMLElement).style.display = 'flex';
-                                              }
-                                            }}
-                                          />
-                                          <div className="hidden absolute inset-0 items-center justify-center bg-white/5 border border-white/10 rounded-2xl">
-                                            <ImagePlus size={20} className="text-white/30" />
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              } catch (err) {
-                                console.error("Error rendering images for message", err);
-                                return (
-                                  <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-2">
-                                    <ImagePlus size={20} className="text-white/30" />
-                                  </div>
-                                );
-                              }
-                            })()}
+                            {Array.isArray(msg.images) && msg.images.length > 0 ? (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {msg.images.map((img, i) => (
+                                  typeof img === 'string' ? (
+                                    <img
+                                      key={i}
+                                      src={img}
+                                      alt={`Attached ${i + 1}`}
+                                      className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity shadow-md"
+                                      referrerPolicy="no-referrer"
+                                      onClick={() => setLightboxImage(img)}
+                                    />
+                                  ) : null
+                                ))}
+                              </div>
+                            ) : (typeof msg.image === 'string' || typeof (msg as any).imageUrl === 'string') ? (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                <img
+                                  src={typeof msg.image === 'string' ? msg.image : (msg as any).imageUrl}
+                                  alt="Attached"
+                                  className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity shadow-md"
+                                  referrerPolicy="no-referrer"
+                                  onClick={() => setLightboxImage(typeof msg.image === 'string' ? msg.image : (msg as any).imageUrl)}
+                                />
+                              </div>
+                            ) : null}
                             {msg.sender === "zoya" && msg.isHighThinking && (
                               <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-white/5 border border-white/10 w-fit backdrop-blur-md shadow-sm">
                                 <Brain size={12} className="text-pink-400 animate-pulse" />
