@@ -231,21 +231,21 @@ export default function App() {
       textareaRef.current.blur();
     }
   }, [showChat]);
-  const [isInputMicActive, setIsInputMicActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
 
   const isSessionActiveRef = useRef(isSessionActive);
-  const isInputMicActiveRef = useRef(isInputMicActive);
+  const isListeningRef = useRef(isListening);
 
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
   }, [isSessionActive]);
 
   useEffect(() => {
-    isInputMicActiveRef.current = isInputMicActive;
-  }, [isInputMicActive]);
+    isListeningRef.current = isListening;
+  }, [isListening]);
 
   // Biometric Security Lock Screen states
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -1828,11 +1828,11 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (isSessionActive) {
       setIsSessionActive(false);
       resetZoyaSession();
-      if (isInputMicActive && recognitionRef.current) {
+      if (isListening && recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch (err) {}
-        setIsInputMicActive(false);
+        setIsListening(false);
       }
     } else {
       setShowChat(true);
@@ -1887,13 +1887,13 @@ In your very first response or greeting to the user, you MUST casually and natur
       return;
     }
 
-    if (isInputMicActive) {
+    if (isListening) {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch (err) {}
       }
-      setIsInputMicActive(false);
+      setIsListening(false);
       return;
     }
 
@@ -1906,7 +1906,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.lang = "en-IN";
 
       recognition.onstart = () => {
-        setIsInputMicActive(true);
+        setIsListening(true);
         setAppState("listening");
         setIsSessionActive(true);
       };
@@ -1930,37 +1930,15 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        if (isSessionActiveRef.current) {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error("Failed to restart speech recognition on error:", e);
-          }
-        } else {
-          setIsInputMicActive(false);
-          setAppState("idle");
-          setIsSessionActive(false);
-          if (!speechDetected) {
-            setShowChat(false);
-          }
-        }
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
       };
 
       recognition.onend = () => {
-        if (isSessionActiveRef.current) {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error("Failed to restart speech recognition on end:", e);
-          }
-        } else {
-          setIsInputMicActive(false);
-          setAppState("idle");
-          setIsSessionActive(false);
-          if (!speechDetected) {
-            setShowChat(false);
-          }
-        }
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
       };
 
       recognitionRef.current = recognition;
@@ -1968,7 +1946,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     } catch (e) {
       console.error("Speech recognition initialization error:", e);
       if (!isSessionActiveRef.current) {
-        setIsInputMicActive(false);
+        setIsListening(false);
         setAppState("idle");
         setIsSessionActive(false);
         if (!speechDetected) {
@@ -1983,11 +1961,11 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (!textInput.trim() && selectedImages.length === 0) return;
     
     // Stop voice dictation if active
-    if (isInputMicActive && recognitionRef.current) {
+    if (isListening && recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch (err) {}
-      setIsInputMicActive(false);
+      setIsListening(false);
     }
 
     // STRICT STATE SANITIZATION: ensure selectedImages is purely strings
@@ -2831,11 +2809,11 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => {
-                      if (isInputMicActive && recognitionRef.current) {
+                      if (isListening && recognitionRef.current) {
                         try {
                           recognitionRef.current.stop();
                         } catch (err) {}
-                        setIsInputMicActive(false);
+                        setIsListening(false);
                       }
                       setShowChat(false);
                       setIsChatMaximized(false);
@@ -3082,7 +3060,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                     type="button"
                     onClick={toggleInputDictation}
                     className={`p-1.5 rounded-md transition-all duration-300 cursor-pointer flex items-center justify-center ${
-                      isInputMicActive
+                      isListening
                         ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105 animate-pulse"
                         : "text-white/60 hover:text-white hover:bg-white/10"
                     }`}
