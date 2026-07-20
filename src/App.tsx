@@ -3034,13 +3034,22 @@ In your very first response or greeting to the user, you MUST casually and natur
                   </div>
                 </div>
               ) : (
-              <div className="flex items-center gap-1.5 mt-1 pt-1.5 border-t border-white/10 shrink-0">
+              <div className="flex flex-col mt-1 pt-1.5 border-t border-white/10 shrink-0 gap-1.5">
                 {isDeepThinking && (
-                  <div className="pl-1 shrink-0" title="Deep Thinking Mode Active">
-                    <Brain className="text-purple-400 animate-pulse w-5 h-5" />
+                  <div className="px-1">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsDeepThinking(false)}
+                      className="bg-purple-900/40 text-purple-200 px-3 py-1.5 rounded-full flex items-center w-fit gap-2 text-sm font-semibold hover:bg-purple-900/60 transition-colors cursor-pointer"
+                    >
+                      <Brain size={14} />
+                      Deep Thinking
+                      <X size={14} />
+                    </button>
                   </div>
                 )}
-                <textarea
+                <div className="flex items-center gap-1.5 w-full">
+                  <textarea
                   ref={textareaRef}
                   autoFocus={false}
                   value={textInput}
@@ -3092,6 +3101,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   >
                     <Send size={13} />
                   </button>
+                </div>
                 </div>
               </div>
               )}
