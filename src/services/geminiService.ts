@@ -70,110 +70,103 @@ Always be respectful, concise, and converse in Hinglish.`;
 export async function getZoyaResponseStream(
   prompt: string,
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
-  imageFrame?: string,
+  imageFrames?: string | string[],
   isProfessionalMode: boolean = false,
   environmentContext: string = "",
   onChunk?: (text: string) => void
 ): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    // Generate current date and time using JavaScript's new Date().toLocaleString('en-IN')
     const dynamicTime = new Date().toLocaleString('en-IN');
     
-    // Always recreate chatSession on every request to ensure the absolute fresh, current timestamp is injected into System Instructions
-    chatSession = null;
-    lastSessionIsProfessional = isProfessionalMode;
-    lastSessionEnvironmentContext = environmentContext;
+    const cleanHistory = history.filter((msg) => {
+      if (!msg || !msg.text) return false;
+      if ((msg as any).isError) return false;
+      const txt = msg.text.toLowerCase();
+      if (
+        txt.includes("system update") ||
+        txt.includes("reconnecting") ||
+        txt.includes("network timeout")
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const recentHistory = cleanHistory.slice(-6).map((msg) => ({
+      ...msg,
+      image: undefined,
+    }));
     
-    if (!chatSession) {
-      // Filter out any local error messages, UI alerts, or system fallbacks from history
-      const cleanHistory = history.filter((msg) => {
-        if (!msg || !msg.text) return false;
-        if ((msg as any).isError) return false;
-        const txt = msg.text.toLowerCase();
-        if (
-          txt.includes("system update") ||
-          txt.includes("dimaag kharab") ||
-          txt.includes("reconnecting") ||
-          txt.includes("network timeout") ||
-          txt.includes("payload too heavy")
-        ) {
-          return false;
-        }
-        return true;
-      });
+    let formattedHistory: any[] = [];
+    let currentRole = "";
+    for (const msg of recentHistory) {
+      const role = msg.sender === "user" ? "user" : "model";
+      let parts: any[] = [];
+      parts.push({ text: msg.text }); 
 
-      // SLIDING WINDOW MEMORY: Keep strictly only the last 3 pairs (6 messages) of user/model messages to reduce token processing and payload size
-      const recentHistory = cleanHistory.slice(-6).map((msg) => ({
-        ...msg,
-        image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
+      if (role === currentRole && formattedHistory.length > 0) {
+        formattedHistory[formattedHistory.length - 1].parts.push(...parts);
+      } else {
+        formattedHistory.push({ role, parts });
+        currentRole = role;
+      }
+    } 
+    if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
+      formattedHistory.shift();
+    }
+
+    const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime); 
+    const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
+    const isImageAnalysis = normalizedImageFrames.length > 0;
+    // VERY IMPORTANT: DO NOT use thinkingConfig with image uploads, it crashes with 400 Bad Request!
+    const isHighThinking = !isImageAnalysis && /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
+    const isSearch = /search|latest|news|today|current|weather|who is|what is|time|date|live/i.test(prompt) && !isHighThinking;
+    
+    let targetModel = "gemini-3.5-flash";
+    let targetConfig: any = {
+      systemInstruction: activeSystemInstruction,
+    };
+
+    if (isHighThinking) {
+      targetModel = "gemini-3.1-pro-preview";
+      targetConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+    } else if (isSearch) {
+      targetConfig.tools = [{ googleSearch: {} }];
+    } else if (isImageAnalysis) {
+      // If we have an image, we MUST use a model that supports multimodal input (3.5-flash is fine, or 3.1-pro-preview but WITHOUT thinkingConfig)
+      targetModel = "gemini-3.1-pro-preview"; // We can use pro for better image analysis
+    }
+
+    const hiddenContext = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n`;
+    let currentMessageParts: any[] = [];
+    if (normalizedImageFrames.length > 0) {
+      currentMessageParts = normalizedImageFrames.map((frame) => ({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: frame,
+        }
       }));
-      
-      let formattedHistory: any[] = [];
-      let currentRole = "";
- 
-      for (const msg of recentHistory) {
-        const role = msg.sender === "user" ? "user" : "model";
-        
-        let parts: any[] = [];
-        parts.push({ text: msg.text });
- 
-        if (role === currentRole && formattedHistory.length > 0) {
-          formattedHistory[formattedHistory.length - 1].parts.push(...parts);
-        } else {
-          formattedHistory.push({ role, parts });
-          currentRole = role;
-        }
-      }
- 
-      if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
-        formattedHistory.shift();
-      }
- 
-      const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
- 
-      const isImageAnalysis = !!imageFrame;
-      const isHighThinking = isImageAnalysis || /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
-      const isSearch = /search|latest|news|today|current|weather|who is|what is|time|date|live/i.test(prompt) && !isHighThinking;
+      currentMessageParts.push({ text: `${hiddenContext}${prompt}` });
+    } else {
+      currentMessageParts = [{ text: `${hiddenContext}${prompt}` }];
+    }
 
-      let targetModel = "gemini-3.5-flash";
-      let targetConfig: any = {
-        systemInstruction: activeSystemInstruction,
-      };
-
-      if (isHighThinking) {
-        targetModel = "gemini-3.1-pro-preview";
-        targetConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
-      } else if (isSearch) {
-        targetConfig.tools = [{ googleSearch: {} }];
+    const finalContents = [
+      ...formattedHistory,
+      {
+        role: "user",
+        parts: currentMessageParts
       }
+    ];
 
-      chatSession = ai.chats.create({
+    try {
+      const responseStream = await ai.models.generateContentStream({
         model: targetModel,
         config: targetConfig,
-        history: formattedHistory,
+        contents: finalContents,
       });
-    }
- 
-    const hiddenContext = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n`;
-    let messageInput: any = `${hiddenContext}${prompt}`;
-    if (imageFrame) {
-      messageInput = [
-        {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: imageFrame,
-          }
-        },
-        {
-          text: `${hiddenContext}${prompt}`
-        }
-      ];
-    }
- 
-    try {
-      const responseStream = await chatSession.sendMessageStream({ message: messageInput });
+
       let accumulatedText = "";
       for await (const chunk of responseStream) {
         const chunkText = chunk.text || "";
@@ -209,108 +202,99 @@ export async function getZoyaResponseStream(
 export async function getZoyaResponse(
   prompt: string,
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
-  imageFrame?: string,
+  imageFrames?: string | string[],
   isProfessionalMode: boolean = false,
   environmentContext: string = ""
 ): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    // Generate current date and time using JavaScript's new Date().toLocaleString('en-IN')
     const dynamicTime = new Date().toLocaleString('en-IN');
     
-    // Always recreate chatSession on every request to ensure the absolute fresh, current timestamp is injected into System Instructions
-    chatSession = null;
-    lastSessionIsProfessional = isProfessionalMode;
-    lastSessionEnvironmentContext = environmentContext;
+    const cleanHistory = history.filter((msg) => {
+      if (!msg || !msg.text) return false;
+      if ((msg as any).isError) return false;
+      const txt = msg.text.toLowerCase();
+      if (
+        txt.includes("system update") ||
+        txt.includes("reconnecting") ||
+        txt.includes("network timeout")
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const recentHistory = cleanHistory.slice(-6).map((msg) => ({
+      ...msg,
+      image: undefined,
+    }));
     
-    if (!chatSession) {
-      // Filter out any local error messages, UI alerts, or system fallbacks from history
-      const cleanHistory = history.filter((msg) => {
-        if (!msg || !msg.text) return false;
-        if ((msg as any).isError) return false;
-        const txt = msg.text.toLowerCase();
-        if (
-          txt.includes("system update") ||
-          txt.includes("dimaag kharab") ||
-          txt.includes("reconnecting") ||
-          txt.includes("network timeout") ||
-          txt.includes("payload too heavy")
-        ) {
-          return false;
-        }
-        return true;
-      });
-
-      // SLIDING WINDOW MEMORY: Keep strictly only the last 3 pairs (6 messages) of user/model messages to reduce token processing and payload size
-      const recentHistory = cleanHistory.slice(-6).map((msg) => ({
-        ...msg,
-        image: undefined, // Filter out/strip any large image data (base64 strings or heavy objects) from previous messages
-      }));
-      
-      let formattedHistory: any[] = [];
-      let currentRole = "";
-
-      for (const msg of recentHistory) {
-        const role = msg.sender === "user" ? "user" : "model";
-        
-        let parts: any[] = [];
-        parts.push({ text: msg.text });
-
-        if (role === currentRole && formattedHistory.length > 0) {
-          formattedHistory[formattedHistory.length - 1].parts.push(...parts);
-        } else {
-          formattedHistory.push({ role, parts });
-          currentRole = role;
-        }
+    let formattedHistory: any[] = [];
+    let currentRole = "";
+    for (const msg of recentHistory) {
+      const role = msg.sender === "user" ? "user" : "model";
+      let parts: any[] = [];
+      parts.push({ text: msg.text });
+      if (role === currentRole && formattedHistory.length > 0) {
+        formattedHistory[formattedHistory.length - 1].parts.push(...parts);
+      } else {
+        formattedHistory.push({ role, parts });
+        currentRole = role;
       }
+    }
+    if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
+      formattedHistory.shift();
+    }
+    
+    const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
+    const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
+    const isImageAnalysis = normalizedImageFrames.length > 0;
+    // VERY IMPORTANT: DO NOT use thinkingConfig with image uploads, it crashes with 400 Bad Request!
+    const isHighThinking = !isImageAnalysis && /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
+    const isSearch = /search|latest|news|today|current|weather|who is|what is|time|date|live/i.test(prompt) && !isHighThinking;
+    
+    let targetModel = "gemini-3.5-flash";
+    let targetConfig: any = {
+      systemInstruction: activeSystemInstruction,
+    };
 
-      if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
-        formattedHistory.shift();
-      }
-
-      const activeSystemInstruction = buildActiveSystemInstruction(isProfessionalMode, environmentContext, dynamicTime);
-
-      const isHighThinking = /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(prompt);
-      const isSearch = /search|latest|news|today|current|weather|who is|what is|time|date|live/i.test(prompt) && !isHighThinking;
-
-      let targetModel = "gemini-3.5-flash";
-      let targetConfig: any = {
-        systemInstruction: activeSystemInstruction,
-      };
-
-      if (isHighThinking) {
-        targetModel = "gemini-3.1-pro-preview";
-        targetConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
-      } else if (isSearch) {
-        targetConfig.tools = [{ googleSearch: {} }];
-      }
-
-      chatSession = ai.chats.create({
-        model: targetModel,
-        config: targetConfig,
-        history: formattedHistory,
-      });
+    if (isHighThinking) {
+      targetModel = "gemini-3.1-pro-preview";
+      targetConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+    } else if (isSearch) {
+      targetConfig.tools = [{ googleSearch: {} }];
+    } else if (isImageAnalysis) {
+      targetModel = "gemini-3.1-pro-preview";
     }
 
     const hiddenContext = `System Context: The current exact date and time is ${dynamicTime} (IST).\n\n`;
-    let messageInput: any = `${hiddenContext}${prompt}`;
-    if (imageFrame) {
-      messageInput = [
-        {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: imageFrame,
-          }
-        },
-        {
-          text: `${hiddenContext}${prompt}`
+    let currentMessageParts: any[] = [];
+    if (normalizedImageFrames.length > 0) {
+      currentMessageParts = normalizedImageFrames.map((frame) => ({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: frame,
         }
-      ];
+      }));
+      currentMessageParts.push({ text: `${hiddenContext}${prompt}` });
+    } else {
+      currentMessageParts = [{ text: `${hiddenContext}${prompt}` }];
     }
 
+    const finalContents = [
+      ...formattedHistory,
+      {
+        role: "user",
+        parts: currentMessageParts
+      }
+    ];
+
     try {
-      const response = await chatSession.sendMessage({ message: messageInput });
+      const response = await ai.models.generateContent({
+        model: targetModel,
+        config: targetConfig,
+        contents: finalContents,
+      });
       return response.text || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
       const errStr = String(error).toLowerCase();
@@ -332,7 +316,8 @@ export async function getZoyaResponse(
 export async function getZoyaAudio(text: string): Promise<string | null> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
+    try {
+      const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],
       config: {
@@ -347,6 +332,9 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
   } catch (error) {
     console.error("TTS Error:", error);
+    return null;
+  }
+  } catch (error) {
     return null;
   }
 }

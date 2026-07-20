@@ -177,18 +177,22 @@ export default function App() {
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [textInput, setTextInput] = useState("");
-  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setSelectedImageBase64(result.split(",")[1]);
-    };
-    reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setSelectedImages((prev) => [...prev, result.split(",")[1]]);
+      };
+      reader.readAsDataURL(file);
+    });
+    
     e.target.value = "";
   };
   const [chatHeight, setChatHeight] = useState(150);
@@ -1260,16 +1264,16 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   }, []);
 
-  const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false, attachedImageBase64: string | null = null) => {
-    if (!finalTranscript.trim() && !attachedImageBase64) {
+  const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false, attachedImageBase64s: string[] = []) => {
+    if (!finalTranscript.trim() && attachedImageBase64s.length === 0) {
       setAppState("idle");
       return;
     }
 
     autoTriggerUIFromText(finalTranscript);
 
-    let capturedImageBase64: string | undefined = attachedImageBase64 || undefined;
-    if (isCameraActive && !capturedImageBase64) {
+    let capturedImageBase64s: string[] = [...attachedImageBase64s];
+    if (isCameraActive && capturedImageBase64s.length === 0) {
       const video = videoRef.current;
       if (video && !video.paused && !video.ended) {
         try {
@@ -1297,7 +1301,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           if (ctx) {
             ctx.drawImage(video, 0, 0, w, h);
             const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-            capturedImageBase64 = dataUrl.split(",")[1];
+            capturedImageBase64s.push(dataUrl.split(',')[1]);
           }
         } catch (err) {
           console.error("Failed to capture image frame for chat payload:", err);
@@ -1312,13 +1316,13 @@ In your very first response or greeting to the user, you MUST casually and natur
         sender: "user",
         role: "user",
         text: finalTranscript,
-        image: capturedImageBase64 ? `data:image/jpeg;base64,${capturedImageBase64}` : undefined,
+        image: capturedImageBase64s.length > 0 ? `data:image/jpeg;base64,${capturedImageBase64s[0]}` : undefined,
       },
     ]);
     
     // If live session is active (either because voice is active or camera is ON), send text through it
     // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
-    if (liveSessionRef.current && !attachedImageBase64) {
+    if (liveSessionRef.current && attachedImageBase64s.length === 0) {
       liveSessionRef.current.sendText(finalTranscript);
       return;
     }
@@ -1352,7 +1356,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsTyping(true);
       setIsLoading(true);
       
-      const isHighThinking = !!capturedImageBase64 || /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(finalTranscript);
+      const isHighThinking = (capturedImageBase64s.length > 0) || /think|solve|complex|calculate|math|reason|puzzle|code|debug|logic/i.test(finalTranscript);
       
       // Append an initial message for Zoya with empty text so that the UI updates in real-time
       setMessages((prev) => [
@@ -1412,7 +1416,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         responseText = await getZoyaResponseStream(
           finalTranscript,
           messagesRef.current,
-          capturedImageBase64,
+          capturedImageBase64s,
           isProfessionalMode,
           environmentContext,
           (currentText) => {
@@ -2781,16 +2785,20 @@ In your very first response or greeting to the user, you MUST casually and natur
               </div>
 
               {/* Image Preview */}
-              {selectedImageBase64 && (
-                <div className="relative mt-2 p-2 border border-white/10 rounded-lg bg-black/20 w-fit">
-                  <img src={`data:image/jpeg;base64,${selectedImageBase64}`} className="h-16 w-16 object-cover rounded-md" alt="Attached" />
-                  <button
-                    type="button"
-                    onClick={() => setSelectedImageBase64(null)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:scale-110 transition-transform shadow-lg"
-                  >
-                    <X size={10} />
-                  </button>
+              {selectedImages.length > 0 && (
+                <div className="flex flex-wrap gap-3 mt-2 p-2 border border-white/10 rounded-lg bg-black/20 w-fit max-w-full overflow-x-auto">
+                  {selectedImages.map((base64, index) => (
+                    <div key={index} className="relative shrink-0">
+                      <img src={`data:image/jpeg;base64,${base64}`} className="h-16 w-16 object-cover rounded-md border border-white/20" alt={`Attached ${index + 1}`} />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedImages((prev) => prev.filter((_, i) => i !== index))}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:scale-110 transition-transform shadow-lg"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
               {/* Compact Input Bar */}
@@ -2812,10 +2820,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                 />
                 
                 <div className="flex items-center gap-1 shrink-0">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
+                  <input type="file" multiple accept="image/*" className="hidden"
                     ref={fileInputRef}
                     onChange={handleImageUpload}
                   />
@@ -2841,7 +2846,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   </button>
                   <button 
                     type="submit"
-                    disabled={!textInput.trim() && !selectedImageBase64}
+                    disabled={!textInput.trim() && selectedImages.length === 0}
                     className={`p-1.5 rounded-md disabled:opacity-50 transition-all duration-300 cursor-pointer ${
                       isGhostMode
                         ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 text-white"
