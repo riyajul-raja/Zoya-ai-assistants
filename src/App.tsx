@@ -2737,7 +2737,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <AnimatePresence initial={false}>
                     {messages.map((msg) => {
                       const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
-                      const hasImage = !!(msg.images?.length || msg.image || (msg as any).imageUrl);
+                      const hasImage = !!((Array.isArray(msg.images) && msg.images.length > 0) || msg.image || (msg as any).imageUrl);
                       if (!hasText && !hasImage) return null;
                       return (
                         <motion.div
@@ -2762,20 +2762,26 @@ In your very first response or greeting to the user, you MUST casually and natur
                                   : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide pr-8"
                           }`}>
                             {(() => {
-                              const imageList = msg.images || (msg.image ? [msg.image] : ((msg as any).imageUrl ? [(msg as any).imageUrl] : []));
-                              if (imageList.length === 0) return null;
+                              const imageList = Array.isArray(msg.images) && msg.images.length > 0 ? msg.images : (msg.image ? [msg.image] : ((msg as any).imageUrl ? [(msg as any).imageUrl] : []));
+                              if (!imageList || !Array.isArray(imageList) || imageList.length === 0) return null;
                               return (
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                  {imageList.map((imgSrc, idx) => (
-                                    <img
-                                      key={idx}
-                                      src={imgSrc}
-                                      alt={`Attached ${idx + 1}`}
-                                      className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                      referrerPolicy="no-referrer"
-                                      onClick={() => setLightboxImage(imgSrc)}
-                                    />
-                                  ))}
+                                  {imageList.map((imgSrc, idx) => {
+                                    if (!imgSrc || typeof imgSrc !== 'string') return null;
+                                    return (
+                                      <img
+                                        key={idx}
+                                        src={imgSrc}
+                                        alt={`Attached ${idx + 1}`}
+                                        className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                        referrerPolicy="no-referrer"
+                                        onClick={() => setLightboxImage(imgSrc)}
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                    );
+                                  })}
                                 </div>
                               );
                             })()}
