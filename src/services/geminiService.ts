@@ -12,11 +12,9 @@ export async function getZoyaResponseStream(
   selectedModel: string = "gemini"
 ): Promise<string> {
   if (selectedModel === "groq") {
-    const groqKey = process.env.GROQ_API_KEY;
+    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!groqKey) {
-      const errorMsg = "Groq API key is missing or invalid.";
-      if (onChunk) onChunk(errorMsg);
-      return errorMsg;
+      throw new Error("VITE_GROQ_API_KEY is missing");
     }
     
     // Format history for Groq
@@ -242,9 +240,9 @@ export async function getZoyaResponse(
   selectedModel: string = "gemini"
 ): Promise<string> {
   if (selectedModel === "groq") {
-    const groqKey = process.env.GROQ_API_KEY;
+    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!groqKey) {
-      return "Groq API key is missing or invalid.";
+      throw new Error("VITE_GROQ_API_KEY is missing");
     }
     
     const groqHistory = history.map(msg => ({
@@ -280,7 +278,7 @@ export async function getZoyaResponse(
       return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
     } catch (error) {
       console.error("Groq Error:", error);
-      return "Groq API Limit Reached or Error. Zoya is resting.";
+      throw error;
     }
   }
 
