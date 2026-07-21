@@ -2496,10 +2496,15 @@ In your very first response or greeting to the user, you MUST casually and natur
           </button>
 
           {/* Hamburger Menu (Dropdown with Tool Labels) */}
-          <div className={`relative flex items-center justify-center transition-opacity duration-300 ${showChat ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`} ref={toolMenuRef}>
+          <div className="relative flex items-center justify-center transition-opacity duration-300" ref={toolMenuRef}>
             <button
-              onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
-              className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              onClick={() => {
+                if (showChat) return;
+                setIsToolMenuOpen(!isToolMenuOpen);
+              }}
+              className={`p-2 rounded-full border transition-all duration-300 flex items-center justify-center ${
+                showChat ? "opacity-50 pointer-events-none" : "cursor-pointer pointer-events-auto"
+              } ${
                 isToolMenuOpen
                   ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-[0_0_15px_rgba(139,92,246,0.6)] animate-pulse"
                   : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-violet-400 hover:border-violet-500/30"
