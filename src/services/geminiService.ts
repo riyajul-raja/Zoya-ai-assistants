@@ -106,7 +106,7 @@ export async function getZoyaResponseStream(
     ];
 
     try {
-      const response = await fetch("https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
+      const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -291,7 +291,7 @@ export async function getZoyaResponse(
   if (selectedModel === "huggingface") {
     const hfKey = process.env.HUGGINGFACE_API_KEY;
     if (!hfKey) {
-      return "Hugging Face API key is missing or invalid.";
+      throw new Error("Hugging Face API key is missing or invalid.");
     }
     
     const hfHistory = history.map(msg => ({
@@ -306,7 +306,7 @@ export async function getZoyaResponse(
     ];
 
     try {
-      const response = await fetch("https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
+      const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -326,9 +326,12 @@ export async function getZoyaResponse(
       
       const data = await response.json();
       return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
-    } catch (error) {
+    } catch (error: any) {
       console.error("Hugging Face Error:", error);
-      return "Hugging Face API Limit Reached or Error. Zoya is resting.";
+      if (error instanceof TypeError || error.name === 'TypeError') {
+        throw new Error("CORS Error or Network Blocked: " + error.message);
+      }
+      throw error;
     }
   }
 
@@ -386,9 +389,9 @@ export async function getZoyaResponse(
       contents: finalContents,
     });
     return response.text || "Ugh, fine. I have nothing to say.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "API Limit Reached or Error. Zoya is resting.";
+    throw error;
   }
 }
 

@@ -1371,7 +1371,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     
     // If live session is active (either because voice is active or camera is ON), send text through it
     // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
-    if (liveSessionRef.current && attachedImageBase64s.length === 0) {
+    if (liveSessionRef.current && attachedImageBase64s.length === 0 && selectedModel === "gemini") {
       liveSessionRef.current.sendText(finalTranscript);
       return;
     }
@@ -1528,50 +1528,15 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         };
 
-        try {
-          responseText = await getZoyaResponseStream(
-            promptToSend,
-            messagesRef.current,
-            capturedImageBase64s,
-            isProfessionalMode,
-            environmentContext,
-            chunkCallback,
-            currentActiveModel
-          );
-        } catch (error) {
-          if (autoSelectModel && currentActiveModel !== "groq") {
-            console.log("Primary model failed, auto-switching to Groq");
-            currentActiveModel = "groq";
-            setSelectedModel("groq");
-            setMessages((prev) => {
-              const placeholder = prev.find(m => m.id === responseMessageId);
-              const rest = prev.filter(m => m.id !== responseMessageId);
-              return [
-                ...rest,
-                {
-                  id: Date.now().toString() + "-sys",
-                  sender: "zoya",
-                  role: "model",
-                  text: "*System: Switched to Groq for faster response*",
-                },
-                ...(placeholder ? [placeholder] : [])
-              ];
-            });
-            
-            lastProcessedIndex = 0;
-            responseText = await getZoyaResponseStream(
-              promptToSend,
-              messagesRef.current, // uses latest ref which contains system message and empty placeholder
-              capturedImageBase64s,
-              isProfessionalMode,
-              environmentContext,
-              chunkCallback,
-              currentActiveModel
-            );
-          } else {
-            throw error;
-          }
-        }
+        responseText = await getZoyaResponseStream(
+          promptToSend,
+          messagesRef.current,
+          capturedImageBase64s,
+          isProfessionalMode,
+          environmentContext,
+          chunkCallback,
+          selectedModel
+        );
         
         setIsTyping(false);
         setIsLoading(false);
