@@ -86,7 +86,77 @@ export async function getZoyaResponseStream(
   }
 
   if (selectedModel === "huggingface") {
-    throw new Error("Hugging Face integration is not configured yet.");
+    const hfKey = process.env.HUGGINGFACE_API_KEY;
+    if (!hfKey) {
+      const errorMsg = "Hugging Face API key is missing or invalid.";
+      if (onChunk) onChunk(errorMsg);
+      return errorMsg;
+    }
+    
+    const hfHistory = history.map(msg => ({
+      role: msg.sender === "user" ? "user" : "assistant",
+      content: msg.text || ""
+    })).filter(msg => msg.content);
+    
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...hfHistory,
+      { role: "user", content: prompt }
+    ];
+
+    try {
+      const response = await fetch("https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${hfKey}`
+        },
+        body: JSON.stringify({
+          model: "HuggingFaceH4/zephyr-7b-beta",
+          messages,
+          stream: true,
+          max_tokens: 500
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Hugging Face API error: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let accumulatedText = "";
+      let buffer = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          
+          buffer = lines.pop() || "";
+          
+          for (const line of lines) {
+            if (line.trim().startsWith("data: ") && line.trim() !== "data: [DONE]") {
+              try {
+                const data = JSON.parse(line.trim().slice(6));
+                const content = data.choices[0]?.delta?.content || "";
+                accumulatedText += content;
+                if (onChunk) onChunk(accumulatedText);
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+      }
+      return accumulatedText || "Ugh, fine. I have nothing to say.";
+    } catch (error: any) {
+      console.error("Hugging Face Stream Error:", error);
+      throw error;
+    }
   }
 
   try {
@@ -215,7 +285,47 @@ export async function getZoyaResponse(
   }
 
   if (selectedModel === "huggingface") {
-    return "Hugging Face integration is not configured yet.";
+    const hfKey = process.env.HUGGINGFACE_API_KEY;
+    if (!hfKey) {
+      return "Hugging Face API key is missing or invalid.";
+    }
+    
+    const hfHistory = history.map(msg => ({
+      role: msg.sender === "user" ? "user" : "assistant",
+      content: msg.text || ""
+    })).filter(msg => msg.content);
+    
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...hfHistory,
+      { role: "user", content: prompt }
+    ];
+
+    try {
+      const response = await fetch("https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${hfKey}`
+        },
+        body: JSON.stringify({
+          model: "HuggingFaceH4/zephyr-7b-beta",
+          messages,
+          stream: false,
+          max_tokens: 500
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Hugging Face API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
+    } catch (error) {
+      console.error("Hugging Face Error:", error);
+      return "Hugging Face API Limit Reached or Error. Zoya is resting.";
+    }
   }
 
   try {
