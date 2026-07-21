@@ -187,6 +187,7 @@ export default function App() {
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
   const [isDeepThinking, setIsDeepThinking] = useState(false);
+  const [isInputReadOnly, setIsInputReadOnly] = useState(true);
   const [textInput, setTextInput] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1821,7 +1822,10 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
-  const toggleListening = async () => {
+  const toggleListening = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     if (isSessionActive) {
       setIsSessionActive(false);
       
@@ -1832,7 +1836,6 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsListening(false);
       }
     } else {
-      setShowChat(true);
       try {
         // Do not show "Microphone Blocked" before actually requesting microphone permission.
         // Call navigator.mediaDevices.getUserMedia() first.
@@ -3049,6 +3052,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <div className="flex items-end gap-1.5">
                     <textarea
                       ref={textareaRef}
+                      autoFocus={false}
+                      readOnly={isInputReadOnly}
+                      onClick={() => setIsInputReadOnly(false)}
+                      onTouchStart={() => setIsInputReadOnly(false)}
                       value={textInput}
                       onChange={(e) => setTextInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -3090,6 +3097,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                 <div className="flex items-center gap-1.5 w-full">
                   <textarea
                   ref={textareaRef}
+                  autoFocus={false}
+                  readOnly={isInputReadOnly}
+                  onClick={() => setIsInputReadOnly(false)}
+                  onTouchStart={() => setIsInputReadOnly(false)}
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
                   onKeyDown={(e) => {
