@@ -8,8 +8,87 @@ export async function getZoyaResponseStream(
   imageFrames?: string | string[],
   isProfessionalMode: boolean = false,
   environmentContext: string = "",
-  onChunk?: (text: string) => void
+  onChunk?: (text: string) => void,
+  selectedModel: string = "gemini"
 ): Promise<string> {
+  if (selectedModel === "groq") {
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      const errorMsg = "Groq API key is missing or invalid.";
+      if (onChunk) onChunk(errorMsg);
+      return errorMsg;
+    }
+    
+    // Format history for Groq
+    const groqHistory = history.map(msg => ({
+      role: msg.sender === "user" ? "user" : "assistant",
+      content: msg.text || ""
+    })).filter(msg => msg.content);
+    
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...groqHistory,
+      { role: "user", content: prompt }
+    ];
+
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${groqKey}`
+        },
+        body: JSON.stringify({
+          model: "llama3-8b-8192",
+          messages,
+          stream: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Groq API error: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let accumulatedText = "";
+      let buffer = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          
+          buffer = lines.pop() || "";
+          
+          for (const line of lines) {
+            if (line.trim().startsWith("data: ") && line.trim() !== "data: [DONE]") {
+              try {
+                const data = JSON.parse(line.trim().slice(6));
+                const content = data.choices[0]?.delta?.content || "";
+                accumulatedText += content;
+                if (onChunk) onChunk(accumulatedText);
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+      }
+      return accumulatedText || "Ugh, fine. I have nothing to say.";
+    } catch (error: any) {
+      console.error("Groq Stream Error:", error);
+      throw error;
+    }
+  }
+
+  if (selectedModel === "huggingface") {
+    throw new Error("Hugging Face integration is not configured yet.");
+  }
+
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
@@ -80,9 +159,7 @@ export async function getZoyaResponseStream(
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
     console.error("Gemini Stream Error:", error);
-    const fallback = "API Limit Reached or Error. Zoya is resting.";
-    if (onChunk) onChunk(fallback);
-    return fallback;
+    throw error;
   }
 }
 
@@ -91,8 +168,56 @@ export async function getZoyaResponse(
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
   imageFrames?: string | string[],
   isProfessionalMode: boolean = false,
-  environmentContext: string = ""
+  environmentContext: string = "",
+  selectedModel: string = "gemini"
 ): Promise<string> {
+  if (selectedModel === "groq") {
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      return "Groq API key is missing or invalid.";
+    }
+    
+    const groqHistory = history.map(msg => ({
+      role: msg.sender === "user" ? "user" : "assistant",
+      content: msg.text || ""
+    })).filter(msg => msg.content);
+    
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...groqHistory,
+      { role: "user", content: prompt }
+    ];
+
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${groqKey}`
+        },
+        body: JSON.stringify({
+          model: "llama3-8b-8192",
+          messages,
+          stream: false
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Groq API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
+    } catch (error) {
+      console.error("Groq Error:", error);
+      return "Groq API Limit Reached or Error. Zoya is resting.";
+    }
+  }
+
+  if (selectedModel === "huggingface") {
+    return "Hugging Face integration is not configured yet.";
+  }
+
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     

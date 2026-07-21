@@ -1503,35 +1503,75 @@ In your very first response or greeting to the user, you MUST casually and natur
           promptToSend = `[SYSTEM CONTEXT: Engage Deep Thinking Mode. Provide highly advanced, professional, and step-by-step analytical reasoning. Be strictly mindful of token limits—avoid fluff and deliver maximum high-value information.]\n\n${finalTranscript}`;
         }
 
-        responseText = await getZoyaResponseStream(
-          promptToSend,
-          messagesRef.current,
-          capturedImageBase64s,
-          isProfessionalMode,
-          environmentContext,
-          (currentText) => {
-            setIsTyping(false);
-            setIsLoading(false);
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === responseMessageId ? { ...msg, text: currentText } : msg
-              )
-            );
+        let currentActiveModel = selectedModel;
+        
+        const chunkCallback = (currentText: string) => {
+          setIsTyping(false);
+          setIsLoading(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === responseMessageId ? { ...msg, text: currentText } : msg
+            )
+          );
 
-            if (!isMuted && !skipSpeech) {
-              const textToProcess = currentText.slice(lastProcessedIndex);
-              const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
-              let match;
-              let tempIndex = lastProcessedIndex;
-              while ((match = sentenceRegex.exec(textToProcess)) !== null) {
-                const sentence = match[0];
-                queueSentenceSpeak(sentence);
-                tempIndex = lastProcessedIndex + match.index + sentence.length;
-              }
-              lastProcessedIndex = tempIndex;
+          if (!isMuted && !skipSpeech) {
+            const textToProcess = currentText.slice(lastProcessedIndex);
+            const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
+            let match;
+            let tempIndex = lastProcessedIndex;
+            while ((match = sentenceRegex.exec(textToProcess)) !== null) {
+              const sentence = match[0];
+              queueSentenceSpeak(sentence);
+              tempIndex = lastProcessedIndex + match.index + sentence.length;
             }
+            lastProcessedIndex = tempIndex;
           }
-        );
+        };
+
+        try {
+          responseText = await getZoyaResponseStream(
+            promptToSend,
+            messagesRef.current,
+            capturedImageBase64s,
+            isProfessionalMode,
+            environmentContext,
+            chunkCallback,
+            currentActiveModel
+          );
+        } catch (error) {
+          if (autoSelectModel && currentActiveModel !== "groq") {
+            console.log("Primary model failed, auto-switching to Groq");
+            currentActiveModel = "groq";
+            setSelectedModel("groq");
+            setMessages((prev) => {
+              const placeholder = prev.find(m => m.id === responseMessageId);
+              const rest = prev.filter(m => m.id !== responseMessageId);
+              return [
+                ...rest,
+                {
+                  id: Date.now().toString() + "-sys",
+                  sender: "zoya",
+                  role: "model",
+                  text: "*System: Switched to Groq for faster response*",
+                },
+                ...(placeholder ? [placeholder] : [])
+              ];
+            });
+            
+            lastProcessedIndex = 0;
+            responseText = await getZoyaResponseStream(
+              promptToSend,
+              messagesRef.current, // uses latest ref which contains system message and empty placeholder
+              capturedImageBase64s,
+              isProfessionalMode,
+              environmentContext,
+              chunkCallback,
+              currentActiveModel
+            );
+          } else {
+            throw error;
+          }
+        }
         
         setIsTyping(false);
         setIsLoading(false);
