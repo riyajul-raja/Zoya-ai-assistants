@@ -2496,7 +2496,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           </button>
 
           {/* Hamburger Menu (Dropdown with Tool Labels) */}
-          <div className="relative flex items-center justify-center" ref={toolMenuRef}>
+          <div className={`relative flex items-center justify-center transition-opacity duration-300 ${showChat ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`} ref={toolMenuRef}>
             <button
               onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
               className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
@@ -2504,206 +2504,234 @@ In your very first response or greeting to the user, you MUST casually and natur
                   ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-[0_0_15px_rgba(139,92,246,0.6)] animate-pulse"
                   : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-violet-400 hover:border-violet-500/30"
               }`}
-              title="Integrations & Tools Menu"
+              title="Settings & Integrations"
             >
               <Menu size={18} className={isToolMenuOpen ? "rotate-90 transition-transform duration-300" : "transition-transform duration-300"} />
             </button>
 
             <AnimatePresence>
               {isToolMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 15, scale: 0.95 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="absolute right-0 mt-3 w-72 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/15 bg-black/95 backdrop-blur-xl p-4 shadow-[0_10px_50px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 z-50 pointer-events-auto select-none"
-                  style={{ top: "100%" }}
-                >
-                  <div className="px-2 pb-2 border-b border-white/10 flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold">Integrations & Tools</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
-                  </div>
-                  
-                  <div className="flex flex-col gap-1.5">
-                    {[
-                      {
-                        id: "gmail",
-                        name: "Google Gmail",
-                        icon: <Mail size={16} />,
-                        active: showGmail,
-                        toggle: () => setShowGmail(!showGmail),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "calendar",
-                        name: "Google Calendar",
-                        icon: <Calendar size={16} />,
-                        active: showCalendar,
-                        toggle: () => setShowCalendar(!showCalendar),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "tasks",
-                        name: "Google Tasks",
-                        icon: <ListTodo size={16} />,
-                        active: showTasks,
-                        toggle: () => setShowTasks(!showTasks),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "slides",
-                        name: "Google Slides",
-                        icon: <Presentation size={16} />,
-                        active: showSlides,
-                        toggle: () => setShowSlides(!showSlides),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "contacts",
-                        name: "Google Contacts",
-                        icon: <Users size={16} />,
-                        active: showContacts,
-                        toggle: () => setShowContacts(!showContacts),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "chat",
-                        name: "Google Chat",
-                        icon: <MessageSquare size={16} />,
-                        active: showGoogleChat,
-                        toggle: () => setShowGoogleChat(!showGoogleChat),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "docs",
-                        name: "Google Docs",
-                        icon: <FileText size={16} />,
-                        active: showDocs,
-                        toggle: () => setShowDocs(!showDocs),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "forms",
-                        name: "Google Forms",
-                        icon: <ClipboardList size={16} />,
-                        active: showForms,
-                        toggle: () => setShowForms(!showForms),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "meet",
-                        name: "Google Meet",
-                        icon: <Video size={16} />,
-                        active: showMeet,
-                        toggle: () => setShowMeet(!showMeet),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "keep",
-                        name: "Google Keep",
-                        icon: <StickyNote size={16} />,
-                        active: showKeep,
-                        toggle: () => setShowKeep(!showKeep),
-                        colorClass: "from-amber-600 to-yellow-600",
-                        accentColor: "text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
-                      },
-                      {
-                        id: "classroom",
-                        name: "Google Classroom",
-                        icon: <GraduationCap size={16} />,
-                        active: showClassroom,
-                        toggle: () => setShowClassroom(!showClassroom),
-                        colorClass: "from-emerald-600 to-teal-600",
-                        accentColor: "text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
-                      },
-                      {
-                        id: "drive",
-                        name: "Drive Explorer",
-                        icon: <HardDrive size={16} />,
-                        active: showDrive,
-                        toggle: () => setShowDrive(!showDrive),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "memories",
-                        name: "Memory Core",
-                        icon: <Brain size={16} />,
-                        active: showMemories,
-                        toggle: () => setShowMemories(!showMemories),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "ar-hologram",
-                        name: "AR Hologram Mode",
-                        icon: (
-                          <Box 
-                            size={16} 
-                            className={`transition-all duration-300 ${
-                              isARMode && isCameraActive ? "animate-spin text-cyan-100" : ""
-                            }`} 
-                            style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
-                          />
-                        ),
-                        active: isARMode,
-                        toggle: toggleAR,
-                        colorClass: "from-cyan-500 to-teal-500",
-                        accentColor: "text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
-                      },
-                      {
-                        id: "floating-core",
-                        name: "Floating Core Mode",
-                        icon: (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
-                            <rect width="20" height="14" x="2" y="3" rx="2" />
-                          </svg>
-                        ),
-                        active: isGlobePiPActive,
-                        toggle: handlePiP,
-                        colorClass: "from-violet-600 to-pink-600",
-                        accentColor: "text-violet-400 border-violet-500/30 shadow-[0_0_10px_rgba(139,92,246,0.4)]",
-                      },
-                    ].map((tool) => (
-                      <button
-                        key={tool.id}
-                        onClick={() => {
-                          tool.toggle();
-                          setIsToolMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
-                          tool.active
-                            ? `bg-gradient-to-r ${tool.colorClass} border-transparent text-white font-medium ${tool.accentColor}`
-                            : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className={tool.active ? "text-white" : "text-white/40"}>
-                            {tool.icon}
-                          </span>
-                          <span className="font-medium tracking-wide">{tool.name}</span>
-                        </div>
-                        
-                        {/* Active indicator dot */}
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          tool.active 
-                            ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
-                            : "bg-white/10"
-                        }`} />
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]"
+                    onClick={() => setIsToolMenuOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ x: "100%" }}
+                    animate={{ x: 0 }}
+                    exit={{ x: "100%" }}
+                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                    className="fixed inset-y-0 right-0 w-80 bg-black/95 backdrop-blur-xl border-l border-white/10 p-6 z-[100] flex flex-col shadow-2xl pointer-events-auto overflow-y-auto"
+                  >
+                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
+                      <span className="text-sm font-mono text-white/70 uppercase tracking-widest font-semibold">Settings</span>
+                      <button onClick={() => setIsToolMenuOpen(false)} className="text-white/50 hover:text-white transition-colors cursor-pointer p-1">
+                        <X size={18} />
                       </button>
-                    ))}
-                  </div>
-                </motion.div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">App Settings</span>
+                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                          <span className="text-xs text-white/70 font-medium tracking-wide">Voice</span>
+                          <span className="text-xs font-mono text-white/40">Zoya (Default)</span>
+                        </div>
+                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                          <span className="text-xs text-white/70 font-medium tracking-wide">Theme</span>
+                          <span className="text-xs font-mono text-white/40">Dark Glass</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">Integrations & Tools</span>
+                        <div className="flex flex-col gap-1.5">
+                          {[
+                            {
+                              id: "gmail",
+                              name: "Google Gmail",
+                              icon: <Mail size={16} />,
+                              active: showGmail,
+                              toggle: () => setShowGmail(!showGmail),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "calendar",
+                              name: "Google Calendar",
+                              icon: <Calendar size={16} />,
+                              active: showCalendar,
+                              toggle: () => setShowCalendar(!showCalendar),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "tasks",
+                              name: "Google Tasks",
+                              icon: <ListTodo size={16} />,
+                              active: showTasks,
+                              toggle: () => setShowTasks(!showTasks),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "slides",
+                              name: "Google Slides",
+                              icon: <Presentation size={16} />,
+                              active: showSlides,
+                              toggle: () => setShowSlides(!showSlides),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "contacts",
+                              name: "Google Contacts",
+                              icon: <Users size={16} />,
+                              active: showContacts,
+                              toggle: () => setShowContacts(!showContacts),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "chat",
+                              name: "Google Chat",
+                              icon: <MessageSquare size={16} />,
+                              active: showGoogleChat,
+                              toggle: () => setShowGoogleChat(!showGoogleChat),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "docs",
+                              name: "Google Docs",
+                              icon: <FileText size={16} />,
+                              active: showDocs,
+                              toggle: () => setShowDocs(!showDocs),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "forms",
+                              name: "Google Forms",
+                              icon: <ClipboardList size={16} />,
+                              active: showForms,
+                              toggle: () => setShowForms(!showForms),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "meet",
+                              name: "Google Meet",
+                              icon: <Video size={16} />,
+                              active: showMeet,
+                              toggle: () => setShowMeet(!showMeet),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "keep",
+                              name: "Google Keep",
+                              icon: <StickyNote size={16} />,
+                              active: showKeep,
+                              toggle: () => setShowKeep(!showKeep),
+                              colorClass: "from-amber-600 to-yellow-600",
+                              accentColor: "text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
+                            },
+                            {
+                              id: "classroom",
+                              name: "Google Classroom",
+                              icon: <GraduationCap size={16} />,
+                              active: showClassroom,
+                              toggle: () => setShowClassroom(!showClassroom),
+                              colorClass: "from-emerald-600 to-teal-600",
+                              accentColor: "text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
+                            },
+                            {
+                              id: "drive",
+                              name: "Drive Explorer",
+                              icon: <HardDrive size={16} />,
+                              active: showDrive,
+                              toggle: () => setShowDrive(!showDrive),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "memories",
+                              name: "Memory Core",
+                              icon: <Brain size={16} />,
+                              active: showMemories,
+                              toggle: () => setShowMemories(!showMemories),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "ar-hologram",
+                              name: "AR Hologram Mode",
+                              icon: (
+                                <Box 
+                                  size={16} 
+                                  className={`transition-all duration-300 ${
+                                    isARMode && isCameraActive ? "animate-spin text-cyan-100" : ""
+                                  }`} 
+                                  style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
+                                />
+                              ),
+                              active: isARMode,
+                              toggle: toggleAR,
+                              colorClass: "from-cyan-500 to-teal-500",
+                              accentColor: "text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
+                            },
+                            {
+                              id: "floating-core",
+                              name: "Floating Core Mode",
+                              icon: (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
+                                  <rect width="20" height="14" x="2" y="3" rx="2" />
+                                </svg>
+                              ),
+                              active: isGlobePiPActive,
+                              toggle: handlePiP,
+                              colorClass: "from-violet-600 to-pink-600",
+                              accentColor: "text-violet-400 border-violet-500/30 shadow-[0_0_10px_rgba(139,92,246,0.4)]",
+                            },
+                          ].map((tool) => (
+                            <button
+                              key={tool.id}
+                              onClick={() => {
+                                tool.toggle();
+                                setIsToolMenuOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
+                                tool.active
+                                  ? `bg-gradient-to-r ${tool.colorClass} border-transparent text-white font-medium ${tool.accentColor}`
+                                  : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className={tool.active ? "text-white" : "text-white/40"}>
+                                  {tool.icon}
+                                </span>
+                                <span className="font-medium tracking-wide">{tool.name}</span>
+                              </div>
+                              
+                              {/* Active indicator dot */}
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                tool.active 
+                                  ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
+                                  : "bg-white/10"
+                              }`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
               )}
             </AnimatePresence>
           </div>
