@@ -549,7 +549,6 @@ export default function TasksManager({ onClose, isGhostMode = false, onToast }: 
                   <input
                     type="text"
                     required
-                    autoFocus
                     placeholder="List Title..."
                     value={newListTitle}
                     onChange={(e) => setNewListTitle(e.target.value)}

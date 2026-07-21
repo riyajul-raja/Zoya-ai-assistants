@@ -226,11 +226,7 @@ export default function App() {
     };
   }, [isToolMenuOpen]);
 
-  useEffect(() => {
-    if (showChat && textareaRef.current) {
-      textareaRef.current.blur();
-    }
-  }, [showChat]);
+
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
