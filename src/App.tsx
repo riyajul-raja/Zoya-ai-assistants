@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check, ChevronDown } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
+import { GeminiIcon, GroqIcon } from "./components/BrandIcons";
 import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
 import TypingIndicator from "./components/TypingIndicator";
@@ -187,6 +188,9 @@ export default function App() {
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
   const [isDeepThinking, setIsDeepThinking] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("gemini");
+  const [isModelSelectorExpanded, setIsModelSelectorExpanded] = useState(false);
+  const [autoSelectModel, setAutoSelectModel] = useState(false);
   const [isInputReadOnly, setIsInputReadOnly] = useState(true);
   const [textInput, setTextInput] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -2468,6 +2472,84 @@ In your very first response or greeting to the user, you MUST casually and natur
           </div>
           <h1 className="text-xl font-serif font-medium tracking-wide opacity-90">Zoya</h1>
         </div>
+
+        {/* Center AI Model Selector */}
+        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-50">
+          <div className="relative">
+            <button
+              onClick={() => setIsModelSelectorExpanded(!isModelSelectorExpanded)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 transition-all cursor-pointer shadow-lg backdrop-blur-md"
+            >
+              {selectedModel === "gemini" && <GeminiIcon size={14} />}
+              {selectedModel === "groq" && <GroqIcon size={14} />}
+              {selectedModel === "huggingface" && <span className="text-sm leading-none">🤗</span>}
+              <span className="text-xs font-medium tracking-wide">
+                {selectedModel === "gemini" ? "Gemini" : selectedModel === "groq" ? "Groq" : "Hugging Face"}
+              </span>
+              <ChevronDown
+                size={14}
+                className={`text-white/50 transition-transform duration-300 ${isModelSelectorExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+            <AnimatePresence>
+              {isModelSelectorExpanded && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-56 rounded-2xl border border-white/15 bg-black/95 backdrop-blur-xl p-2 shadow-[0_10px_50px_rgba(0,0,0,0.8)] z-[100]"
+                >
+                  <div className="flex flex-col gap-1">
+                    {[
+                      { id: "gemini", name: "Gemini", desc: "(Default)", icon: <GeminiIcon /> },
+                      { id: "groq", name: "Groq", desc: "(Fast)", icon: <GroqIcon /> },
+                      { id: "huggingface", name: "Hugging Face", desc: "(Open Models)", icon: <span className="text-base leading-none">🤗</span> }
+                    ].map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setIsModelSelectorExpanded(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-sm transition-all duration-200 cursor-pointer ${
+                          selectedModel === model.id
+                            ? "bg-white/15 text-white shadow-sm border border-white/10"
+                            : "text-white/60 hover:bg-white/5 hover:text-white border border-transparent"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {model.icon}
+                          <span className="font-medium tracking-wide">
+                            {model.name} <span className="text-white/40 font-normal text-xs">{model.desc}</span>
+                          </span>
+                        </div>
+                        {selectedModel === model.id && <Check size={14} className="text-blue-400" />}
+                      </button>
+                    ))}
+                    
+                    <div className="mt-1 pt-2 border-t border-white/10 px-2 pb-1">
+                      <label className="flex items-center justify-between cursor-pointer group">
+                        <span className="text-xs font-medium text-white/60 group-hover:text-white/90 transition-colors">Auto Select Best Model</span>
+                        <div className="relative">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only" 
+                            checked={autoSelectModel} 
+                            onChange={(e) => setAutoSelectModel(e.target.checked)} 
+                          />
+                          <div className={`block w-8 h-4.5 rounded-full transition-colors duration-300 ${autoSelectModel ? 'bg-blue-500/80' : 'bg-white/10'}`}></div>
+                          <div className={`absolute left-0.5 top-0.5 bg-white w-3.5 h-3.5 rounded-full transition-transform duration-300 ${autoSelectModel ? 'translate-x-3.5' : 'translate-x-0'}`}></div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
         <div className="flex items-center gap-2">
           {showInstallBtn && (
             <button
@@ -2524,7 +2606,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   className="absolute right-0 mt-3 w-72 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/15 bg-black/95 backdrop-blur-xl p-4 shadow-[0_10px_50px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 z-50 pointer-events-auto select-none"
                   style={{ top: "100%" }}
                 >
-                  <div className="px-2 pb-2 border-b border-white/10 flex items-center justify-between mb-1">
+                  <div className="px-2 pb-2 border-b border-white/10 flex items-center justify-between mb-1 mt-1">
                     <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold">Integrations & Tools</span>
                     <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
                   </div>
