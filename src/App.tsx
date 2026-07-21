@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, Plus, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -3114,7 +3114,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   rows={1}
                 />
                 
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <input type="file" multiple accept="image/*" className="hidden"
                     ref={fileInputRef}
                     onChange={handleImageUpload}
@@ -3122,33 +3122,29 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => setIsPlusMenuOpen(true)}
-                    className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-all duration-300 cursor-pointer"
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
                     title="Media Options"
                   >
-                    <Plus size={13} />
+                    <PlusCircle size={18} />
                   </button>
                   <button
                     type="button"
                     onClick={toggleInputDictation}
-                    className={`p-1.5 rounded-md transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                    className={`p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer flex items-center justify-center ${
                       isListening
                         ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105 animate-pulse"
-                        : "text-white/60 hover:text-white hover:bg-white/10"
+                        : ""
                     }`}
                     title="Dictate message (Speech to Text)"
                   >
-                    <Mic size={13} />
+                    <Mic size={18} />
                   </button>
                   <button 
                     type="submit"
-                    disabled={!textInput.trim() && selectedImages.length === 0}
-                    className={`p-1.5 rounded-md disabled:opacity-50 transition-all duration-300 cursor-pointer ${
-                      isGhostMode
-                        ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-red-500/30 disabled:to-rose-600/30 text-white"
-                        : "bg-red-600 hover:bg-red-500 disabled:bg-neutral-800 disabled:text-white/30 text-white"
-                    }`}
+                    disabled={(!textInput.trim() && selectedImages.length === 0) || isLoading}
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:hover:bg-white/5 disabled:hover:text-gray-400"
                   >
-                    <Send size={13} />
+                    {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                   </button>
                 </div>
                 </div>
