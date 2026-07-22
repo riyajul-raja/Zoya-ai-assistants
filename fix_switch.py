@@ -1,8 +1,14 @@
-import { GoogleGenAI } from "@google/genai";
+import re
 
-const systemInstruction = "Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).";
+with open('src/services/geminiService.ts', 'r') as f:
+    content = f.read()
 
-export async function getZoyaResponseStream(
+# Make a clean replacement of the geminiService bodies
+# I'll replace everything from "export async function getZoyaResponseStream" up to "export async function getZoyaAudio"
+
+# ... wait, let's just do it directly
+
+new_stream_impl = """export async function getZoyaResponseStream(
   prompt: string,
   history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
   imageFrames?: string | string[],
@@ -12,7 +18,7 @@ export async function getZoyaResponseStream(
   selectedModel: string = "gemini"
 ): Promise<string> {
   if (selectedModel === "groq") {
-    const groqKey = import.meta.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
+    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!groqKey) {
       throw new Error("VITE_GROQ_API_KEY is missing");
     }
@@ -41,7 +47,7 @@ export async function getZoyaResponseStream(
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
+          const lines = buffer.split("\\n");
           buffer = lines.pop() || "";
           for (const line of lines) {
             if (line.trim().startsWith("data: ") && line.trim() !== "data: [DONE]") {
@@ -64,7 +70,7 @@ export async function getZoyaResponseStream(
       throw error;
     }
   } else if (selectedModel === "huggingface") {
-    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
+    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
     if (!hfKey) {
       throw new Error("VITE_HUGGINGFACE_API_KEY is missing");
     }
@@ -93,7 +99,7 @@ export async function getZoyaResponseStream(
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
+          const lines = buffer.split("\\n");
           buffer = lines.pop() || "";
           for (const line of lines) {
             if (line.trim().startsWith("data: ") && line.trim() !== "data: [DONE]") {
@@ -179,7 +185,7 @@ export async function getZoyaResponse(
   selectedModel: string = "gemini"
 ): Promise<string> {
   if (selectedModel === "groq") {
-    const groqKey = import.meta.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
+    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!groqKey) {
       throw new Error("VITE_GROQ_API_KEY is missing");
     }
@@ -209,7 +215,7 @@ export async function getZoyaResponse(
       throw error;
     }
   } else if (selectedModel === "huggingface") {
-    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
+    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
     if (!hfKey) {
       throw new Error("VITE_HUGGINGFACE_API_KEY is missing");
     }
@@ -284,25 +290,17 @@ export async function getZoyaResponse(
     }
   }
 }
+"""
 
-export async function getZoyaAudio(text: string): Promise<string | null> {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Kore" },
-          },
-        },
-      },
-    });
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
-  } catch (error) {
-    console.error("TTS Error:", error);
-    return null;
-  }
-}
+start_str = "export async function getZoyaResponseStream"
+end_str = "export async function getZoyaAudio"
+
+idx_start = content.find(start_str)
+idx_end = content.find(end_str)
+
+new_content = content[:idx_start] + new_stream_impl + "\n" + content[idx_end:]
+
+with open('src/services/geminiService.ts', 'w') as f:
+    f.write(new_content)
+
+print("Success")
