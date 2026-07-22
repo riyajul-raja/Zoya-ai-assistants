@@ -34,7 +34,7 @@ export async function getZoyaResponseStream(
     const startTime = Date.now();
     diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
-      const response = await fetch("https://corsproxy.io/?https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({ model: "llama3-8b-8192", messages, stream: true })
@@ -100,7 +100,7 @@ export async function getZoyaResponseStream(
     const startTime = Date.now();
     diagnosticsStore.updateProvider("huggingface", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
-      const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
+      const response = await fetch("https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hfKey}` },
         body: JSON.stringify({ model: "HuggingFaceH4/zephyr-7b-beta", messages, stream: true, max_tokens: 500 })
@@ -244,7 +244,7 @@ export async function getZoyaResponse(
     const startTime = Date.now();
     diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
-      const response = await fetch("https://corsproxy.io/?https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({ model: "llama3-8b-8192", messages, stream: false })
@@ -289,7 +289,7 @@ export async function getZoyaResponse(
     const startTime = Date.now();
     diagnosticsStore.updateProvider("huggingface", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
-      const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
+      const response = await fetch("https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hfKey}` },
         body: JSON.stringify({ model: "HuggingFaceH4/zephyr-7b-beta", messages, stream: false, max_tokens: 500 })
