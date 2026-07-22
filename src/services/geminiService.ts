@@ -1,4 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
+import { diagnosticsStore, Provider } from "./diagnosticsStore";
+
 
 const systemInstruction = "Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).";
 
@@ -29,6 +31,8 @@ export async function getZoyaResponseStream(
     ];
     if (isDev) console.log("[Groq Stream] Sending request", { model: "llama3-8b-8192", messageCount: messages.length });
     
+    const startTime = Date.now();
+    diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
       const response = await fetch("https://corsproxy.io/?https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -69,9 +73,11 @@ export async function getZoyaResponseStream(
           }
         }
       }
+      diagnosticsStore.updateProvider("groq", { status: "success", latencyMs: Date.now() - startTime });
       if (isDev) console.log("[Groq Stream] Success, length:", accumulatedText.length);
       return accumulatedText || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
+      diagnosticsStore.updateProvider("groq", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
       if (isDev) console.error("Groq Stream Error:", error);
       throw error;
     }
@@ -91,6 +97,8 @@ export async function getZoyaResponseStream(
     ];
     if (isDev) console.log("[Hugging Face Stream] Sending request", { model: "HuggingFaceH4/zephyr-7b-beta", messageCount: messages.length });
     
+    const startTime = Date.now();
+    diagnosticsStore.updateProvider("huggingface", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
       const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
@@ -131,9 +139,11 @@ export async function getZoyaResponseStream(
           }
         }
       }
+      diagnosticsStore.updateProvider("huggingface", { status: "success", latencyMs: Date.now() - startTime });
       if (isDev) console.log("[Hugging Face Stream] Success, length:", accumulatedText.length);
       return accumulatedText || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
+      diagnosticsStore.updateProvider("huggingface", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
       if (isDev) console.error("Hugging Face Stream Error:", error);
       throw error;
     }
@@ -144,6 +154,8 @@ export async function getZoyaResponseStream(
       throw new Error("Gemini API key not configured.");
     }
     
+    const startTime = Date.now();
+    diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
       let formattedHistory: any[] = [];
@@ -192,9 +204,11 @@ export async function getZoyaResponseStream(
           if (onChunk) onChunk(accumulatedText);
         }
       }
+      diagnosticsStore.updateProvider("gemini", { status: "success", latencyMs: Date.now() - startTime });
       if (isDev) console.log("[Gemini Stream] Success, length:", accumulatedText.length);
       return accumulatedText || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
+      diagnosticsStore.updateProvider("gemini", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
       if (isDev) console.error("Gemini Stream Error:", error);
       throw error;
     }
@@ -227,6 +241,8 @@ export async function getZoyaResponse(
     ];
     if (isDev) console.log("[Groq Request] Sending", { model: "llama3-8b-8192" });
     
+    const startTime = Date.now();
+    diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
       const response = await fetch("https://corsproxy.io/?https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -245,9 +261,12 @@ export async function getZoyaResponse(
       }
       
       const data = await response.json();
+      const tokenUsage = data.usage ? { prompt: data.usage.prompt_tokens, completion: data.usage.completion_tokens, total: data.usage.total_tokens } : null;
+      diagnosticsStore.updateProvider("groq", { status: "success", latencyMs: Date.now() - startTime, tokenUsage });
       if (isDev) console.log("[Groq Request] Success");
       return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
+      diagnosticsStore.updateProvider("groq", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
       if (isDev) console.error("Groq Error:", error);
       throw error;
     }
@@ -267,6 +286,8 @@ export async function getZoyaResponse(
     ];
     if (isDev) console.log("[Hugging Face Request] Sending", { model: "HuggingFaceH4/zephyr-7b-beta" });
     
+    const startTime = Date.now();
+    diagnosticsStore.updateProvider("huggingface", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
       const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
@@ -285,9 +306,11 @@ export async function getZoyaResponse(
       }
       
       const data = await response.json();
+      diagnosticsStore.updateProvider("huggingface", { status: "success", latencyMs: Date.now() - startTime });
       if (isDev) console.log("[Hugging Face Request] Success");
       return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
+      diagnosticsStore.updateProvider("huggingface", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
       if (isDev) console.error("Hugging Face Error:", error);
       throw error;
     }
@@ -298,6 +321,8 @@ export async function getZoyaResponse(
       throw new Error("Gemini API key not configured.");
     }
     
+    const startTime = Date.now();
+    diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
       let formattedHistory: any[] = [];
@@ -331,15 +356,18 @@ export async function getZoyaResponse(
         { role: "user", parts: currentMessageParts }
       ];
       if (isDev) console.log("[Gemini Request] Sending", { model: "gemini-3.5-flash", frames: normalizedImageFrames.length });
-      
+      const startTime = Date.now();
+      diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true });
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
         config: { systemInstruction },
         contents: finalContents,
       });
+      diagnosticsStore.updateProvider("gemini", { status: "success", latencyMs: Date.now() - startTime });
       if (isDev) console.log("[Gemini Request] Success");
       return response.text || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
+      diagnosticsStore.updateProvider("gemini", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
       if (isDev) console.error("Gemini Error:", error);
       throw error;
     }
