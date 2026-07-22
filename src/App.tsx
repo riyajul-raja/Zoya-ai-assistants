@@ -190,7 +190,6 @@ export default function App() {
   const [isDeepThinking, setIsDeepThinking] = useState(false);
   const [selectedModel, setSelectedModel] = useState("gemini");
   const [isModelSelectorExpanded, setIsModelSelectorExpanded] = useState(false);
-  const [autoSelectModel, setAutoSelectModel] = useState(false);
   const [isInputReadOnly, setIsInputReadOnly] = useState(true);
   const [textInput, setTextInput] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -200,7 +199,7 @@ export default function App() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach((file: any) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
@@ -1347,7 +1346,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
 
     // 1. SAFE URL CREATION
-    const safeImages = capturedImageBase64s.map(img => {
+    const safeImages = capturedImageBase64s.map((img: any) => {
       if (typeof img === 'string') {
         return img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
       }
@@ -1615,14 +1614,14 @@ In your very first response or greeting to the user, you MUST casually and natur
             id: Date.now().toString() + "-z",
             sender: "zoya",
             role: "model",
-            text: `SYSTEM ERROR: ${errMsg}`,
+            text: errMsg,
             isError: true,
           },
         ]);
       }
       setAppState("idle");
     }
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking, selectedModel]);
 
   useEffect(() => {
     return () => {
@@ -2513,21 +2512,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                       </button>
                     ))}
                     
-                    <div className="mt-1 pt-2 border-t border-white/10 px-2 pb-1">
-                      <label className="flex items-center justify-between cursor-pointer group">
-                        <span className="text-xs font-medium text-white/60 group-hover:text-white/90 transition-colors">Auto Select Best Model</span>
-                        <div className="relative">
-                          <input 
-                            type="checkbox" 
-                            className="sr-only" 
-                            checked={autoSelectModel} 
-                            onChange={(e) => setAutoSelectModel(e.target.checked)} 
-                          />
-                          <div className={`block w-8 h-4.5 rounded-full transition-colors duration-300 ${autoSelectModel ? 'bg-blue-500/80' : 'bg-white/10'}`}></div>
-                          <div className={`absolute left-0.5 top-0.5 bg-white w-3.5 h-3.5 rounded-full transition-transform duration-300 ${autoSelectModel ? 'translate-x-3.5' : 'translate-x-0'}`}></div>
-                        </div>
-                      </label>
-                    </div>
+
                   </div>
                 </motion.div>
               )}

@@ -11,10 +11,12 @@ export async function getZoyaResponseStream(
   onChunk?: (text: string) => void,
   selectedModel: string = "gemini"
 ): Promise<string> {
+  const isDev = import.meta.env.DEV;
+
   if (selectedModel === "groq") {
     const groqKey = import.meta.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
     if (!groqKey) {
-      throw new Error("VITE_GROQ_API_KEY is missing");
+      throw new Error("Groq API key not configured.");
     }
     const groqHistory = history.map(msg => ({
       role: msg.sender === "user" ? "user" : "assistant",
@@ -25,13 +27,25 @@ export async function getZoyaResponseStream(
       ...groqHistory,
       { role: "user", content: prompt }
     ];
+    if (isDev) console.log("[Groq Stream] Sending request", { model: "llama3-8b-8192", messageCount: messages.length });
+    
     try {
       const response = await fetch("https://corsproxy.io/?https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({ model: "llama3-8b-8192", messages, stream: true })
       });
-      if (!response.ok) throw new Error(`Groq API error: ${response.statusText}`);
+      
+      if (!response.ok) {
+        let errMsg = `Groq API error: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error?.message) errMsg = errData.error.message;
+          else if (errData?.message) errMsg = errData.message;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
+      
       const reader = response.body?.getReader();
       const decoder = new TextDecoder("utf-8");
       let accumulatedText = "";
@@ -55,18 +69,16 @@ export async function getZoyaResponseStream(
           }
         }
       }
+      if (isDev) console.log("[Groq Stream] Success, length:", accumulatedText.length);
       return accumulatedText || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
-      console.error("Groq Stream Error:", error);
-      if (error instanceof TypeError || error.name === 'TypeError') {
-        throw new Error("CORS Error or Network Blocked: " + error.message);
-      }
+      if (isDev) console.error("Groq Stream Error:", error);
       throw error;
     }
   } else if (selectedModel === "huggingface") {
     const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
     if (!hfKey) {
-      throw new Error("VITE_HUGGINGFACE_API_KEY is missing");
+      throw new Error("Hugging Face API key not configured.");
     }
     const hfHistory = history.map(msg => ({
       role: msg.sender === "user" ? "user" : "assistant",
@@ -77,13 +89,25 @@ export async function getZoyaResponseStream(
       ...hfHistory,
       { role: "user", content: prompt }
     ];
+    if (isDev) console.log("[Hugging Face Stream] Sending request", { model: "HuggingFaceH4/zephyr-7b-beta", messageCount: messages.length });
+    
     try {
       const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hfKey}` },
         body: JSON.stringify({ model: "HuggingFaceH4/zephyr-7b-beta", messages, stream: true, max_tokens: 500 })
       });
-      if (!response.ok) throw new Error(`Hugging Face API error: ${response.statusText}`);
+      
+      if (!response.ok) {
+        let errMsg = `Hugging Face API error: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error) errMsg = errData.error;
+          else if (errData?.message) errMsg = errData.message;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
+      
       const reader = response.body?.getReader();
       const decoder = new TextDecoder("utf-8");
       let accumulatedText = "";
@@ -107,18 +131,21 @@ export async function getZoyaResponseStream(
           }
         }
       }
+      if (isDev) console.log("[Hugging Face Stream] Success, length:", accumulatedText.length);
       return accumulatedText || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
-      console.error("Hugging Face Stream Error:", error);
-      if (error instanceof TypeError || error.name === 'TypeError') {
-        throw new Error("CORS Error or Network Blocked: " + error.message);
-      }
+      if (isDev) console.error("Hugging Face Stream Error:", error);
       throw error;
     }
   } else {
     // gemini
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      throw new Error("Gemini API key not configured.");
+    }
+    
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
       let formattedHistory: any[] = [];
       let currentRole = "";
       for (const msg of history.slice(-6)) {
@@ -149,6 +176,9 @@ export async function getZoyaResponseStream(
         ...formattedHistory,
         { role: "user", parts: currentMessageParts }
       ];
+      
+      if (isDev) console.log("[Gemini Stream] Sending request", { model: "gemini-3.5-flash", frames: normalizedImageFrames.length });
+      
       const responseStream = await ai.models.generateContentStream({
         model: "gemini-3.5-flash",
         config: { systemInstruction },
@@ -162,9 +192,10 @@ export async function getZoyaResponseStream(
           if (onChunk) onChunk(accumulatedText);
         }
       }
+      if (isDev) console.log("[Gemini Stream] Success, length:", accumulatedText.length);
       return accumulatedText || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
-      console.error("Gemini Stream Error:", error);
+      if (isDev) console.error("Gemini Stream Error:", error);
       throw error;
     }
   }
@@ -178,10 +209,12 @@ export async function getZoyaResponse(
   environmentContext: string = "",
   selectedModel: string = "gemini"
 ): Promise<string> {
+  const isDev = import.meta.env.DEV;
+
   if (selectedModel === "groq") {
     const groqKey = import.meta.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
     if (!groqKey) {
-      throw new Error("VITE_GROQ_API_KEY is missing");
+      throw new Error("Groq API key not configured.");
     }
     const groqHistory = history.map(msg => ({
       role: msg.sender === "user" ? "user" : "assistant",
@@ -192,26 +225,36 @@ export async function getZoyaResponse(
       ...groqHistory,
       { role: "user", content: prompt }
     ];
+    if (isDev) console.log("[Groq Request] Sending", { model: "llama3-8b-8192" });
+    
     try {
       const response = await fetch("https://corsproxy.io/?https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({ model: "llama3-8b-8192", messages, stream: false })
       });
-      if (!response.ok) throw new Error(`Groq API error: ${response.statusText}`);
+      
+      if (!response.ok) {
+        let errMsg = `Groq API error: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error?.message) errMsg = errData.error.message;
+          else if (errData?.message) errMsg = errData.message;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
+      
       const data = await response.json();
+      if (isDev) console.log("[Groq Request] Success");
       return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
-      console.error("Groq Error:", error);
-      if (error instanceof TypeError || error.name === 'TypeError') {
-        throw new Error("CORS Error or Network Blocked: " + error.message);
-      }
+      if (isDev) console.error("Groq Error:", error);
       throw error;
     }
   } else if (selectedModel === "huggingface") {
     const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
     if (!hfKey) {
-      throw new Error("VITE_HUGGINGFACE_API_KEY is missing");
+      throw new Error("Hugging Face API key not configured.");
     }
     const hfHistory = history.map(msg => ({
       role: msg.sender === "user" ? "user" : "assistant",
@@ -222,26 +265,41 @@ export async function getZoyaResponse(
       ...hfHistory,
       { role: "user", content: prompt }
     ];
+    if (isDev) console.log("[Hugging Face Request] Sending", { model: "HuggingFaceH4/zephyr-7b-beta" });
+    
     try {
       const response = await fetch("https://corsproxy.io/?https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hfKey}` },
         body: JSON.stringify({ model: "HuggingFaceH4/zephyr-7b-beta", messages, stream: false, max_tokens: 500 })
       });
-      if (!response.ok) throw new Error(`Hugging Face API error: ${response.statusText}`);
+      
+      if (!response.ok) {
+        let errMsg = `Hugging Face API error: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error) errMsg = errData.error;
+          else if (errData?.message) errMsg = errData.message;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
+      
       const data = await response.json();
+      if (isDev) console.log("[Hugging Face Request] Success");
       return data.choices?.[0]?.message?.content || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
-      console.error("Hugging Face Error:", error);
-      if (error instanceof TypeError || error.name === 'TypeError') {
-        throw new Error("CORS Error or Network Blocked: " + error.message);
-      }
+      if (isDev) console.error("Hugging Face Error:", error);
       throw error;
     }
   } else {
     // gemini
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      throw new Error("Gemini API key not configured.");
+    }
+    
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
       let formattedHistory: any[] = [];
       let currentRole = "";
       for (const msg of history.slice(-6)) {
@@ -272,22 +330,30 @@ export async function getZoyaResponse(
         ...formattedHistory,
         { role: "user", parts: currentMessageParts }
       ];
+      if (isDev) console.log("[Gemini Request] Sending", { model: "gemini-3.5-flash", frames: normalizedImageFrames.length });
+      
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
         config: { systemInstruction },
         contents: finalContents,
       });
+      if (isDev) console.log("[Gemini Request] Success");
       return response.text || "Ugh, fine. I have nothing to say.";
     } catch (error: any) {
-      console.error("Gemini Error:", error);
+      if (isDev) console.error("Gemini Error:", error);
       throw error;
     }
   }
 }
 
 export async function getZoyaAudio(text: string): Promise<string | null> {
+  const isDev = import.meta.env.DEV;
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      throw new Error("Gemini API key not configured.");
+    }
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],
@@ -302,7 +368,7 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
     });
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
   } catch (error) {
-    console.error("TTS Error:", error);
+    if (isDev) console.error("TTS Error:", error);
     return null;
   }
 }
