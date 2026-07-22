@@ -26,7 +26,7 @@ let state: DiagnosticsState = {
   },
   groq: {
     provider: "groq",
-    modelName: "llama3-8b-8192",
+    modelName: "llama-3.1-8b-instant",
     latencyMs: 0,
     tokenUsage: null,
     status: "idle",

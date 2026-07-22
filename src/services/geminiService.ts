@@ -31,7 +31,7 @@ export async function getZoyaResponseStream(
       { role: "user", content: prompt }
     ];
 
-    if (isDev) console.log("[Groq Stream] Sending request", { model: "llama3-8b-8192" });
+    if (isDev) console.log("[Groq Stream] Sending request", { model: "llama-3.1-8b-instant" });
     const startTime = Date.now();
     diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     
@@ -39,7 +39,7 @@ export async function getZoyaResponseStream(
       const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true });
       const stream = await groq.chat.completions.create({
         messages: messages as any,
-        model: "llama3-8b-8192",
+        model: "llama-3.1-8b-instant",
         stream: true,
       });
 
@@ -200,7 +200,7 @@ export async function getZoyaResponse(
       { role: "user", content: prompt }
     ];
 
-    if (isDev) console.log("[Groq Request] Sending", { model: "llama3-8b-8192" });
+    if (isDev) console.log("[Groq Request] Sending", { model: "llama-3.1-8b-instant" });
     const startTime = Date.now();
     diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     
@@ -208,7 +208,7 @@ export async function getZoyaResponse(
       const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true });
       const response = await groq.chat.completions.create({
         messages: messages as any,
-        model: "llama3-8b-8192",
+        model: "llama-3.1-8b-instant",
       });
       
       const usage = response.usage;
