@@ -17,7 +17,7 @@ export async function getZoyaResponseStream(
   const isDev = import.meta.env.DEV;
 
   if (selectedModel === "groq") {
-    const groqKey = import.meta.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
+    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!groqKey) throw new Error("Groq API key not configured.");
     
     const groqHistory = history.map(msg => ({
@@ -60,7 +60,7 @@ export async function getZoyaResponseStream(
       throw error;
     }
   } else if (selectedModel === "huggingface") {
-    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
+    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
     if (!hfKey) throw new Error("Hugging Face API key not configured.");
 
     const hfHistory = history.map(msg => ({
@@ -186,7 +186,7 @@ export async function getZoyaResponse(
   const isDev = import.meta.env.DEV;
 
   if (selectedModel === "groq") {
-    const groqKey = import.meta.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
+    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!groqKey) throw new Error("Groq API key not configured.");
 
     const groqHistory = history.map(msg => ({
@@ -221,7 +221,7 @@ export async function getZoyaResponse(
       throw error;
     }
   } else if (selectedModel === "huggingface") {
-    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
+    const hfKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
     if (!hfKey) throw new Error("Hugging Face API key not configured.");
 
     const hfHistory = history.map(msg => ({
