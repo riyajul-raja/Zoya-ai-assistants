@@ -1,4 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
+import os
+
+content = """import { GoogleGenAI } from "@google/genai";
 import { diagnosticsStore, Provider } from "./diagnosticsStore";
 import Groq from "groq-sdk";
 import { HfInference } from "@huggingface/inference";
@@ -343,3 +345,9 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
     return null;
   }
 }
+"""
+
+with open('src/services/geminiService.ts', 'w') as f:
+    f.write(content)
+
+print("Success")
