@@ -2450,6 +2450,12 @@ In your very first response or greeting to the user, you MUST casually and natur
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showDiagnostics && (
+          <DiagnosticsPanel onClose={() => setShowDiagnostics(false)} />
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="absolute top-0 left-0 w-full flex justify-between items-center z-50 shrink-0 px-6 py-4 md:px-12 md:py-6 pointer-events-auto">
         <div className="flex items-center gap-3">
@@ -2547,6 +2553,15 @@ In your very first response or greeting to the user, you MUST casually and natur
             title="Hard Refresh"
           >
             <RefreshCw size={18} className={`transition-transform duration-300 ${isSyncing ? "animate-spin" : "hover:rotate-180"}`} />
+          </button>
+
+          {/* Diagnostics Button */}
+          <button
+            onClick={() => setShowDiagnostics(true)}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center hover:text-blue-400 hover:border-blue-500/30"
+            title="System Diagnostics"
+          >
+            <Activity size={18} className="hover:scale-110 transition-transform duration-300" />
           </button>
 
           {/* Hamburger Menu (Dropdown with Tool Labels) */}
