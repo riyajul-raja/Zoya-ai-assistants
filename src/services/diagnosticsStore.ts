@@ -16,7 +16,7 @@ export type DiagnosticsState = Record<Provider, ProviderDiagnostic>;
 let state: DiagnosticsState = {
   gemini: {
     provider: "gemini",
-    modelName: "gemini-3.5-flash",
+    modelName: "gemini-2.5-flash",
     latencyMs: 0,
     tokenUsage: null,
     status: "idle",
