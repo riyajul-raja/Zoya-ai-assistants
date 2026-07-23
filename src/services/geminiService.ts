@@ -31,12 +31,12 @@ export async function getZoyaResponseStream(
       { role: "user", content: prompt }
     ];
 
-    if (isDev) console.log("[Groq Stream] Sending request", { model: "llama-3.1-8b-instant" });
+    console.log(`[PROVIDER ROUTING] Provider: Groq, Model: llama-3.1-8b-instant, Endpoint: https://api.groq.com/openai/v1`);
     const startTime = Date.now();
     diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     
     try {
-      const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true });
+      const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true, baseURL: "https://api.groq.com/openai/v1" });
       const stream = await groq.chat.completions.create({
         messages: messages as any,
         model: "llama-3.1-8b-instant",
@@ -74,7 +74,7 @@ export async function getZoyaResponseStream(
       { role: "user", content: prompt }
     ];
 
-    if (isDev) console.log("[Hugging Face Stream] Sending request", { model: "HuggingFaceH4/zephyr-7b-beta" });
+    console.log(`[PROVIDER ROUTING] Provider: Hugging Face, Model: HuggingFaceH4/zephyr-7b-beta, Endpoint: Official HF Inference API`);
     const startTime = Date.now();
     diagnosticsStore.updateProvider("huggingface", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     
@@ -148,7 +148,7 @@ export async function getZoyaResponseStream(
         { role: "user", parts: currentMessageParts }
       ];
 
-      if (isDev) console.log("[Gemini Stream] Sending request", { model: "gemini-2.5-flash", frames: normalizedImageFrames.length });
+      console.log(`[PROVIDER ROUTING] Provider: Gemini, Model: gemini-2.5-flash, Endpoint: Official Google Gen AI API`);
       
       const responseStream = await ai.models.generateContentStream({
         model: "gemini-2.5-flash",
@@ -200,12 +200,12 @@ export async function getZoyaResponse(
       { role: "user", content: prompt }
     ];
 
-    if (isDev) console.log("[Groq Request] Sending", { model: "llama-3.1-8b-instant" });
+    console.log(`[PROVIDER ROUTING] Provider: Groq, Model: llama-3.1-8b-instant, Endpoint: https://api.groq.com/openai/v1`);
     const startTime = Date.now();
     diagnosticsStore.updateProvider("groq", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     
     try {
-      const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true });
+      const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true, baseURL: "https://api.groq.com/openai/v1" });
       const response = await groq.chat.completions.create({
         messages: messages as any,
         model: "llama-3.1-8b-instant",
@@ -235,7 +235,7 @@ export async function getZoyaResponse(
       { role: "user", content: prompt }
     ];
 
-    if (isDev) console.log("[Hugging Face Request] Sending", { model: "HuggingFaceH4/zephyr-7b-beta" });
+    console.log(`[PROVIDER ROUTING] Provider: Hugging Face, Model: HuggingFaceH4/zephyr-7b-beta, Endpoint: Official HF Inference API`);
     const startTime = Date.now();
     diagnosticsStore.updateProvider("huggingface", { status: "pending", lastRequestTime: startTime, isConfigured: true });
     
@@ -298,7 +298,7 @@ export async function getZoyaResponse(
         { role: "user", parts: currentMessageParts }
       ];
 
-      if (isDev) console.log("[Gemini Request] Sending", { model: "gemini-2.5-flash", frames: normalizedImageFrames.length });
+      console.log(`[PROVIDER ROUTING] Provider: Gemini, Model: gemini-2.5-flash, Endpoint: Official Google Gen AI API`);
       const startTime = Date.now();
       diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true });
       const response = await ai.models.generateContent({
