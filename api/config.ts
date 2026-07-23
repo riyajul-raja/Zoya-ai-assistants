@@ -1,15 +1,16 @@
+import { getGroqKey, getHfKey, getGeminiKey } from "./envHelper";
 export default function handler(req: any, res: any) {
   const envStatus = {
-    GROQ_API_KEY: process.env.GROQ_API_KEY ? "FOUND" : "MISSING",
-    HUGGINGFACE_API_KEY: process.env.HUGGINGFACE_API_KEY ? "FOUND" : "MISSING",
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "FOUND" : "MISSING",
+    GROQ_API_KEY: getGroqKey() ? "FOUND" : "MISSING",
+    HUGGINGFACE_API_KEY: getHfKey() ? "FOUND" : "MISSING",
+    GEMINI_API_KEY: getGeminiKey() ? "FOUND" : "MISSING",
   };
   console.log(`[Config Route] Env Status:`, envStatus);
 
   res.status(200).json({
-    gemini: !!process.env.GEMINI_API_KEY,
-    groq: !!process.env.GROQ_API_KEY,
-    huggingface: !!process.env.HUGGINGFACE_API_KEY,
+    gemini: !!getGeminiKey(),
+    groq: !!getGroqKey(),
+    huggingface: !!getHfKey(),
     envStatus
   });
 }

@@ -15,15 +15,25 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
       setState(newState);
     });
 
-    // Fetch initial config from backend
-    fetch("/api/config")
-      .then(res => res.json())
-      .then(config => {
-        diagnosticsStore.setConfigured("gemini", config.gemini);
-        diagnosticsStore.setConfigured("groq", config.groq);
-        diagnosticsStore.setConfigured("huggingface", config.huggingface);
-      })
-      .catch(err => console.error("Failed to fetch diagnostics config:", err));
+    import("../utils/envHelper").then(m => {
+      const clientEnv = m.getClientEnv();
+      
+      // Fetch initial config from backend
+      fetch("/api/config")
+        .then(res => res.json())
+        .then(config => {
+          diagnosticsStore.setConfigured("gemini", config.gemini || clientEnv.gemini);
+          diagnosticsStore.setConfigured("groq", config.groq || clientEnv.groq);
+          diagnosticsStore.setConfigured("huggingface", config.huggingface || clientEnv.hf);
+        })
+        .catch(err => {
+          console.error("Failed to fetch diagnostics config:", err);
+          // Fallback to client check
+          diagnosticsStore.setConfigured("gemini", clientEnv.gemini);
+          diagnosticsStore.setConfigured("groq", clientEnv.groq);
+          diagnosticsStore.setConfigured("huggingface", clientEnv.hf);
+        });
+    }).catch(e => console.error(e));
 
     return () => unsubscribe();
   }, []);

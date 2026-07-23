@@ -1,3 +1,4 @@
+import { getGroqKey, getHfKey, getGeminiKey } from "../envHelper";
 import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 import { HfInference } from "@huggingface/inference";
@@ -12,15 +13,15 @@ export default async function handler(req: any, res: any) {
   const { prompt, history, imageFrames, selectedModel } = req.body;
 
   const envStatus = {
-    GROQ_API_KEY: process.env.GROQ_API_KEY ? "FOUND" : "MISSING",
-    HUGGINGFACE_API_KEY: process.env.HUGGINGFACE_API_KEY ? "FOUND" : "MISSING",
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "FOUND" : "MISSING",
+    GROQ_API_KEY: getGroqKey() ? "FOUND" : "MISSING",
+    HUGGINGFACE_API_KEY: getHfKey() ? "FOUND" : "MISSING",
+    GEMINI_API_KEY: getGeminiKey() ? "FOUND" : "MISSING",
   };
   console.log(`Environment variables status:`, envStatus);
 
   try {
     if (selectedModel === "groq") {
-      const groqKey = process.env.GROQ_API_KEY;
+      const groqKey = getGroqKey();
       if (!groqKey) {
           return res.status(500).json({ error: `Groq API key not configured. Status: ${JSON.stringify(envStatus)}` });
       }
@@ -60,7 +61,7 @@ export default async function handler(req: any, res: any) {
       res.end();
 
     } else if (selectedModel === "huggingface") {
-      const hfKey = process.env.HUGGINGFACE_API_KEY;
+      const hfKey = getHfKey();
       if (!hfKey) {
           return res.status(500).json({ error: `Hugging Face API key not configured. Status: ${JSON.stringify(envStatus)}` });
       }
@@ -100,7 +101,7 @@ export default async function handler(req: any, res: any) {
       res.end();
 
     } else {
-      const geminiKey = process.env.GEMINI_API_KEY;
+      const geminiKey = getGeminiKey();
       if (!geminiKey) {
           return res.status(500).json({ error: `Gemini API key not configured. Status: ${JSON.stringify(envStatus)}` });
       }
