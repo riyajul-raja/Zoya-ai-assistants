@@ -11,11 +11,18 @@ export default async function handler(req: any, res: any) {
 
   const { prompt, history, imageFrames, selectedModel } = req.body;
 
+  const envStatus = {
+    GROQ_API_KEY: process.env.GROQ_API_KEY ? "FOUND" : "MISSING",
+    HUGGINGFACE_API_KEY: process.env.HUGGINGFACE_API_KEY ? "FOUND" : "MISSING",
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "FOUND" : "MISSING",
+  };
+  console.log(`Environment variables status:`, envStatus);
+
   try {
     if (selectedModel === "groq") {
       const groqKey = process.env.GROQ_API_KEY;
       if (!groqKey) {
-          return res.status(500).json({ error: "Groq API key not configured." });
+          return res.status(500).json({ error: `Groq API key not configured. Status: ${JSON.stringify(envStatus)}` });
       }
       
       const groqHistory = (history || []).map((msg: any) => ({
@@ -29,18 +36,20 @@ export default async function handler(req: any, res: any) {
         { role: "user", content: prompt }
       ];
 
-      console.log(`[PROVIDER ROUTING] Provider: Groq, Model: llama-3.1-8b-instant, Endpoint: https://api.groq.com/openai/v1`);
+      console.log(`[PROVIDER ROUTING] Provider: Groq`);
       
-      const groq = new Groq({ apiKey: groqKey, baseURL: "https://api.groq.com/openai/v1" });
+      const groq = new Groq({ apiKey: groqKey });
+      
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
       const stream = await groq.chat.completions.create({
         messages: messages as any,
         model: "llama-3.1-8b-instant",
         stream: true,
       });
-
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
 
       for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
@@ -53,7 +62,7 @@ export default async function handler(req: any, res: any) {
     } else if (selectedModel === "huggingface") {
       const hfKey = process.env.HUGGINGFACE_API_KEY;
       if (!hfKey) {
-          return res.status(500).json({ error: "Hugging Face API key not configured." });
+          return res.status(500).json({ error: `Hugging Face API key not configured. Status: ${JSON.stringify(envStatus)}` });
       }
       
       const hfHistory = (history || []).map((msg: any) => ({
@@ -67,19 +76,21 @@ export default async function handler(req: any, res: any) {
         { role: "user", content: prompt }
       ];
 
-      console.log(`[PROVIDER ROUTING] Provider: Hugging Face, Model: HuggingFaceH4/zephyr-7b-beta, Endpoint: Official HF Inference API`);
+      console.log(`[PROVIDER ROUTING] Provider: Hugging Face`);
       
       const hf = new HfInference(hfKey);
-      const stream = hf.chatCompletionStream({
-        model: "HuggingFaceH4/zephyr-7b-beta",
-        messages: messages as any,
-        max_tokens: 500
-      });
       
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
+      const stream = hf.chatCompletionStream({
+        model: "microsoft/Phi-3.5-mini-instruct",
+        messages: messages as any,
+        max_tokens: 500
+      });
+      
       for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
           if (content) {
@@ -91,7 +102,7 @@ export default async function handler(req: any, res: any) {
     } else {
       const geminiKey = process.env.GEMINI_API_KEY;
       if (!geminiKey) {
-          return res.status(500).json({ error: "Gemini API key not configured." });
+          return res.status(500).json({ error: `Gemini API key not configured. Status: ${JSON.stringify(envStatus)}` });
       }
 
       const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -132,17 +143,18 @@ export default async function handler(req: any, res: any) {
         { role: "user", parts: currentMessageParts }
       ];
 
-      console.log(`[PROVIDER ROUTING] Provider: Gemini, Model: gemini-2.5-flash, Endpoint: Official Google Gen AI API`);
+      console.log(`[PROVIDER ROUTING] Provider: Gemini`);
       
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
       const responseStream = await ai.models.generateContentStream({
         model: "gemini-2.5-flash",
         config: { systemInstruction },
         contents: finalContents as any,
       });
-
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
 
       for await (const chunk of responseStream) {
           const content = chunk.text || "";
@@ -154,10 +166,14 @@ export default async function handler(req: any, res: any) {
     }
   } catch (error: any) {
     console.error("Chat Stream Error:", error);
-    if (!res.headersSent) {
-      return res.status(500).json({ error: error.message || "Internal server error" });
+    const errorMessage = error?.message || String(error);
+    try {
+        res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+        res.end();
+    } catch(e) {
+        if (!res.headersSent) {
+            res.status(500).json({ error: errorMessage });
+        }
     }
-    res.write(`data: ${JSON.stringify({ error: error.message || "Internal server error" })}\n\n`);
-    res.end();
   }
 }
