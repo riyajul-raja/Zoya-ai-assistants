@@ -1,4 +1,6 @@
+const fs = require('fs');
 
+const envHelperContent = `
 export const getGeminiKey = () => {
     let key = "";
     if (typeof process !== 'undefined' && process.env) {
@@ -24,3 +26,7 @@ export const getGeminiKeys = () => {
     }
     return keys;
 };
+`;
+
+fs.writeFileSync('api/envHelper.ts', envHelperContent);
+console.log("Updated api/envHelper.ts");

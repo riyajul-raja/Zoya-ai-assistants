@@ -2457,8 +2457,8 @@ In your very first response or greeting to the user, you MUST casually and natur
       </AnimatePresence>
 
       {/* Header */}
-      <header className="absolute top-0 left-0 w-full flex justify-between items-center z-50 shrink-0 px-6 py-4 md:px-12 md:py-6 pointer-events-auto">
-        <div className="flex items-center gap-3">
+      <header className="absolute top-0 left-0 w-full flex items-center justify-between gap-2 z-50 shrink-0 px-4 py-4 md:px-12 md:py-6 pointer-events-auto">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-sm">
             Z
           </div>
@@ -2466,19 +2466,19 @@ In your very first response or greeting to the user, you MUST casually and natur
         </div>
 
         {/* Center AI Model Selector */}
-        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-50">
-          <div className="relative">
+        <div className="flex-1 flex justify-center items-center z-50 min-w-0">
+          <div className="relative flex justify-center w-full">
             <button
               onClick={() => setIsModelSelectorExpanded(!isModelSelectorExpanded)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 transition-all cursor-pointer shadow-lg backdrop-blur-md"
+              className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 transition-all cursor-pointer shadow-lg backdrop-blur-md w-full max-w-[160px] sm:max-w-[200px]"
             >
-              <GeminiIcon size={14} />
-              <span className="text-xs font-medium tracking-wide">
+              <div className="shrink-0"><GeminiIcon size={14} /></div>
+              <span className="text-xs font-medium tracking-wide truncate">
                 {selectedModel === "gemini-3.6-flash" ? "Gemini 3.6 Flash" : selectedModel === "gemini-3.5-flash-lite" ? "Gemini 3.5 Flash Lite" : selectedModel === "gemini-3.5-flash" ? "Gemini 3.5 Flash" : selectedModel === "gemini-3.1-pro-preview" ? "Gemini 3.1 Pro Preview" : selectedModel === "gemini-3.1-flash-lite" ? "Gemini 3.1 Flash Lite" : selectedModel === "gemini-3.0-flash-preview" ? "Gemini 3 Flash Preview" : selectedModel === "gemini-pro-latest" ? "Gemini Pro Latest" : "Gemini 2.5 Flash"}
               </span>
               <ChevronDown
                 size={14}
-                className={`text-white/50 transition-transform duration-300 ${isModelSelectorExpanded ? 'rotate-180' : ''}`}
+                className={`shrink-0 text-white/50 transition-transform duration-300 ${isModelSelectorExpanded ? 'rotate-180' : ''}`}
               />
             </button>
 
@@ -2533,7 +2533,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {showInstallBtn && (
             <button
               onClick={handleInstallClick}

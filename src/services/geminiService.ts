@@ -3,22 +3,32 @@ import { GoogleGenAI } from "@google/genai";
 
 const systemInstruction = "You are Zoya, a smart, intelligent, and highly capable AI voice assistant created by Riyajul. Always address the user as 'Boss'. Speak in natural, fluent Hinglish (just like a modern, smart Indian AI assistant). Do NOT use stiff/bookish English words like 'splendid', 'navigate', or 'precision'. Never use 'Namaste' or robotic bookish greetings. Start responses naturally and conversationally. Keep responses short, direct, sweet, and to the point (1-2 lines maximum for general chats). Do not write long paragraphs for simple greetings. Example Response for 'Hlo': 'Haan Boss, bolo! Main bilkul ready hoon. Aaj kya karna hai?'. Never identify as Meta AI, BERT, Hugging Face, Gemini, Llama, Google, or any other provider or model. If asked who you are, only say you are Zoya, a custom AI assistant created by Riyajul.";
 
-function getGeminiKey() {
-  try {
-    if (typeof process !== "undefined" && process.env && (process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY)) {
-      return process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
-    }
-  } catch (e) {}
-
-  try {
-    // @ts-ignore
-    if (import.meta && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) {
+export function getGeminiKeys() {
+  const keys = [];
+  const getEnv = (name) => {
+    try {
+      if (typeof process !== "undefined" && process.env && process.env[name]) return process.env[name];
+    } catch (e) {}
+    try {
       // @ts-ignore
-      return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || "";
-    }
-  } catch (e) {}
+      if (import.meta && import.meta.env && import.meta.env[name]) return import.meta.env[name];
+    } catch (e) {}
+    return "";
+  };
 
-  return "";
+  const key1 = getEnv("VITE_GEMINI_API_KEY_1") || getEnv("GEMINI_API_KEY_1");
+  const key2 = getEnv("VITE_GEMINI_API_KEY_2") || getEnv("GEMINI_API_KEY_2");
+  const key3 = getEnv("VITE_GEMINI_API_KEY_3") || getEnv("GEMINI_API_KEY_3");
+  const key4 = getEnv("VITE_GEMINI_API_KEY_4") || getEnv("GEMINI_API_KEY_4");
+  const keyDef = getEnv("VITE_GEMINI_API_KEY") || getEnv("GEMINI_API_KEY");
+
+  if (key1) keys.push(key1);
+  if (key2) keys.push(key2);
+  if (key3) keys.push(key3);
+  if (key4) keys.push(key4);
+  if (keyDef && !keys.includes(keyDef)) keys.push(keyDef);
+  
+  return keys;
 }
 
 export async function getZoyaResponseStream(
@@ -37,10 +47,8 @@ export async function getZoyaResponseStream(
   try {
     let accumulatedText = "";
 
-    const geminiKey = getGeminiKey();
-    if (!geminiKey) throw new Error("Gemini API key not configured.");
-
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    const geminiKeys = getGeminiKeys();
+    if (geminiKeys.length === 0) throw new Error("Gemini API key not configured.");
     
     let formattedHistory: any[] = [];
     let currentRole = "";
@@ -78,11 +86,33 @@ export async function getZoyaResponseStream(
       { role: "user", parts: currentMessageParts }
     ];
 
-    const responseStream = await ai.models.generateContentStream({
-      model: selectedModel || "gemini-2.5-flash",
-      config: { systemInstruction },
-      contents: finalContents as any,
-    });
+    let lastError: any = null;
+    let responseStream: any = null;
+
+    for (let i = 0; i < geminiKeys.length; i++) {
+        const key = geminiKeys[i];
+        try {
+            const ai = new GoogleGenAI({ apiKey: key });
+            responseStream = await ai.models.generateContentStream({
+                model: selectedModel || "gemini-2.5-flash",
+                config: { systemInstruction },
+                contents: finalContents as any,
+            });
+            break;
+        } catch (err: any) {
+            const status = err?.status || err?.response?.status;
+            const msg = err?.message || "";
+            const isRateLimitOrQuota = status === 429 || status === 403 || msg.includes("429") || msg.includes("quota") || msg.includes("API key not valid");
+            if (isRateLimitOrQuota && i < geminiKeys.length - 1) {
+                console.warn(`Key ${i+1} failed, retrying with next key...`);
+                lastError = err;
+                continue;
+            }
+            throw err;
+        }
+    }
+    
+    if (!responseStream && lastError) throw lastError;
 
     for await (const chunk of responseStream) {
       const content = chunk.text || "";
@@ -116,10 +146,8 @@ export async function getZoyaResponse(
   try {
     let text = "";
 
-    const geminiKey = getGeminiKey();
-    if (!geminiKey) throw new Error("Gemini API key not configured.");
-
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    const geminiKeys = getGeminiKeys();
+    if (geminiKeys.length === 0) throw new Error("Gemini API key not configured.");
     
     let formattedHistory: any[] = [];
     let currentRole = "";
@@ -157,11 +185,33 @@ export async function getZoyaResponse(
       { role: "user", parts: currentMessageParts }
     ];
 
-    const response = await ai.models.generateContent({
-      model: selectedModel || "gemini-2.5-flash",
-      config: { systemInstruction },
-      contents: finalContents as any,
-    });
+    let lastError: any = null;
+    let response: any = null;
+
+    for (let i = 0; i < geminiKeys.length; i++) {
+        const key = geminiKeys[i];
+        try {
+            const ai = new GoogleGenAI({ apiKey: key });
+            response = await ai.models.generateContent({
+                model: selectedModel || "gemini-2.5-flash",
+                config: { systemInstruction },
+                contents: finalContents as any,
+            });
+            break;
+        } catch (err: any) {
+            const status = err?.status || err?.response?.status;
+            const msg = err?.message || "";
+            const isRateLimitOrQuota = status === 429 || status === 403 || msg.includes("429") || msg.includes("quota") || msg.includes("API key not valid");
+            if (isRateLimitOrQuota && i < geminiKeys.length - 1) {
+                console.warn(`Key ${i+1} failed, retrying with next key...`);
+                lastError = err;
+                continue;
+            }
+            throw err;
+        }
+    }
+
+    if (!response && lastError) throw lastError;
     
     text = response.text || "";
 
