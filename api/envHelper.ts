@@ -16,11 +16,11 @@ export const getGeminiKeys = () => {
         const key4 = process.env.GEMINI_API_KEY_4 || process.env.VITE_GEMINI_API_KEY_4;
         const keyDef = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
-        if (key1) keys.push(key1);
-        if (key2) keys.push(key2);
-        if (key3) keys.push(key3);
-        if (key4) keys.push(key4);
-        if (keyDef && !keys.includes(keyDef)) keys.push(keyDef);
+        if (key1) keys.push(key1.trim());
+        if (key2) keys.push(key2.trim());
+        if (key3) keys.push(key3.trim());
+        if (key4) keys.push(key4.trim());
+        if (keyDef && !keys.includes(keyDef)) keys.push(keyDef.trim());
     }
     return keys;
 };

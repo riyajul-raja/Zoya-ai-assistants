@@ -22,11 +22,11 @@ export function getGeminiKeys() {
   const key4 = getEnv("VITE_GEMINI_API_KEY_4") || getEnv("GEMINI_API_KEY_4");
   const keyDef = getEnv("VITE_GEMINI_API_KEY") || getEnv("GEMINI_API_KEY");
 
-  if (key1) keys.push(key1);
-  if (key2) keys.push(key2);
-  if (key3) keys.push(key3);
-  if (key4) keys.push(key4);
-  if (keyDef && !keys.includes(keyDef)) keys.push(keyDef);
+  if (key1) keys.push(key1.trim());
+  if (key2) keys.push(key2.trim());
+  if (key3) keys.push(key3.trim());
+  if (key4) keys.push(key4.trim());
+  if (keyDef && !keys.includes(keyDef.trim())) keys.push(keyDef.trim());
   
   return keys;
 }
@@ -92,7 +92,7 @@ export async function getZoyaResponseStream(
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
         try {
-            const ai = new GoogleGenAI({ apiKey: key });
+            const ai = new GoogleGenAI({ apiKey: key.trim(), httpOptions: { headers: { "x-goog-api-key": key.trim() } } });
             responseStream = await ai.models.generateContentStream({
                 model: selectedModel || "gemini-2.5-flash",
                 config: { systemInstruction },
@@ -191,7 +191,7 @@ export async function getZoyaResponse(
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
         try {
-            const ai = new GoogleGenAI({ apiKey: key });
+            const ai = new GoogleGenAI({ apiKey: key.trim(), httpOptions: { headers: { "x-goog-api-key": key.trim() } } });
             response = await ai.models.generateContent({
                 model: selectedModel || "gemini-2.5-flash",
                 config: { systemInstruction },

@@ -26,10 +26,8 @@ export default async function handler(req: any, res: any) {
             res.write(`data: ${JSON.stringify(data)}\n\n`);
         };
 
-        const geminiKey = getGeminiKey();
-        if (!geminiKey) throw new Error("Gemini API key not configured");
-
-        const ai = new GoogleGenAI({ apiKey: geminiKey });
+        const geminiKeys = getGeminiKeys();
+        if (geminiKeys.length === 0) throw new Error("Gemini API key not configured");
         
         let formattedHistory: any[] = [];
         let currentRole = "";
@@ -73,7 +71,7 @@ export default async function handler(req: any, res: any) {
         for (let i = 0; i < geminiKeys.length; i++) {
             const key = geminiKeys[i];
             try {
-                const ai = new GoogleGenAI({ apiKey: key });
+                const ai = new GoogleGenAI({ apiKey: key.trim(), httpOptions: { headers: { "x-goog-api-key": key.trim() } } });
                 responseStream = await ai.models.generateContentStream({
                     model: targetModel || "gemini-2.5-flash",
                     config: { systemInstruction },
