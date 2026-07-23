@@ -15,13 +15,15 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
       setState(newState);
     });
 
-    // Check initial config
-    console.log("import.meta.env.VITE_GROQ_API_KEY exists =", !!import.meta.env.VITE_GROQ_API_KEY);
-    console.log("import.meta.env.VITE_HUGGINGFACE_API_KEY exists =", !!import.meta.env.VITE_HUGGINGFACE_API_KEY);
-    
-    diagnosticsStore.setConfigured("gemini", !!(import.meta.env.VITE_GEMINI_API_KEY || (window as any).process?.env?.GEMINI_API_KEY));
-    diagnosticsStore.setConfigured("groq", !!import.meta.env.VITE_GROQ_API_KEY);
-    diagnosticsStore.setConfigured("huggingface", !!import.meta.env.VITE_HUGGINGFACE_API_KEY);
+    // Fetch initial config from backend
+    fetch("/api/config")
+      .then(res => res.json())
+      .then(config => {
+        diagnosticsStore.setConfigured("gemini", config.gemini);
+        diagnosticsStore.setConfigured("groq", config.groq);
+        diagnosticsStore.setConfigured("huggingface", config.huggingface);
+      })
+      .catch(err => console.error("Failed to fetch diagnostics config:", err));
 
     return () => unsubscribe();
   }, []);
