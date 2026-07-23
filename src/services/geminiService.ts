@@ -41,17 +41,19 @@ export async function getZoyaResponseStream(
           if (line.startsWith('data: ')) {
             const dataStr = line.slice(6);
             if (dataStr === '[DONE]') continue;
+            let data: any;
             try {
-              const data = JSON.parse(dataStr);
-              if (data.error) {
-                throw new Error(data.error);
-              }
-              if (data.text) {
-                accumulatedText += data.text;
-                if (onChunk) onChunk(accumulatedText);
-              }
+              data = JSON.parse(dataStr);
             } catch (e) {
               // ignore parse errors for partial chunks
+              continue;
+            }
+            if (data.error) {
+              throw new Error(data.error);
+            }
+            if (data.text) {
+              accumulatedText += data.text;
+              if (onChunk) onChunk(accumulatedText);
             }
           }
         }
