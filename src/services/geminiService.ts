@@ -32,7 +32,7 @@ export async function getZoyaResponseStream(
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider(selectedModel as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true });
+  diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
 
   try {
     let accumulatedText = "";
@@ -79,7 +79,7 @@ export async function getZoyaResponseStream(
     ];
 
     const responseStream = await ai.models.generateContentStream({
-      model: "gemini-2.5-flash",
+      model: selectedModel || "gemini-2.5-flash",
       config: { systemInstruction },
       contents: finalContents as any,
     });
@@ -92,10 +92,10 @@ export async function getZoyaResponseStream(
       }
     }
 
-    diagnosticsStore.updateProvider(selectedModel as Provider, { status: "success", latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider("gemini", { status: "success", latencyMs: Date.now() - startTime });
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider(selectedModel as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider("gemini", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error(`${selectedModel} Stream Error:`, error);
     throw error;
   }
@@ -111,7 +111,7 @@ export async function getZoyaResponse(
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider(selectedModel as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true });
+  diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
   
   try {
     let text = "";
@@ -158,21 +158,21 @@ export async function getZoyaResponse(
     ];
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: selectedModel || "gemini-2.5-flash",
       config: { systemInstruction },
       contents: finalContents as any,
     });
     
     text = response.text || "";
 
-    diagnosticsStore.updateProvider(selectedModel as Provider, { 
+    diagnosticsStore.updateProvider("gemini", { 
       status: "success", 
       latencyMs: Date.now() - startTime
     });
     
     return text || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider(selectedModel as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider("gemini", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error(`${selectedModel} Request Error:`, error);
     throw error;
   }

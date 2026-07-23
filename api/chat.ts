@@ -11,6 +11,8 @@ export default async function handler(req: any, res: any) {
     try {
         const { prompt, history, selectedModel, isProfessionalMode, environmentContext, imageFrames } = req.body;
 
+        let targetModel = selectedModel || "gemini-2.5-flash";
+
         const geminiKey = getGeminiKey();
         if (!geminiKey) throw new Error("Gemini API key not configured");
 
@@ -53,7 +55,7 @@ export default async function handler(req: any, res: any) {
         ];
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: targetModel || "gemini-2.5-flash",
             config: { systemInstruction },
             contents: finalContents as any,
         });

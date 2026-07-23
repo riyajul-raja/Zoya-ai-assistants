@@ -11,7 +11,7 @@ export default async function handler(req: any, res: any) {
     try {
         const { prompt, history, selectedModel, isProfessionalMode, environmentContext, imageFrames } = req.body;
         
-        let targetModel = "gemini";
+        let targetModel = "gemini-2.5-flash";
         if (selectedModel) {
             targetModel = selectedModel;
         }
@@ -68,7 +68,7 @@ export default async function handler(req: any, res: any) {
         ];
 
         const responseStream = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash",
+            model: targetModel || "gemini-2.5-flash",
             config: { systemInstruction },
             contents: finalContents as any,
         });

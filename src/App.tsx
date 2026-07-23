@@ -190,7 +190,7 @@ export default function App() {
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
   const [isDeepThinking, setIsDeepThinking] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("gemini");
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
   const [isModelSelectorExpanded, setIsModelSelectorExpanded] = useState(false);
   const [isInputReadOnly, setIsInputReadOnly] = useState(true);
   const [textInput, setTextInput] = useState("");
@@ -1372,7 +1372,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     
     // If live session is active (either because voice is active or camera is ON), send text through it
     // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
-    if (liveSessionRef.current && attachedImageBase64s.length === 0 && selectedModel === "gemini") {
+    if (liveSessionRef.current && attachedImageBase64s.length === 0 && selectedModel.includes("gemini")) {
       liveSessionRef.current.sendText(finalTranscript);
       return;
     }
@@ -2474,7 +2474,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             >
               <GeminiIcon size={14} />
               <span className="text-xs font-medium tracking-wide">
-                Gemini
+                {selectedModel === "gemini-2.5-flash" ? "Gemini 2.5 Flash" : selectedModel === "gemini-2.5-flash-lite" ? "Gemini 2.5 Flash-Lite" : selectedModel === "gemini-3.0-flash" ? "Gemini 3 Flash" : "Gemini Pro"}
               </span>
               <ChevronDown
                 size={14}
@@ -2493,7 +2493,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                 >
                   <div className="flex flex-col gap-1">
                     {[
-                      { id: "gemini", name: "Gemini", desc: "(Default)", icon: <GeminiIcon /> }
+                      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", desc: "(Default)", icon: <GeminiIcon /> },
+                      { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", desc: "(Fast)", icon: <GeminiIcon /> },
+                      { id: "gemini-3.0-flash", name: "Gemini 3 Flash", desc: "(Preview)", icon: <GeminiIcon /> },
+                      { id: "gemini-1.5-pro", name: "Gemini Pro", desc: "(Advanced)", icon: <GeminiIcon /> }
                     ].map((model) => (
                       <button
                         key={model.id}
