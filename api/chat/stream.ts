@@ -11,16 +11,11 @@ export default async function handler(req: any, res: any) {
 
   const { prompt, history, imageFrames, selectedModel } = req.body;
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
   try {
     if (selectedModel === "groq") {
       const groqKey = process.env.GROQ_API_KEY;
       if (!groqKey) {
-          res.write(`data: ${JSON.stringify({ error: "Groq API key not configured." })}\n\n`);
-          return res.end();
+          return res.status(500).json({ error: "Groq API key not configured." });
       }
       
       const groqHistory = (history || []).map((msg: any) => ({
@@ -43,6 +38,10 @@ export default async function handler(req: any, res: any) {
         stream: true,
       });
 
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
       for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
           if (content) {
@@ -54,8 +53,7 @@ export default async function handler(req: any, res: any) {
     } else if (selectedModel === "huggingface") {
       const hfKey = process.env.HUGGINGFACE_API_KEY;
       if (!hfKey) {
-          res.write(`data: ${JSON.stringify({ error: "Hugging Face API key not configured." })}\n\n`);
-          return res.end();
+          return res.status(500).json({ error: "Hugging Face API key not configured." });
       }
       
       const hfHistory = (history || []).map((msg: any) => ({
@@ -78,6 +76,10 @@ export default async function handler(req: any, res: any) {
         max_tokens: 500
       });
       
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
       for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || "";
           if (content) {
@@ -89,8 +91,7 @@ export default async function handler(req: any, res: any) {
     } else {
       const geminiKey = process.env.GEMINI_API_KEY;
       if (!geminiKey) {
-          res.write(`data: ${JSON.stringify({ error: "Gemini API key not configured." })}\n\n`);
-          return res.end();
+          return res.status(500).json({ error: "Gemini API key not configured." });
       }
 
       const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -139,6 +140,10 @@ export default async function handler(req: any, res: any) {
         contents: finalContents as any,
       });
 
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
       for await (const chunk of responseStream) {
           const content = chunk.text || "";
           if (content) {
@@ -149,6 +154,9 @@ export default async function handler(req: any, res: any) {
     }
   } catch (error: any) {
     console.error("Chat Stream Error:", error);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: error.message || "Internal server error" });
+    }
     res.write(`data: ${JSON.stringify({ error: error.message || "Internal server error" })}\n\n`);
     res.end();
   }

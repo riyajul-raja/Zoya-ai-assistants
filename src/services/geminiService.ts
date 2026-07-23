@@ -22,7 +22,12 @@ export async function getZoyaResponseStream(
     });
 
     if (!response.ok) {
-      throw new Error(`API returned error: ${response.statusText}`);
+      let errorText = `API returned error: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) errorText = errorData.error;
+      } catch (e) {}
+      throw new Error(errorText);
     }
 
     const reader = response.body?.getReader();
