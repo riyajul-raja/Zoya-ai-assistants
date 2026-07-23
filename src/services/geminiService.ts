@@ -32,7 +32,7 @@ export async function getZoyaResponseStream(
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
+  diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
 
   try {
     let accumulatedText = "";
@@ -92,10 +92,10 @@ export async function getZoyaResponseStream(
       }
     }
 
-    diagnosticsStore.updateProvider("gemini", { status: "success", latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "success", latencyMs: Date.now() - startTime });
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider("gemini", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error(`${selectedModel} Stream Error:`, error);
     throw error;
   }
@@ -111,7 +111,7 @@ export async function getZoyaResponse(
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider("gemini", { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
+  diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
   
   try {
     let text = "";
@@ -165,14 +165,14 @@ export async function getZoyaResponse(
     
     text = response.text || "";
 
-    diagnosticsStore.updateProvider("gemini", { 
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { 
       status: "success", 
       latencyMs: Date.now() - startTime
     });
     
     return text || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider("gemini", { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error(`${selectedModel} Request Error:`, error);
     throw error;
   }

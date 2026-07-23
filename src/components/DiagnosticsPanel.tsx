@@ -22,12 +22,12 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
       fetch("/api/config")
         .then(res => res.json())
         .then(config => {
-          diagnosticsStore.setConfigured("gemini", config.gemini || clientEnv.gemini);
+          diagnosticsStore.setAllConfigured(!!(config.gemini || clientEnv.gemini));
                             })
         .catch(err => {
           console.error("Failed to fetch diagnostics config:", err);
           // Fallback to client check
-          diagnosticsStore.setConfigured("gemini", clientEnv.gemini);
+          diagnosticsStore.setAllConfigured(!!clientEnv.gemini);
                             });
     }).catch(e => console.error(e));
 
@@ -100,7 +100,7 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-semibold text-white capitalize">{p.provider.replace('huggingface', 'Hugging Face')}</h3>
+                      <h3 className="text-base font-semibold text-white capitalize">{p.modelName}</h3>
                       <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${
                         p.isConfigured 
                           ? isOnline ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-red-500/20 text-red-300 border-red-500/30"
@@ -109,7 +109,7 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
                         {p.isConfigured ? (isOnline ? "Online" : "Offline") : "Unconfigured"}
                       </div>
                     </div>
-                    <p className="text-xs text-white/50 font-mono mt-1">{p.modelName}</p>
+                    <p className="text-xs text-white/50 font-mono mt-1">{p.subtitle}</p>
                   </div>
                 </div>
                 

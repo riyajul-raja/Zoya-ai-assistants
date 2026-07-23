@@ -2493,14 +2493,14 @@ In your very first response or greeting to the user, you MUST casually and natur
                 >
                   <div className="flex flex-col gap-1">
                     {[
-                      { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", desc: "", icon: <GeminiIcon /> },
-                      { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", desc: "", icon: <GeminiIcon /> },
-                      { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", desc: "", icon: <GeminiIcon /> },
-                      { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", desc: "", icon: <GeminiIcon /> },
-                      { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", desc: "", icon: <GeminiIcon /> },
-                      { id: "gemini-3.0-flash-preview", name: "Gemini 3 Flash Preview", desc: "", icon: <GeminiIcon /> },
-                      { id: "gemini-pro-latest", name: "Gemini Pro Latest", desc: "", icon: <GeminiIcon /> },
-                      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", desc: "(Default)", icon: <GeminiIcon /> }
+                      { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", desc: "All-around help", icon: <GeminiIcon /> },
+                      { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", desc: "Fastest answers", icon: <GeminiIcon /> },
+                      { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", desc: "Balanced speed & intelligence", icon: <GeminiIcon /> },
+                      { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", desc: "Advanced maths and code", icon: <GeminiIcon /> },
+                      { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", desc: "Ultra-fast response engine", icon: <GeminiIcon /> },
+                      { id: "gemini-3.0-flash-preview", name: "Gemini 3 Flash Preview", desc: "Next-gen experimental model", icon: <GeminiIcon /> },
+                      { id: "gemini-pro-latest", name: "Gemini Pro Latest", desc: "Complex reasoning & deep analysis", icon: <GeminiIcon /> },
+                      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", desc: "Stable default engine", icon: <GeminiIcon /> }
                     ].map((model) => (
                       <button
                         key={model.id}
@@ -2516,9 +2516,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                       >
                         <div className="flex items-center gap-2.5">
                           {model.icon}
-                          <span className="font-medium tracking-wide">
-                            {model.name} <span className="text-white/40 font-normal text-xs">{model.desc}</span>
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold tracking-wide text-white leading-tight">{model.name}</span>
+                            <span className="text-white/40 font-normal text-[10px] leading-tight">{model.desc}</span>
+                          </div>
                         </div>
                         {selectedModel === model.id && <Check size={14} className="text-blue-400" />}
                       </button>
