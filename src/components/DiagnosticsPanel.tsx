@@ -16,10 +16,12 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
     });
 
     // Check initial config
-    const env = import.meta.env;
-    diagnosticsStore.setConfigured("gemini", !!(env.VITE_GEMINI_API_KEY || (window as any).process?.env?.GEMINI_API_KEY));
-    diagnosticsStore.setConfigured("groq", !!env.VITE_GROQ_API_KEY);
-    diagnosticsStore.setConfigured("huggingface", !!env.VITE_HUGGINGFACE_API_KEY);
+    console.log("import.meta.env.VITE_GROQ_API_KEY exists =", !!import.meta.env.VITE_GROQ_API_KEY);
+    console.log("import.meta.env.VITE_HUGGINGFACE_API_KEY exists =", !!import.meta.env.VITE_HUGGINGFACE_API_KEY);
+    
+    diagnosticsStore.setConfigured("gemini", !!(import.meta.env.VITE_GEMINI_API_KEY || (window as any).process?.env?.GEMINI_API_KEY));
+    diagnosticsStore.setConfigured("groq", !!import.meta.env.VITE_GROQ_API_KEY);
+    diagnosticsStore.setConfigured("huggingface", !!import.meta.env.VITE_HUGGINGFACE_API_KEY);
 
     return () => unsubscribe();
   }, []);
