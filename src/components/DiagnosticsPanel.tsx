@@ -23,16 +23,12 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
         .then(res => res.json())
         .then(config => {
           diagnosticsStore.setConfigured("gemini", config.gemini || clientEnv.gemini);
-          diagnosticsStore.setConfigured("groq", config.groq || clientEnv.groq);
-          diagnosticsStore.setConfigured("huggingface", config.huggingface || clientEnv.hf);
-        })
+                            })
         .catch(err => {
           console.error("Failed to fetch diagnostics config:", err);
           // Fallback to client check
           diagnosticsStore.setConfigured("gemini", clientEnv.gemini);
-          diagnosticsStore.setConfigured("groq", clientEnv.groq);
-          diagnosticsStore.setConfigured("huggingface", clientEnv.hf);
-        });
+                            });
     }).catch(e => console.error(e));
 
     return () => unsubscribe();

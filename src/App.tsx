@@ -4,7 +4,7 @@ import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Came
 import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
-import { GeminiIcon, GroqIcon } from "./components/BrandIcons";
+import { GeminiIcon } from "./components/BrandIcons";
 import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
 import TypingIndicator from "./components/TypingIndicator";
@@ -2472,17 +2472,16 @@ In your very first response or greeting to the user, you MUST casually and natur
               onClick={() => setIsModelSelectorExpanded(!isModelSelectorExpanded)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 transition-all cursor-pointer shadow-lg backdrop-blur-md"
             >
-              {selectedModel === "gemini" && <GeminiIcon size={14} />}
-              {selectedModel === "groq" && <GroqIcon size={14} />}
-              {selectedModel === "huggingface" && <span className="text-sm leading-none">🤗</span>}
+              <GeminiIcon size={14} />
               <span className="text-xs font-medium tracking-wide">
-                {selectedModel === "gemini" ? "Gemini" : selectedModel === "groq" ? "Groq" : "Hugging Face"}
+                Gemini
               </span>
               <ChevronDown
                 size={14}
                 className={`text-white/50 transition-transform duration-300 ${isModelSelectorExpanded ? 'rotate-180' : ''}`}
               />
             </button>
+
             <AnimatePresence>
               {isModelSelectorExpanded && (
                 <motion.div
@@ -2494,9 +2493,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                 >
                   <div className="flex flex-col gap-1">
                     {[
-                      { id: "gemini", name: "Gemini", desc: "(Default)", icon: <GeminiIcon /> },
-                      { id: "groq", name: "Groq", desc: "(Fast)", icon: <GroqIcon /> },
-                      { id: "huggingface", name: "Hugging Face", desc: "(Open Models)", icon: <span className="text-base leading-none">🤗</span> }
+                      { id: "gemini", name: "Gemini", desc: "(Default)", icon: <GeminiIcon /> }
                     ].map((model) => (
                       <button
                         key={model.id}

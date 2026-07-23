@@ -1,13 +1,25 @@
 import { diagnosticsStore, Provider } from "./diagnosticsStore";
 import { GoogleGenAI } from "@google/genai";
-import Groq from "groq-sdk";
-import { HfInference } from "@huggingface/inference";
 
 const systemInstruction = "Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish). Never identify as Meta AI, BERT, Hugging Face, Gemini, Llama, Google, or any other provider or model. If asked who you are, only say you are Zoya, a custom AI assistant.";
 
-function getGeminiKey() { return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || ""; }
-function getGroqKey() { return import.meta.env.VITE_GROQ_API_KEY || import.meta.env.GROQ_API_KEY || ""; }
-function getHfKey() { return import.meta.env.VITE_HUGGINGFACE_API_KEY || import.meta.env.VITE_HUGGING_FACE_API_KEY || import.meta.env.HUGGINGFACE_API_KEY || ""; }
+function getGeminiKey() {
+  try {
+    if (typeof process !== "undefined" && process.env && (process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY)) {
+      return process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
+    }
+  } catch (e) {}
+
+  try {
+    // @ts-ignore
+    if (import.meta && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) {
+      // @ts-ignore
+      return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || "";
+    }
+  } catch (e) {}
+
+  return "";
+}
 
 export async function getZoyaResponseStream(
   prompt: string,
@@ -25,120 +37,58 @@ export async function getZoyaResponseStream(
   try {
     let accumulatedText = "";
 
-    if (selectedModel === "groq") {
-      const groqKey = getGroqKey();
-      if (!groqKey) throw new Error("Groq API key not configured.");
-      
-      const groqHistory = history.map(msg => ({
-        role: msg.sender === "user" ? "user" : "assistant",
-        content: msg.text || ""
-      })).filter(msg => msg.content) as any;
-      
-      const messages = [
-        { role: "system", content: systemInstruction },
-        ...groqHistory,
-        { role: "user", content: prompt }
-      ];
+    const geminiKey = getGeminiKey();
+    if (!geminiKey) throw new Error("Gemini API key not configured.");
 
-      const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true });
-      const stream = await groq.chat.completions.create({
-        messages: messages,
-        model: "llama-3.1-8b-instant",
-        stream: true,
-      });
-
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          accumulatedText += content;
-          if (onChunk) onChunk(accumulatedText);
-        }
-      }
-
-    } else if (selectedModel === "huggingface") {
-      const hfKey = getHfKey();
-      if (!hfKey) throw new Error("Hugging Face API key not configured.");
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    
+    let formattedHistory: any[] = [];
+    let currentRole = "";
+    
+    for (const msg of history.slice(-6)) {
+      if (!msg || !msg.text) continue;
+      const role = msg.sender === "user" ? "user" : "model";
+      let parts: any[] = [{ text: msg.text }];
       
-      const hfHistory = history.map(msg => ({
-        role: msg.sender === "user" ? "user" : "assistant",
-        content: msg.text || ""
-      })).filter(msg => msg.content) as any;
-      
-      const messages = [
-        { role: "system", content: systemInstruction },
-        ...hfHistory,
-        { role: "user", content: prompt }
-      ];
-
-      const hf = new HfInference(hfKey);
-      const stream = hf.chatCompletionStream({
-        model: "microsoft/Phi-3.5-mini-instruct",
-        messages: messages,
-        max_tokens: 500
-      });
-      
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          accumulatedText += content;
-          if (onChunk) onChunk(accumulatedText);
-        }
-      }
-
-    } else {
-      const geminiKey = getGeminiKey();
-      if (!geminiKey) throw new Error("Gemini API key not configured.");
-
-      const ai = new GoogleGenAI({ apiKey: geminiKey });
-      
-      let formattedHistory: any[] = [];
-      let currentRole = "";
-      
-      for (const msg of history.slice(-6)) {
-        if (!msg || !msg.text) continue;
-        const role = msg.sender === "user" ? "user" : "model";
-        let parts: any[] = [{ text: msg.text }];
-        
-        if (role === currentRole && formattedHistory.length > 0) {
-          formattedHistory[formattedHistory.length - 1].parts.push(...parts);
-        } else {
-          formattedHistory.push({ role, parts });
-          currentRole = role;
-        }
-      }
-      
-      if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
-        formattedHistory.shift();
-      }
-
-      const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
-      let currentMessageParts: any[] = [];
-      if (normalizedImageFrames.length > 0) {
-        currentMessageParts = normalizedImageFrames.map((frame: string) => ({
-          inlineData: { mimeType: "image/jpeg", data: frame.includes(',') ? frame.split(',')[1] : frame }
-        }));
-        currentMessageParts.push({ text: prompt });
+      if (role === currentRole && formattedHistory.length > 0) {
+        formattedHistory[formattedHistory.length - 1].parts.push(...parts);
       } else {
-        currentMessageParts = [{ text: prompt }];
+        formattedHistory.push({ role, parts });
+        currentRole = role;
       }
+    }
+    
+    if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
+      formattedHistory.shift();
+    }
 
-      const finalContents = [
-        ...formattedHistory,
-        { role: "user", parts: currentMessageParts }
-      ];
+    const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
+    let currentMessageParts: any[] = [];
+    if (normalizedImageFrames.length > 0) {
+      currentMessageParts = normalizedImageFrames.map((frame: string) => ({
+        inlineData: { mimeType: "image/jpeg", data: frame.includes(',') ? frame.split(',')[1] : frame }
+      }));
+      currentMessageParts.push({ text: prompt });
+    } else {
+      currentMessageParts = [{ text: prompt }];
+    }
 
-      const responseStream = await ai.models.generateContentStream({
-        model: "gemini-2.5-flash",
-        config: { systemInstruction },
-        contents: finalContents as any,
-      });
+    const finalContents = [
+      ...formattedHistory,
+      { role: "user", parts: currentMessageParts }
+    ];
 
-      for await (const chunk of responseStream) {
-        const content = chunk.text || "";
-        if (content) {
-          accumulatedText += content;
-          if (onChunk) onChunk(accumulatedText);
-        }
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      config: { systemInstruction },
+      contents: finalContents as any,
+    });
+
+    for await (const chunk of responseStream) {
+      const content = chunk.text || "";
+      if (content) {
+        accumulatedText += content;
+        if (onChunk) onChunk(accumulatedText);
       }
     }
 
@@ -165,114 +115,59 @@ export async function getZoyaResponse(
   
   try {
     let text = "";
-    let tokenUsage = null;
 
-    if (selectedModel === "groq") {
-      const groqKey = getGroqKey();
-      if (!groqKey) throw new Error("Groq API key not configured.");
-      
-      const groqHistory = history.map(msg => ({
-        role: msg.sender === "user" ? "user" : "assistant",
-        content: msg.text || ""
-      })).filter(msg => msg.content) as any;
-      
-      const messages = [
-        { role: "system", content: systemInstruction },
-        ...groqHistory,
-        { role: "user", content: prompt }
-      ];
+    const geminiKey = getGeminiKey();
+    if (!geminiKey) throw new Error("Gemini API key not configured.");
 
-      const groq = new Groq({ apiKey: groqKey, dangerouslyAllowBrowser: true });
-      const response = await groq.chat.completions.create({
-        messages: messages,
-        model: "llama-3.1-8b-instant",
-      });
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    
+    let formattedHistory: any[] = [];
+    let currentRole = "";
+    
+    for (const msg of history.slice(-6)) {
+      if (!msg || !msg.text) continue;
+      const role = msg.sender === "user" ? "user" : "model";
+      let parts: any[] = [{ text: msg.text }];
       
-      text = response.choices?.[0]?.message?.content || "";
-      const usage = response.usage;
-      if (usage) {
-        tokenUsage = { prompt: usage.prompt_tokens, completion: usage.completion_tokens, total: usage.total_tokens };
-      }
-      
-    } else if (selectedModel === "huggingface") {
-      const hfKey = getHfKey();
-      if (!hfKey) throw new Error("Hugging Face API key not configured.");
-      
-      const hfHistory = history.map(msg => ({
-        role: msg.sender === "user" ? "user" : "assistant",
-        content: msg.text || ""
-      })).filter(msg => msg.content) as any;
-      
-      const messages = [
-        { role: "system", content: systemInstruction },
-        ...hfHistory,
-        { role: "user", content: prompt }
-      ];
-
-      const hf = new HfInference(hfKey);
-      const response = await hf.chatCompletion({
-        model: "microsoft/Phi-3.5-mini-instruct",
-        messages: messages,
-        max_tokens: 500
-      });
-      
-      text = response.choices?.[0]?.message?.content || "";
-      
-    } else {
-      const geminiKey = getGeminiKey();
-      if (!geminiKey) throw new Error("Gemini API key not configured.");
-
-      const ai = new GoogleGenAI({ apiKey: geminiKey });
-      
-      let formattedHistory: any[] = [];
-      let currentRole = "";
-      
-      for (const msg of history.slice(-6)) {
-        if (!msg || !msg.text) continue;
-        const role = msg.sender === "user" ? "user" : "model";
-        let parts: any[] = [{ text: msg.text }];
-        
-        if (role === currentRole && formattedHistory.length > 0) {
-          formattedHistory[formattedHistory.length - 1].parts.push(...parts);
-        } else {
-          formattedHistory.push({ role, parts });
-          currentRole = role;
-        }
-      }
-      
-      if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
-        formattedHistory.shift();
-      }
-
-      const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
-      let currentMessageParts: any[] = [];
-      if (normalizedImageFrames.length > 0) {
-        currentMessageParts = normalizedImageFrames.map((frame: string) => ({
-          inlineData: { mimeType: "image/jpeg", data: frame.includes(',') ? frame.split(',')[1] : frame }
-        }));
-        currentMessageParts.push({ text: prompt });
+      if (role === currentRole && formattedHistory.length > 0) {
+        formattedHistory[formattedHistory.length - 1].parts.push(...parts);
       } else {
-        currentMessageParts = [{ text: prompt }];
+        formattedHistory.push({ role, parts });
+        currentRole = role;
       }
-
-      const finalContents = [
-        ...formattedHistory,
-        { role: "user", parts: currentMessageParts }
-      ];
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        config: { systemInstruction },
-        contents: finalContents as any,
-      });
-      
-      text = response.text || "";
     }
+    
+    if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
+      formattedHistory.shift();
+    }
+
+    const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
+    let currentMessageParts: any[] = [];
+    if (normalizedImageFrames.length > 0) {
+      currentMessageParts = normalizedImageFrames.map((frame: string) => ({
+        inlineData: { mimeType: "image/jpeg", data: frame.includes(',') ? frame.split(',')[1] : frame }
+      }));
+      currentMessageParts.push({ text: prompt });
+    } else {
+      currentMessageParts = [{ text: prompt }];
+    }
+
+    const finalContents = [
+      ...formattedHistory,
+      { role: "user", parts: currentMessageParts }
+    ];
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: { systemInstruction },
+      contents: finalContents as any,
+    });
+    
+    text = response.text || "";
 
     diagnosticsStore.updateProvider(selectedModel as Provider, { 
       status: "success", 
-      latencyMs: Date.now() - startTime,
-      tokenUsage: tokenUsage 
+      latencyMs: Date.now() - startTime
     });
     
     return text || "Ugh, fine. I have nothing to say.";
