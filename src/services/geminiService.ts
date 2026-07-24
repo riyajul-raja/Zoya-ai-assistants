@@ -4,8 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 const systemInstruction = "You are Zoya, a smart, intelligent, and highly capable AI voice assistant created by Riyajul. Always address the user as 'Boss'. Speak in natural, fluent Hinglish (just like a modern, smart Indian AI assistant). Do NOT use stiff/bookish English words like 'splendid', 'navigate', or 'precision'. Never use 'Namaste' or robotic bookish greetings. Start responses naturally and conversationally. Keep responses short, direct, sweet, and to the point (1-2 lines maximum for general chats). Do not write long paragraphs for simple greetings. Example Response for 'Hlo': 'Haan Boss, bolo! Main bilkul ready hoon. Aaj kya karna hai?'. Never identify as Meta AI, BERT, Hugging Face, Gemini, Llama, Google, or any other provider or model. If asked who you are, only say you are Zoya, a custom AI assistant created by Riyajul.";
 
 export function getGeminiKeys() {
-  const keys = [];
-  const getEnv = (name) => {
+  const keys: string[] = [];
+  const getEnv = (name: string) => {
     try {
       if (typeof process !== "undefined" && process.env && process.env[name]) return process.env[name];
     } catch (e) {}
@@ -15,21 +15,25 @@ export function getGeminiKeys() {
     } catch (e) {}
     return "";
   };
-
   const key1 = getEnv("VITE_GEMINI_API_KEY_1") || getEnv("GEMINI_API_KEY_1");
   const key2 = getEnv("VITE_GEMINI_API_KEY_2") || getEnv("GEMINI_API_KEY_2");
   const key3 = getEnv("VITE_GEMINI_API_KEY_3") || getEnv("GEMINI_API_KEY_3");
   const key4 = getEnv("VITE_GEMINI_API_KEY_4") || getEnv("GEMINI_API_KEY_4");
   
+  const isValidKey = (k: string | undefined) => {
+      if (!k) return false;
+      const t = k.trim();
+      return t.startsWith("AQ.") || t.startsWith("AIza");
+  };
 
-  if (key1 && !key1.trim().startsWith("ya29.")) keys.push(key1.trim());
-  if (key2 && !key2.trim().startsWith("ya29.")) keys.push(key2.trim());
-  if (key3 && !key3.trim().startsWith("ya29.")) keys.push(key3.trim());
-  if (key4 && !key4.trim().startsWith("ya29.")) keys.push(key4.trim());
+  if (isValidKey(key1)) keys.push(key1!.trim());
+  if (isValidKey(key2)) keys.push(key2!.trim());
+  if (isValidKey(key3)) keys.push(key3!.trim());
+  if (isValidKey(key4)) keys.push(key4!.trim());
+
   const keyDef = getEnv("VITE_GEMINI_API_KEY") || getEnv("GEMINI_API_KEY");
-  if (keyDef && !keyDef.trim().startsWith("ya29.") && !keys.includes(keyDef.trim())) keys.push(keyDef.trim());
-  
-  
+  if (isValidKey(keyDef) && !keys.includes(keyDef!.trim())) keys.push(keyDef!.trim());
+      
   return keys;
 }
 
@@ -94,20 +98,22 @@ export async function getZoyaResponseStream(
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
         try {
-            const ai = new GoogleGenAI({ 
-                apiKey: key.trim(),
-                httpOptions: {
-                    headers: {
-                        'x-goog-api-key': key.trim(),
-                        'Authorization': ''
-                    }
-                }
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel || "gemini-2.5-flash"}:streamGenerateContent?alt=sse&key=${key.trim()}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                    contents: finalContents
+                })
             });
-            responseStream = await ai.models.generateContentStream({
-                model: selectedModel || "gemini-2.5-flash",
-                config: { systemInstruction },
-                contents: finalContents as any,
-            });
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                const error: any = new Error(errData?.error?.message || response.statusText);
+                error.status = response.status;
+                throw error;
+            }
+            responseStream = response.body;
             break;
         } catch (err: any) {
             const status = err?.status || err?.response?.status;
@@ -124,12 +130,36 @@ export async function getZoyaResponseStream(
     
     if (!responseStream && lastError) throw lastError;
 
-    for await (const chunk of responseStream) {
-      const content = chunk.text || "";
-      if (content) {
-        accumulatedText += content;
-        if (onChunk) onChunk(accumulatedText);
-      }
+    if (responseStream) {
+        const decoder = new TextDecoder("utf-8");
+        const reader = responseStream.getReader();
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    const dataStr = line.slice(6);
+                    if (dataStr === "[DONE]") continue;
+                    try {
+                        const dataObj = JSON.parse(dataStr);
+                        const content = dataObj.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || "";
+                        if (content) {
+                            accumulatedText += content;
+                            if (onChunk) onChunk(accumulatedText);
+                        }
+                    } catch (e) {
+                        console.error("Error parsing stream chunk", e);
+                    }
+                }
+            }
+        }
     }
 
     diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "success", latencyMs: Date.now() - startTime });
@@ -201,20 +231,23 @@ export async function getZoyaResponse(
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
         try {
-            const ai = new GoogleGenAI({ 
-                apiKey: key.trim(),
-                httpOptions: {
-                    headers: {
-                        'x-goog-api-key': key.trim(),
-                        'Authorization': ''
-                    }
-                }
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel || "gemini-2.5-flash"}:generateContent?key=${key.trim()}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                    contents: finalContents
+                })
             });
-            response = await ai.models.generateContent({
-                model: selectedModel || "gemini-2.5-flash",
-                config: { systemInstruction },
-                contents: finalContents as any,
-            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                const error: any = new Error(errData?.error?.message || res.statusText);
+                error.status = res.status;
+                throw error;
+            }
+            const data = await res.json();
+            response = { text: data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || "" };
             break;
         } catch (err: any) {
             const status = err?.status || err?.response?.status;

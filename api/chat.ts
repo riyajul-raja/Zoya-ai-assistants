@@ -56,22 +56,31 @@ export default async function handler(req: any, res: any) {
         for (let i = 0; i < geminiKeys.length; i++) {
             const key = geminiKeys[i];
             try {
-                const ai = new GoogleGenAI({ 
-                    apiKey: key.trim(),
-                    httpOptions: {
-                        headers: {
-                            'x-goog-api-key': key.trim(),
-                            'Authorization': ''
-                        }
-                    }
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel || "gemini-2.5-flash"}:generateContent?key=${key.trim()}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json' 
+                        // Do not add Authorization header
+                    },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                        contents: finalContents
+                    })
                 });
-                const response = await ai.models.generateContent({
-                    model: targetModel || "gemini-2.5-flash",
-                    config: { systemInstruction },
-                    contents: finalContents as any,
-                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const error: any = new Error(errData?.error?.message || response.statusText);
+                    error.status = response.status;
+                    throw error;
+                }
+
+                const data = await response.json();
+                const responseText = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || "";
+
                 return res.status(200).json({ 
-                    text: response.text || "",
+                    text: responseText,
                     tokenUsage: null
                 });
             } catch (err: any) {

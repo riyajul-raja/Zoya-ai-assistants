@@ -67,24 +67,27 @@ export default async function handler(req: any, res: any) {
 
         let lastError: any = null;
         let responseStream: any = null;
-
         for (let i = 0; i < geminiKeys.length; i++) {
             const key = geminiKeys[i];
             try {
-                const ai = new GoogleGenAI({ 
-                    apiKey: key.trim(),
-                    httpOptions: {
-                        headers: {
-                            'x-goog-api-key': key.trim(),
-                            'Authorization': ''
-                        }
-                    }
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel || "gemini-2.5-flash"}:streamGenerateContent?alt=sse&key=${key.trim()}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                        contents: finalContents
+                    })
                 });
-                responseStream = await ai.models.generateContentStream({
-                    model: targetModel || "gemini-2.5-flash",
-                    config: { systemInstruction },
-                    contents: finalContents as any,
-                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const error: any = new Error(errData?.error?.message || response.statusText);
+                    error.status = response.status;
+                    throw error;
+                }
+                
+                responseStream = response.body;
                 break; // Successfully got stream, break out of retry loop
             } catch (err: any) {
                 const status = err?.status || err?.response?.status;
@@ -101,10 +104,34 @@ export default async function handler(req: any, res: any) {
         
         if (!responseStream && lastError) throw lastError;
 
-        for await (const chunk of responseStream) {
-            const content = chunk.text || "";
-            if (content) {
-                sendEvent('chunk', { text: content });
+        if (responseStream) {
+            const decoder = new TextDecoder("utf-8");
+            const reader = responseStream.getReader();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+                
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const dataStr = line.slice(6);
+                        if (dataStr === "[DONE]") continue;
+                        try {
+                            const dataObj = JSON.parse(dataStr);
+                            const content = dataObj.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || "";
+                            if (content) {
+                                sendEvent('chunk', { text: content });
+                            }
+                        } catch (e) {
+                            console.error("Error parsing stream chunk", e);
+                        }
+                    }
+                }
             }
         }
         
