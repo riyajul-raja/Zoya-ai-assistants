@@ -1,12 +1,35 @@
 const fs = require('fs');
 
-let content = fs.readFileSync('src/services/geminiService.ts', 'utf8');
+const geminiSvcPath = 'src/services/geminiService.ts';
+let geminiSvc = fs.readFileSync(geminiSvcPath, 'utf8');
 
-content = content.replace(/if \(key1\) keys\.push\(key1\)/g, 'if (key1) keys.push(key1.trim())')
-                 .replace(/if \(key2\) keys\.push\(key2\)/g, 'if (key2) keys.push(key2.trim())')
-                 .replace(/if \(key3\) keys\.push\(key3\)/g, 'if (key3) keys.push(key3.trim())')
-                 .replace(/if \(key4\) keys\.push\(key4\)/g, 'if (key4) keys.push(key4.trim())')
-                 .replace(/if \(keyDef && !keys\.includes\(keyDef\)\) keys\.push\(keyDef\)/g, 'if (keyDef && !keys.includes(keyDef.trim())) keys.push(keyDef.trim())');
+const newGeminiSvcKeys = `export function getGeminiKeys() {
+  const keys = [];
+  const getEnv = (name) => {
+    try {
+      if (typeof process !== "undefined" && process.env && process.env[name]) return process.env[name];
+    } catch (e) {}
+    try {
+      // @ts-ignore
+      if (import.meta && import.meta.env && import.meta.env[name]) return import.meta.env[name];
+    } catch (e) {}
+    return "";
+  };
 
-fs.writeFileSync('src/services/geminiService.ts', content);
+  const key1 = getEnv("VITE_GEMINI_API_KEY_1") || getEnv("GEMINI_API_KEY_1");
+  const key2 = getEnv("VITE_GEMINI_API_KEY_2") || getEnv("GEMINI_API_KEY_2");
+  const key3 = getEnv("VITE_GEMINI_API_KEY_3") || getEnv("GEMINI_API_KEY_3");
+  const key4 = getEnv("VITE_GEMINI_API_KEY_4") || getEnv("GEMINI_API_KEY_4");
+  const keyDef = getEnv("VITE_GEMINI_API_KEY") || getEnv("GEMINI_API_KEY");
+
+  if (key1) keys.push(key1.trim());
+  if (key2) keys.push(key2.trim());
+  if (key3) keys.push(key3.trim());
+  if (key4) keys.push(key4.trim());
+  if (keyDef && !keys.includes(keyDef.trim())) keys.push(keyDef.trim());
+  
+  return keys;
+}`;
+geminiSvc = geminiSvc.replace(/export function getGeminiKeys\(\) \{[\s\S]*?return keys;\n\}/, newGeminiSvcKeys);
+fs.writeFileSync(geminiSvcPath, geminiSvc);
 console.log("Updated src/services/geminiService.ts");

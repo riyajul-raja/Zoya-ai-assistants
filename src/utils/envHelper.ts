@@ -6,14 +6,14 @@ export const getClientEnv = () => {
         // @ts-ignore
         if (import.meta && import.meta.env) {
             // @ts-ignore
-            if (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY) gemini = true;
+            if (import.meta.env.VITE_GEMINI_API_KEY_1 || import.meta.env.GEMINI_API_KEY_1 || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY) gemini = true;
         }
     } catch(e) {}
     
     // Check process.env fallback if polyfilled
     try {
         if (typeof process !== 'undefined' && process.env) {
-            if (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) gemini = true;
+            if (process.env.GEMINI_API_KEY_1 || process.env.VITE_GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) gemini = true;
         }
     } catch(e) {}
     

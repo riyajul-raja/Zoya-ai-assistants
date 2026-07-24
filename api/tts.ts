@@ -7,11 +7,12 @@ export default async function handler(req: any, res: any) {
 
   const { text } = req.body;
   try {
-    const geminiKey = process.env.GEMINI_API_KEY;
+    const keys = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3, process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY];
+    const geminiKey = keys.find(k => k && !k.trim().startsWith("ya29."));
     if (!geminiKey) {
         return res.status(500).json({ error: "Gemini API key not configured." });
     }
-    const ai = new GoogleGenAI({ apiKey: geminiKey.trim(), httpOptions: { headers: { "x-goog-api-key": geminiKey.trim() } } });
+    const ai = new GoogleGenAI({ apiKey: geminiKey.trim() });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],
