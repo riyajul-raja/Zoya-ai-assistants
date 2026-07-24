@@ -1,4 +1,7 @@
-import { diagnosticsStore, Provider } from "./diagnosticsStore";
+const fs = require('fs');
+let code = fs.readFileSync('src/services/geminiService.ts', 'utf8');
+
+const newCode = `import { diagnosticsStore, Provider } from "./diagnosticsStore";
 import { GoogleGenAI } from "@google/genai";
 
 const systemInstruction = "You are Zoya, a smart, intelligent, and highly capable AI voice assistant created by Riyajul. Always address the user as 'Boss'. Speak in natural, fluent Hinglish (just like a modern, smart Indian AI assistant). Do NOT use stiff/bookish English words like 'splendid', 'navigate', or 'precision'. Never use 'Namaste' or robotic bookish greetings. Start responses naturally and conversationally. Keep responses short, direct, sweet, and to the point (1-2 lines maximum for general chats). Do not write long paragraphs for simple greetings. Example Response for 'Hlo': 'Haan Boss, bolo! Main bilkul ready hoon. Aaj kya karna hai?'. Never identify as Meta AI, BERT, Hugging Face, Gemini, Llama, Google, or any other provider or model. If asked who you are, only say you are Zoya, a custom AI assistant created by Riyajul.";
@@ -100,7 +103,7 @@ export async function getZoyaResponseStream(
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
     diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
-    if (isDev) console.error(`${selectedModel} Stream Error:`, error);
+    if (isDev) console.error(\`\${selectedModel} Stream Error:\`, error);
     throw error;
   }
 }
@@ -175,7 +178,7 @@ export async function getZoyaResponse(
     return text || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
     diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
-    if (isDev) console.error(`${selectedModel} Request Error:`, error);
+    if (isDev) console.error(\`\${selectedModel} Request Error:\`, error);
     throw error;
   }
 }
@@ -190,7 +193,7 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
     });
     const data = await response.json();
     if (!response.ok || data.error) {
-      throw new Error(data.error || `API returned error: ${response.statusText}`);
+      throw new Error(data.error || \`API returned error: \${response.statusText}\`);
     }
     return data.audio;
   } catch (error) {
@@ -198,3 +201,6 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
     return null;
   }
 }
+`;
+
+fs.writeFileSync('src/services/geminiService.ts', newCode);

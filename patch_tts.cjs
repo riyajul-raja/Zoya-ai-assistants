@@ -1,6 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
+const fs = require('fs');
+let code = fs.readFileSync('api/tts.ts', 'utf8');
 
-export default async function handler(req: any, res: any) {
+const newHandler = `export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -38,4 +39,8 @@ export default async function handler(req: any, res: any) {
     console.error("TTS Error:", error);
     return res.status(500).json({ error: error.message || "Internal server error" });
   }
-}
+}`;
+
+code = code.replace(/export default async function handler\(req: any, res: any\) \{[\s\S]*\}\s*$/, newHandler);
+
+fs.writeFileSync('api/tts.ts', code);

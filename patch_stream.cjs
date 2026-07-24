@@ -1,9 +1,10 @@
-import { GoogleGenAI } from "@google/genai";
-import { getApiKey } from "../envHelper";
+const fs = require('fs');
+let code = fs.readFileSync('api/chat/stream.ts', 'utf8');
 
-const systemInstruction = "You are Zoya, a smart, intelligent, and highly capable AI voice assistant created by Riyajul. Always address the user as 'Boss'. Speak in natural, fluent Hinglish (just like a modern, smart Indian AI assistant). Do NOT use stiff/bookish English words like 'splendid', 'navigate', or 'precision'. Never use 'Namaste' or robotic bookish greetings. Start responses naturally and conversationally. Keep responses short, direct, sweet, and to the point (1-2 lines maximum for general chats). Do not write long paragraphs for simple greetings. Example Response for 'Hlo': 'Haan Boss, bolo! Main bilkul ready hoon. Aaj kya karna hai?'. Never identify as Meta AI, BERT, Hugging Face, Gemini, Llama, Google, or any other provider or model. If asked who you are, only say you are Zoya, a custom AI assistant created by Riyajul.";
+// Replace getGeminiKeys import with getApiKey
+code = code.replace(/import { getGeminiKeys } from "\.\.\/envHelper";/, 'import { getApiKey } from "../envHelper";');
 
-export default async function handler(req: any, res: any) {
+const newHandler = `export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -21,8 +22,8 @@ export default async function handler(req: any, res: any) {
         res.setHeader('Connection', 'keep-alive');
         
         const sendEvent = (event: string, data: any) => {
-            res.write(`event: ${event}\n`);
-            res.write(`data: ${JSON.stringify(data)}\n\n`);
+            res.write(\`event: \${event}\\n\`);
+            res.write(\`data: \${JSON.stringify(data)}\\n\\n\`);
         };
         
         const apiKey = getApiKey();
@@ -87,9 +88,13 @@ export default async function handler(req: any, res: any) {
         if (!res.headersSent) {
             res.status(500).json({ error: error.message || 'An error occurred during chat stream' });
         } else {
-            res.write(`event: error\n`);
-            res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+            res.write(\`event: error\\n\`);
+            res.write(\`data: \${JSON.stringify({ error: error.message })}\\n\\n\`);
             res.end();
         }
     }
-}
+}`;
+
+code = code.replace(/export default async function handler\(req: any, res: any\) \{[\s\S]*\}\s*$/, newHandler);
+
+fs.writeFileSync('api/chat/stream.ts', code);

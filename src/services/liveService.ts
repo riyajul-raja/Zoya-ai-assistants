@@ -45,19 +45,32 @@ export class LiveSessionManager {
   public onCommand: (url: string) => void = () => {};
   public onUIAction: (panelName: string) => void = () => {};
 
+    getApiKey() {
+    const getEnv = (name: string) => {
+      try {
+        if (typeof process !== "undefined" && process.env && process.env[name]) return process.env[name];
+      } catch (e) {}
+      try {
+        // @ts-ignore
+        if (import.meta && import.meta.env && import.meta.env[name]) return import.meta.env[name];
+      } catch (e) {}
+      return "";
+    };
+    const apiKey = (
+        getEnv("GEMINI_API_KEY") || getEnv("VITE_GEMINI_API_KEY") ||
+        getEnv("GEMINI_API_KEY_1") || getEnv("VITE_GEMINI_API_KEY_1") ||
+        getEnv("GEMINI_API_KEY_2") || getEnv("VITE_GEMINI_API_KEY_2") ||
+        getEnv("GEMINI_API_KEY_3") || getEnv("VITE_GEMINI_API_KEY_3") ||
+        getEnv("GEMINI_API_KEY_4") || getEnv("VITE_GEMINI_API_KEY_4") ||
+        ""
+    ).trim();
+    if (!apiKey) throw new Error("API Key is missing in environment");
+    return apiKey;
+  }
+
   constructor() {
-    const key = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3, process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY]
-      .find(k => k && !k.trim().startsWith("ya29."))?.trim() || "INVALID_KEY";
-    
-    this.ai = new GoogleGenAI({ 
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          'x-goog-api-key': key,
-          'Authorization': ''
-        }
-      }
-    });
+    const apiKey = this.getApiKey();
+    this.ai = new GoogleGenAI({ apiKey });
   }
 
   async start(
