@@ -1,4 +1,5 @@
 import { getGeminiKeys } from "./envHelper";
+import { GoogleGenAI } from "@google/genai";
 
 const systemInstruction = "You are Zoya, a smart, intelligent, and highly capable AI voice assistant created by Riyajul. Always address the user as 'Boss'. Speak in natural, fluent Hinglish (just like a modern, smart Indian AI assistant). Do NOT use stiff/bookish English words like 'splendid', 'navigate', or 'precision'. Never use 'Namaste' or robotic bookish greetings. Start responses naturally and conversationally. Keep responses short, direct, sweet, and to the point (1-2 lines maximum for general chats). Do not write long paragraphs for simple greetings. Example Response for 'Hlo': 'Haan Boss, bolo! Main bilkul ready hoon. Aaj kya karna hai?'. Never identify as Meta AI, BERT, Hugging Face, Gemini, Llama, Google, or any other provider or model. If asked who you are, only say you are Zoya, a custom AI assistant created by Riyajul.";
 
@@ -52,35 +53,22 @@ export default async function handler(req: any, res: any) {
         let lastError: any = null;
         for (let i = 0; i < geminiKeys.length; i++) {
             const key = geminiKeys[i];
-            if (!key || key.trim() === "") {
-                throw new Error("STOP: API Key is completely empty in the code!");
-            }
             try {
-                const url = "https://generativelanguage.googleapis.com/v1beta/models/" + targetModel + ":generateContent?key=" + key;
+                const ai = new GoogleGenAI({ 
+                    apiKey: key,
+                    httpOptions: { headers: { 'x-goog-api-key': key, 'Authorization': '' } }
+                });
                 
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json' 
-                    },
-                    body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: systemInstruction }] },
-                        contents: finalContents
-                    })
+                const response = await ai.models.generateContent({
+                    model: targetModel,
+                    contents: finalContents,
+                    config: {
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    }
                 });
 
-                if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    const error: any = new Error(errData?.error?.message || response.statusText);
-                    error.status = response.status;
-                    throw error;
-                }
-
-                const data = await response.json();
-                const responseText = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || "";
-
                 return res.status(200).json({ 
-                    text: responseText,
+                    text: response.text,
                     tokenUsage: null
                 });
             } catch (err: any) {
