@@ -70,8 +70,7 @@ export default async function handler(req: any, res: any) {
             const key = geminiKeys[i];
             try {
                 const ai = new GoogleGenAI({ 
-                    apiKey: key,
-                    httpOptions: { headers: { 'x-goog-api-key': key, 'Authorization': '' } }
+                    apiKey: key
                 });
                 
                 responseStreamObj = await ai.models.generateContentStream({

@@ -104,8 +104,7 @@ export async function getZoyaResponseStream(
         const key = geminiKeys[i];
         try {
             const ai = new GoogleGenAI({ 
-                apiKey: key,
-                httpOptions: { headers: { 'x-goog-api-key': key, 'Authorization': '' } }
+                apiKey: key
             });
             
             responseStreamObj = await ai.models.generateContentStream({
@@ -208,8 +207,7 @@ export async function getZoyaResponse(
         const key = geminiKeys[i];
         try {
             const ai = new GoogleGenAI({ 
-                apiKey: key,
-                httpOptions: { headers: { 'x-goog-api-key': key, 'Authorization': '' } }
+                apiKey: key
             });
             
             const response = await ai.models.generateContent({
