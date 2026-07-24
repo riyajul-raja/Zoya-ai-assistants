@@ -94,7 +94,15 @@ export async function getZoyaResponseStream(
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
         try {
-            const ai = new GoogleGenAI({ apiKey: key.trim() });
+            const ai = new GoogleGenAI({ 
+                apiKey: key.trim(),
+                httpOptions: {
+                    headers: {
+                        'x-goog-api-key': key.trim(),
+                        'Authorization': ''
+                    }
+                }
+            });
             responseStream = await ai.models.generateContentStream({
                 model: selectedModel || "gemini-2.5-flash",
                 config: { systemInstruction },
@@ -193,7 +201,15 @@ export async function getZoyaResponse(
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
         try {
-            const ai = new GoogleGenAI({ apiKey: key.trim() });
+            const ai = new GoogleGenAI({ 
+                apiKey: key.trim(),
+                httpOptions: {
+                    headers: {
+                        'x-goog-api-key': key.trim(),
+                        'Authorization': ''
+                    }
+                }
+            });
             response = await ai.models.generateContent({
                 model: selectedModel || "gemini-2.5-flash",
                 config: { systemInstruction },

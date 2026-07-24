@@ -71,7 +71,15 @@ export default async function handler(req: any, res: any) {
         for (let i = 0; i < geminiKeys.length; i++) {
             const key = geminiKeys[i];
             try {
-                const ai = new GoogleGenAI({ apiKey: key.trim() });
+                const ai = new GoogleGenAI({ 
+                    apiKey: key.trim(),
+                    httpOptions: {
+                        headers: {
+                            'x-goog-api-key': key.trim(),
+                            'Authorization': ''
+                        }
+                    }
+                });
                 responseStream = await ai.models.generateContentStream({
                     model: targetModel || "gemini-2.5-flash",
                     config: { systemInstruction },

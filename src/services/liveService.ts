@@ -46,7 +46,18 @@ export class LiveSessionManager {
   public onUIAction: (panelName: string) => void = () => {};
 
   constructor() {
-    this.ai = new GoogleGenAI({ apiKey: [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3, process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY].find(k => k && !k.trim().startsWith("ya29."))?.trim() || "" });
+    const key = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3, process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY]
+      .find(k => k && !k.trim().startsWith("ya29."))?.trim() || "INVALID_KEY";
+    
+    this.ai = new GoogleGenAI({ 
+      apiKey: key,
+      httpOptions: {
+        headers: {
+          'x-goog-api-key': key,
+          'Authorization': ''
+        }
+      }
+    });
   }
 
   async start(
