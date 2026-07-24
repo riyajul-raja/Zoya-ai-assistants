@@ -2474,7 +2474,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             >
               <div className="shrink-0"><GeminiIcon size={14} /></div>
               <span className="text-xs font-medium tracking-wide truncate">
-                {selectedModel === "gemini-3.6-flash" ? "Gemini 3.6 Flash" : selectedModel === "gemini-3.5-flash-lite" ? "Gemini 3.5 Flash Lite" : selectedModel === "gemini-3.5-flash" ? "Gemini 3.5 Flash" : selectedModel === "gemini-3.1-pro-preview" ? "Gemini 3.1 Pro Preview" : selectedModel === "gemini-3.1-flash-lite" ? "Gemini 3.1 Flash Lite" : selectedModel === "gemini-3.0-flash-preview" ? "Gemini 3 Flash Preview" : selectedModel === "gemini-pro-latest" ? "Gemini Pro Latest" : "Gemini 2.5 Flash"}
+                {selectedModel === "gemini-3.6-flash" ? "Gemini 3.6 Flash" : selectedModel === "gemini-3.5-flash-lite" ? "Gemini 3.5 Flash Lite" : selectedModel === "gemini-3.5-flash" ? "Gemini 3.5 Flash" : selectedModel === "gemini-3.1-pro-preview" ? "Gemini 3.1 Pro Preview" : selectedModel === "gemini-3.1-flash-lite" ? "Gemini 3.1 Flash Lite" : selectedModel === "gemini-3-flash-preview" ? "Gemini 3 Flash Preview" : selectedModel === "gemini-pro-latest" ? "Gemini Pro Latest" : "Gemini 2.5 Flash"}
               </span>
               <ChevronDown
                 size={14}
@@ -2498,7 +2498,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                       { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", desc: "Balanced speed & intelligence", icon: <GeminiIcon /> },
                       { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", desc: "Advanced maths and code", icon: <GeminiIcon /> },
                       { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", desc: "Ultra-fast response engine", icon: <GeminiIcon /> },
-                      { id: "gemini-3.0-flash-preview", name: "Gemini 3 Flash Preview", desc: "Next-gen experimental model", icon: <GeminiIcon /> },
+                      { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", desc: "Next-gen experimental model", icon: <GeminiIcon /> },
                       { id: "gemini-pro-latest", name: "Gemini Pro Latest", desc: "Complex reasoning & deep analysis", icon: <GeminiIcon /> },
                       { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", desc: "Stable default engine", icon: <GeminiIcon /> }
                     ].map((model) => (

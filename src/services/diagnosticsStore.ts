@@ -1,5 +1,5 @@
 
-export type Provider = "gemini-3.6-flash" | "gemini-3.5-flash-lite" | "gemini-3.5-flash" | "gemini-3.1-pro-preview" | "gemini-3.1-flash-lite" | "gemini-3.0-flash-preview" | "gemini-pro-latest" | "gemini-2.5-flash";
+export type Provider = "gemini-3.6-flash" | "gemini-3.5-flash-lite" | "gemini-3.5-flash" | "gemini-3.1-pro-preview" | "gemini-3.1-flash-lite" | "gemini-3-flash-preview" | "gemini-pro-latest" | "gemini-2.5-flash";
 
 export interface ProviderDiagnostic {
   provider: Provider;
@@ -71,8 +71,8 @@ let state: DiagnosticsState = {
     isConfigured: false,
     lastRequestTime: null,
   },
-  "gemini-3.0-flash-preview": {
-    provider: "gemini-3.0-flash-preview",
+  "gemini-3-flash-preview": {
+    provider: "gemini-3-flash-preview",
     modelName: "Gemini 3 Flash Preview",
     subtitle: "Next-gen experimental model",
     latencyMs: 0,

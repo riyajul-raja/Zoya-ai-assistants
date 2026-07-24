@@ -50,11 +50,11 @@ export async function getZoyaResponseStream(
   isProfessionalMode: boolean = false,
   environmentContext: string = "",
   onChunk?: (text: string) => void,
-  selectedModel: string = "gemini-1.5-flash"
+  selectedModel: string = "gemini-2.5-flash"
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-1.5-flash" });
+  diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
   
   try {
     let accumulatedText = "";
@@ -108,7 +108,7 @@ export async function getZoyaResponseStream(
             });
             
             responseStreamObj = await ai.models.generateContentStream({
-                model: selectedModel || "gemini-1.5-flash",
+                model: selectedModel || "gemini-2.5-flash",
                 contents: finalContents,
                 config: {
                     systemInstruction: { parts: [{ text: systemInstruction }] }
@@ -139,10 +139,10 @@ export async function getZoyaResponseStream(
         }
     }
     
-    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "success", latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "success", latencyMs: Date.now() - startTime });
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error("Stream Error:", error);
     throw error;
   }
@@ -154,11 +154,11 @@ export async function getZoyaResponse(
   imageFrames?: string | string[],
   isProfessionalMode: boolean = false,
   environmentContext: string = "",
-  selectedModel: string = "gemini-1.5-flash"
+  selectedModel: string = "gemini-2.5-flash"
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-1.5-flash" });
+  diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
   
   try {
     const geminiKeys = getGeminiKeys();
@@ -211,7 +211,7 @@ export async function getZoyaResponse(
             });
             
             const response = await ai.models.generateContent({
-                model: selectedModel || "gemini-1.5-flash",
+                model: selectedModel || "gemini-2.5-flash",
                 contents: finalContents,
                 config: {
                     systemInstruction: { parts: [{ text: systemInstruction }] }
@@ -234,14 +234,14 @@ export async function getZoyaResponse(
     
     if (!responseText && lastError) throw lastError;
 
-    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { 
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { 
        status: "success", 
        latencyMs: Date.now() - startTime 
     });
     
     return responseText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error("Request Error:", error);
     throw error;
   }

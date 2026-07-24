@@ -9,7 +9,7 @@ export default async function handler(req: any, res: any) {
     }
     try {
         const { prompt, history, selectedModel, isProfessionalMode, environmentContext, imageFrames } = req.body;
-        let targetModel = selectedModel || "gemini-1.5-flash";
+        let targetModel = selectedModel || "gemini-2.5-flash";
         
         const geminiKeys = getGeminiKeys();
         

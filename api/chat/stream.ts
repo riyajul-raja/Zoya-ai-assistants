@@ -10,7 +10,7 @@ export default async function handler(req: any, res: any) {
     try {
         const { prompt, history, selectedModel, isProfessionalMode, environmentContext, imageFrames } = req.body;
         
-        let targetModel = "gemini-1.5-flash";
+        let targetModel = "gemini-2.5-flash";
         if (selectedModel) {
             targetModel = selectedModel;
         }
