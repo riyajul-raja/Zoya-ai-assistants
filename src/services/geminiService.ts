@@ -4,20 +4,26 @@ const systemInstruction = "You are Zoya, a smart, intelligent, and highly capabl
 
 export function getGeminiKeys() {
   const keys: string[] = [];
-  const getEnv = (name: string) => {
-    try {
-      if (typeof process !== "undefined" && process.env && process.env[name]) return process.env[name];
-    } catch (e) {}
-    try {
-      // @ts-ignore
-      if (import.meta && import.meta.env && import.meta.env[name]) return import.meta.env[name];
-    } catch (e) {}
-    return "";
-  };
-  const key1 = getEnv("VITE_GEMINI_API_KEY_1") || getEnv("GEMINI_API_KEY_1");
-  const key2 = getEnv("VITE_GEMINI_API_KEY_2") || getEnv("GEMINI_API_KEY_2");
-  const key3 = getEnv("VITE_GEMINI_API_KEY_3") || getEnv("GEMINI_API_KEY_3");
-  const key4 = getEnv("VITE_GEMINI_API_KEY_4") || getEnv("GEMINI_API_KEY_4");
+  
+  // Statically reference Vite env variables
+  const viteKey1 = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY_1 : undefined;
+  const viteKey2 = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY_2 : undefined;
+  const viteKey3 = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY_3 : undefined;
+  const viteKey4 = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY_4 : undefined;
+  const viteKeyDef = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : undefined;
+
+  // Statically reference Node env variables
+  const nodeKey1 = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY_1 : undefined;
+  const nodeKey2 = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY_2 : undefined;
+  const nodeKey3 = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY_3 : undefined;
+  const nodeKey4 = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY_4 : undefined;
+  const nodeKeyDef = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : undefined;
+  
+  const key1 = viteKey1 || nodeKey1;
+  const key2 = viteKey2 || nodeKey2;
+  const key3 = viteKey3 || nodeKey3;
+  const key4 = viteKey4 || nodeKey4;
+  const keyDef = viteKeyDef || nodeKeyDef;
   
   const isValidKey = (k: string | undefined) => {
       if (!k) return false;
@@ -30,9 +36,11 @@ export function getGeminiKeys() {
   if (isValidKey(key3)) keys.push(key3!.trim());
   if (isValidKey(key4)) keys.push(key4!.trim());
 
-  const keyDef = getEnv("VITE_GEMINI_API_KEY") || getEnv("GEMINI_API_KEY");
   if (isValidKey(keyDef) && !keys.includes(keyDef!.trim())) keys.push(keyDef!.trim());
       
+  if (keys.length === 0) {
+      throw new Error("STOP: API Key is completely empty in the code! Please check your environment variables.");
+  }
   return keys;
 }
 
@@ -43,16 +51,15 @@ export async function getZoyaResponseStream(
   isProfessionalMode: boolean = false,
   environmentContext: string = "",
   onChunk?: (text: string) => void,
-  selectedModel: string = "gemini-2.5-flash"
+  selectedModel: string = "gemini-1.5-flash"
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
+  diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-1.5-flash" });
   
   try {
     let accumulatedText = "";
     const geminiKeys = getGeminiKeys();
-    if (geminiKeys.length === 0) throw new Error("Gemini API key not configured.");
     
     let formattedHistory: any[] = [];
     let currentRole = "";
@@ -96,8 +103,11 @@ export async function getZoyaResponseStream(
     
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
+        if (!key || key.trim() === "") {
+            throw new Error("STOP: API Key is completely empty in the code!");
+        }
         try {
-            const url = "https://generativelanguage.googleapis.com/v1beta/models/" + (selectedModel || "gemini-2.5-flash") + ":streamGenerateContent?alt=sse&key=" + key;
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/" + (selectedModel || "gemini-1.5-flash") + ":streamGenerateContent?alt=sse&key=" + key;
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -161,10 +171,10 @@ export async function getZoyaResponseStream(
         }
     }
     
-    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "success", latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "success", latencyMs: Date.now() - startTime });
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error("Stream Error:", error);
     throw error;
   }
@@ -176,16 +186,15 @@ export async function getZoyaResponse(
   imageFrames?: string | string[],
   isProfessionalMode: boolean = false,
   environmentContext: string = "",
-  selectedModel: string = "gemini-2.5-flash"
+  selectedModel: string = "gemini-1.5-flash"
 ): Promise<string> {
   const isDev = import.meta.env.DEV;
   const startTime = Date.now();
-  diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-2.5-flash" });
+  diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel || "gemini-1.5-flash" });
   
   try {
     let text = "";
     const geminiKeys = getGeminiKeys();
-    if (geminiKeys.length === 0) throw new Error("Gemini API key not configured.");
     
     let formattedHistory: any[] = [];
     let currentRole = "";
@@ -229,8 +238,11 @@ export async function getZoyaResponse(
     
     for (let i = 0; i < geminiKeys.length; i++) {
         const key = geminiKeys[i];
+        if (!key || key.trim() === "") {
+            throw new Error("STOP: API Key is completely empty in the code!");
+        }
         try {
-            const url = "https://generativelanguage.googleapis.com/v1beta/models/" + (selectedModel || "gemini-2.5-flash") + ":generateContent?key=" + key;
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/" + (selectedModel || "gemini-1.5-flash") + ":generateContent?key=" + key;
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -263,14 +275,14 @@ export async function getZoyaResponse(
     
     if (!responseText && lastError) throw lastError;
 
-    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { 
+    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { 
        status: "success", 
        latencyMs: Date.now() - startTime 
     });
     
     return responseText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
-    diagnosticsStore.updateProvider((selectedModel || "gemini-2.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
+    diagnosticsStore.updateProvider((selectedModel || "gemini-1.5-flash") as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
     if (isDev) console.error("Request Error:", error);
     throw error;
   }

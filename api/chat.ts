@@ -8,10 +8,9 @@ export default async function handler(req: any, res: any) {
     }
     try {
         const { prompt, history, selectedModel, isProfessionalMode, environmentContext, imageFrames } = req.body;
-        let targetModel = selectedModel || "gemini-2.5-flash";
+        let targetModel = selectedModel || "gemini-1.5-flash";
         
         const geminiKeys = getGeminiKeys();
-        if (geminiKeys.length === 0) throw new Error("Gemini API key not configured");
         
         let formattedHistory: any[] = [];
         let currentRole = "";
@@ -53,6 +52,9 @@ export default async function handler(req: any, res: any) {
         let lastError: any = null;
         for (let i = 0; i < geminiKeys.length; i++) {
             const key = geminiKeys[i];
+            if (!key || key.trim() === "") {
+                throw new Error("STOP: API Key is completely empty in the code!");
+            }
             try {
                 const url = "https://generativelanguage.googleapis.com/v1beta/models/" + targetModel + ":generateContent?key=" + key;
                 
