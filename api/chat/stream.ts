@@ -1,5 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
-import { getApiKey } from "../envHelper";
+import { getGeminiKeys } from "../envHelper";
 
 const systemInstruction = "You are Zoya, a smart, intelligent, and highly capable AI voice assistant created by Riyajul. Always address the user as 'Boss'. Speak in natural, fluent Hinglish (just like a modern, smart Indian AI assistant). Do NOT use stiff/bookish English words like 'splendid', 'navigate', or 'precision'. Never use 'Namaste' or robotic bookish greetings. Start responses naturally and conversationally. Keep responses short, direct, sweet, and to the point (1-2 lines maximum for general chats). Do not write long paragraphs for simple greetings. Example Response for 'Hlo': 'Haan Boss, bolo! Main bilkul ready hoon. Aaj kya karna hai?'. Never identify as Meta AI, BERT, Hugging Face, Gemini, Llama, Google, or any other provider or model. If asked who you are, only say you are Zoya, a custom AI assistant created by Riyajul.";
 
@@ -15,17 +14,17 @@ export default async function handler(req: any, res: any) {
             targetModel = selectedModel;
         }
         
-        // Set up SSE headers
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         
         const sendEvent = (event: string, data: any) => {
-            res.write(`event: ${event}\n`);
-            res.write(`data: ${JSON.stringify(data)}\n\n`);
+            res.write("event: " + event + "\n");
+            res.write("data: " + JSON.stringify(data) + "\n\n");
         };
         
-        const apiKey = getApiKey();
+        const geminiKeys = getGeminiKeys();
+        if (geminiKeys.length === 0) throw new Error("Gemini API key not configured");
         
         let formattedHistory: any[] = [];
         let currentRole = "";
@@ -64,18 +63,74 @@ export default async function handler(req: any, res: any) {
             { role: "user", parts: currentMessageParts }
         ];
         
-        const ai = new GoogleGenAI({ apiKey });
+        let lastError: any = null;
+        let responseStream: any = null;
         
-        const responseStream = await ai.models.generateContentStream({
-            model: targetModel,
-            config: { systemInstruction },
-            contents: finalContents as any,
-        });
+        for (let i = 0; i < geminiKeys.length; i++) {
+            const key = geminiKeys[i];
+            try {
+                const url = "https://generativelanguage.googleapis.com/v1beta/models/" + targetModel + ":streamGenerateContent?alt=sse&key=" + key;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                        contents: finalContents
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const error: any = new Error(errData?.error?.message || response.statusText);
+                    error.status = response.status;
+                    throw error;
+                }
+                
+                responseStream = response.body;
+                break;
+            } catch (err: any) {
+                const status = err?.status || err?.response?.status;
+                const msg = err?.message || "";
+                const isRateLimitOrQuota = status === 429 || status === 403 || msg.includes("429") || msg.includes("quota") || msg.includes("API key not valid");
+                if (isRateLimitOrQuota && i < geminiKeys.length - 1) {
+                    console.warn("Key " + (i+1) + " failed, retrying with next key...");
+                    lastError = err;
+                    continue;
+                }
+                throw err;
+            }
+        }
         
-        for await (const chunk of responseStream) {
-            const content = chunk.text || "";
-            if (content) {
-                sendEvent('chunk', { text: content });
+        if (!responseStream && lastError) throw lastError;
+
+        if (responseStream) {
+            const decoder = new TextDecoder("utf-8");
+            const reader = responseStream.getReader();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+                
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const dataStr = line.slice(6);
+                        if (dataStr === "[DONE]") continue;
+                        try {
+                            const dataObj = JSON.parse(dataStr);
+                            const content = dataObj.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || "";
+                            if (content) {
+                                sendEvent('chunk', { text: content });
+                            }
+                        } catch (e) {
+                            console.error("Error parsing stream chunk", e);
+                        }
+                    }
+                }
             }
         }
         
@@ -83,12 +138,11 @@ export default async function handler(req: any, res: any) {
         res.end();
     } catch (error: any) {
         console.error("Stream Chat Error:", error);
-        // If headers are already sent, we just end the stream
         if (!res.headersSent) {
             res.status(500).json({ error: error.message || 'An error occurred during chat stream' });
         } else {
-            res.write(`event: error\n`);
-            res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+            res.write("event: error\n");
+            res.write("data: " + JSON.stringify({ error: error.message }) + "\n\n");
             res.end();
         }
     }

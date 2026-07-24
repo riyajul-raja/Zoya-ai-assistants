@@ -1,4 +1,5 @@
-export const getGeminiKeys = () => {
+const fs = require('fs');
+fs.writeFileSync('api/envHelper.ts', `export const getGeminiKeys = () => {
     const keys: string[] = [];
     if (typeof process !== 'undefined' && process.env) {
         const key1 = process.env.GEMINI_API_KEY_1 || process.env.VITE_GEMINI_API_KEY_1;
@@ -9,6 +10,7 @@ export const getGeminiKeys = () => {
         const isValidKey = (k: string | undefined) => {
             if (!k) return false;
             const t = k.trim();
+            // Just accept anything that isn't empty and isn't ya29 (oauth)
             return t.length > 0 && !t.startsWith("ya29.");
         };
 
@@ -22,3 +24,4 @@ export const getGeminiKeys = () => {
     }
     return keys;
 };
+`);
