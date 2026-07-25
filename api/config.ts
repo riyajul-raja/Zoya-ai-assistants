@@ -1,4 +1,4 @@
-import { getGeminiKey } from "./envHelper";
+import { getGeminiKeys } from "./envHelper";
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'GET') {
@@ -7,7 +7,7 @@ export default async function handler(req: any, res: any) {
 
     try {
         const config = {
-            gemini: !!getGeminiKey()
+            gemini: getGeminiKeys().length > 0
         };
         
         res.status(200).json(config);
