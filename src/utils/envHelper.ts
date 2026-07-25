@@ -1,21 +1,13 @@
-export const getClientEnv = () => {
-    let gemini = false;
-    
-    // Check standard import.meta.env in Vite
+
+export const getClientEnv = async () => {
     try {
-        // @ts-ignore
-        if (import.meta && import.meta.env) {
-            // @ts-ignore
-            if (import.meta.env.VITE_GEMINI_API_KEY_1 || import.meta.env.GEMINI_API_KEY_1 || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY) gemini = true;
+        const res = await fetch('/api/config');
+        if (res.ok) {
+            const data = await res.json();
+            return data;
         }
-    } catch(e) {}
-    
-    // Check process.env fallback if polyfilled
-    try {
-        if (typeof process !== 'undefined' && process.env) {
-            if (process.env.GEMINI_API_KEY_1 || process.env.VITE_GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) gemini = true;
-        }
-    } catch(e) {}
-    
-    return { gemini };
+    } catch(e) {
+        console.error("Failed to fetch client env", e);
+    }
+    return { gemini: true }; // default assumption
 };

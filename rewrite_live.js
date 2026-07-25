@@ -1,5 +1,7 @@
+import fs from 'fs/promises';
 
-import { getZoyaResponseStream, getZoyaAudio } from "./geminiService";
+const content = `
+import { getZoyaResponseStream } from "./geminiService";
 
 export class LiveSessionManager {
   private isPlaying: boolean = false;
@@ -103,32 +105,26 @@ export class LiveSessionManager {
     }
   }
 
-  private async playTTS(text: string, isProfessionalMode: boolean, environmentContext: string, history: any[]) {
+  private playTTS(text: string, isProfessionalMode: boolean, environmentContext: string, history: any[]) {
     this.isPlaying = true;
-    try {
-      const base64Audio = await getZoyaAudio(text);
-      if (base64Audio) {
-        const audio = new Audio("data:audio/wav;base64," + base64Audio);
-        audio.onended = () => {
-          this.isPlaying = false;
-          if (!this.stopRequested) {
-            this.onStateChange("listening");
-            this.startListening(isProfessionalMode, environmentContext, history);
-          }
-        };
-        await audio.play();
-        return;
-      }
-    } catch(e) {
-      console.error("TTS error", e);
-    }
+    const utterance = new SpeechSynthesisUtterance(text);
     
-    // fallback
-    this.isPlaying = false;
-    if (!this.stopRequested) {
-      this.onStateChange("listening");
-      this.startListening(isProfessionalMode, environmentContext, history);
-    }
+    const voices = window.speechSynthesis.getVoices();
+    const indianFemale = voices.find(v => (v.name.includes('India') || v.lang === 'en-IN') && (v.name.includes('Female') || v.name.includes('Zira')));
+    if (indianFemale) utterance.voice = indianFemale;
+    
+    utterance.pitch = 1.1;
+    utterance.rate = 1.0;
+    
+    utterance.onend = () => {
+      this.isPlaying = false;
+      if (!this.stopRequested) {
+        this.onStateChange("listening");
+        this.startListening(isProfessionalMode, environmentContext, history);
+      }
+    };
+    
+    window.speechSynthesis.speak(utterance);
   }
 
   stop() {
@@ -182,3 +178,5 @@ export class LiveSessionManager {
     return { volume, highEnergy };
   }
 }
+`;
+await fs.writeFile('src/services/liveService.ts', content);

@@ -16,20 +16,16 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ onClose }) =
       setState(newState);
     });
 
-    import("../utils/envHelper").then(m => {
-      const clientEnv = m.getClientEnv();
-      
-      // Fetch initial config from backend
+    import("../utils/envHelper").then(m => m.getClientEnv()).then(clientEnv => {
       fetch("/api/config")
         .then(res => res.json())
         .then(config => {
           diagnosticsStore.setAllConfigured(!!(config.gemini || clientEnv.gemini));
-                            })
+        })
         .catch(err => {
           console.error("Failed to fetch diagnostics config:", err);
-          // Fallback to client check
           diagnosticsStore.setAllConfigured(!!clientEnv.gemini);
-                            });
+        });
     }).catch(e => console.error(e));
 
     return () => unsubscribe();

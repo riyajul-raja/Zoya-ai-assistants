@@ -1,7 +1,7 @@
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check, ChevronDown , Activity } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
+import { getZoyaResponseStream, getZoyaAudio } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import { GeminiIcon } from "./components/BrandIcons";
@@ -1174,7 +1174,7 @@ In your very first response or greeting to the user, you MUST casually and natur
   }, [messages, showChat]);
 
   const speakMessageText = useCallback((text: string) => {
-    window.speechSynthesis.cancel();
+    // speechSynthesis removed
     activeUtterancesRef.current = [];
 
     const sentences = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
@@ -1371,7 +1371,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     ]);
     
     // If live session is active (either because voice is active or camera is ON), send text through it
-    // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
+    // Standard REST API is now unified
     if (liveSessionRef.current && attachedImageBase64s.length === 0 && selectedModel.includes("gemini")) {
       liveSessionRef.current.sendText(finalTranscript);
       return;
@@ -1454,7 +1454,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         let lastProcessedIndex = 0;
         
         if (!isMuted && !skipSpeech) {
-          window.speechSynthesis.cancel(); // Clear any ongoing speech
+          // speechSynthesis removed // Clear any ongoing speech
           activeUtterancesRef.current = [];
         }
 
@@ -2474,7 +2474,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             >
               <div className="shrink-0"><GeminiIcon size={14} /></div>
               <span className="text-xs font-medium tracking-wide truncate">
-                {selectedModel === "gemini-3.6-flash" ? "Gemini 3.6 Flash" : selectedModel === "gemini-3.5-flash-lite" ? "Gemini 3.5 Flash Lite" : selectedModel === "gemini-3.5-flash" ? "Gemini 3.5 Flash" : selectedModel === "gemini-3.1-pro-preview" ? "Gemini 3.1 Pro Preview" : selectedModel === "gemini-3.1-flash-lite" ? "Gemini 3.1 Flash Lite" : selectedModel === "gemini-3-flash-preview" ? "Gemini 3 Flash Preview" : selectedModel === "gemini-pro-latest" ? "Gemini Pro Latest" : "Gemini 2.5 Flash"}
+                {selectedModel === "gemini-2.5-flash" ? "Gemini 2.5 Flash" : "Gemini 2.5 Flash"}
               </span>
               <ChevronDown
                 size={14}
@@ -2493,13 +2493,6 @@ In your very first response or greeting to the user, you MUST casually and natur
                 >
                   <div className="flex flex-col gap-1">
                     {[
-                      { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", desc: "All-around help", icon: <GeminiIcon /> },
-                      { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", desc: "Fastest answers", icon: <GeminiIcon /> },
-                      { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", desc: "Balanced speed & intelligence", icon: <GeminiIcon /> },
-                      { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", desc: "Advanced maths and code", icon: <GeminiIcon /> },
-                      { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", desc: "Ultra-fast response engine", icon: <GeminiIcon /> },
-                      { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", desc: "Next-gen experimental model", icon: <GeminiIcon /> },
-                      { id: "gemini-pro-latest", name: "Gemini Pro Latest", desc: "Complex reasoning & deep analysis", icon: <GeminiIcon /> },
                       { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", desc: "Stable default engine", icon: <GeminiIcon /> }
                     ].map((model) => (
                       <button

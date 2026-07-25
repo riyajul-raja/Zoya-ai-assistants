@@ -75,38 +75,6 @@ export async function getZoyaResponseStream(
   }
 }
 
-export async function getZoyaResponse(
-  prompt: string,
-  history: { sender: "user" | "zoya"; text: string; image?: string }[] = [],
-  imageFrames?: string | string[],
-  isProfessionalMode: boolean = false,
-  environmentContext: string = "",
-  selectedModel: string = "gemini-2.5-flash"
-): Promise<string> {
-  const startTime = Date.now();
-  diagnosticsStore.updateProvider(selectedModel as Provider, { status: "pending", lastRequestTime: startTime, isConfigured: true, modelName: selectedModel });
-  
-  try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, history, selectedModel, isProfessionalMode, environmentContext, imageFrames })
-    });
-    
-    if (!response.ok) {
-        let errData;
-        try { errData = await response.json(); } catch(e) {}
-        throw new Error(errData?.error || response.statusText);
-    }
-    
-    const data = await response.json();
-    diagnosticsStore.updateProvider(selectedModel as Provider, { status: "success", latencyMs: Date.now() - startTime });
-    return data.text || "Ugh, fine. I have nothing to say.";
-  } catch (error: any) {
-    diagnosticsStore.updateProvider(selectedModel as Provider, { status: "error", lastError: error.message, latencyMs: Date.now() - startTime });
-    throw error;
-  }
-}
 
 export async function getZoyaAudio(text: string): Promise<string | null> {
   try {
