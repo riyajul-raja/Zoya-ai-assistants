@@ -1,4 +1,5 @@
-import { GoogleGenAI, LiveServerMessage, Modality, Type } from "@google/genai";
+// Removed GoogleGenAI import
+type LiveServerMessage = any;
 import { processCommand } from "./commandService";
 
 const systemInstruction = `Your name is Zoya. You are an Indian female AI assistant. Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting your creator, Riyajul, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).
@@ -25,7 +26,6 @@ DYNAMIC FEATURE MEMORY PROTOCOL:
 - [Update 2026-07-15]: Upgraded your central visualizer container to an ultra-crisp, clean minimalist 3D spherical shell inspired by the high-end IRIS AI reference. It uses 750 micro-particles (0.4px-0.8px radius), incredibly thin 3D wrapping orbital rings with flawless depth sorting/layering, and a sharp, high-tech neon green default color theme that rotates and breathes dynamically based on your state.`;
 
 export class LiveSessionManager {
-  private ai: GoogleGenAI;
   private sessionPromise: Promise<any> | null = null;
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -46,7 +46,7 @@ export class LiveSessionManager {
   public onUIAction: (panelName: string) => void = () => {};
 
   constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    // No direct GoogleGenAI instantiation
   }
 
   async start(
@@ -135,54 +135,117 @@ export class LiveSessionManager {
       }
 
       // Connect to Live API
-      this.sessionPromise = this.ai.live.connect({
-        model: "gemini-3.1-flash-live-preview",
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
-          },
-          systemInstruction: activeSystemInstruction,
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-          tools: [{
-            functionDeclarations: [
-              {
-                name: "executeBrowserAction",
-                description: "Open a website or perform a browser action (like opening YouTube, Spotify, or WhatsApp). Call this when the user asks to open a site, play a song, or send a message.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    actionType: { type: Type.STRING, description: "Type of action: 'open', 'youtube', 'spotify', 'whatsapp'" },
-                    query: { type: Type.STRING, description: "The search query, website name, or message content." },
-                    target: { type: Type.STRING, description: "The target phone number for WhatsApp, if applicable." }
-                  },
-                  required: ["actionType", "query"]
-                }
+      this.sessionPromise = new Promise((resolve, reject) => {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/api/chat/stream`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log("Live API Connected via backend proxy");
+          this.onStateChange("listening");
+          
+          ws.send(JSON.stringify({
+            setup: {
+              model: "models/gemini-3.1-flash-live-preview",
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                  voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
+                },
               },
-              {
-                name: "openPanel",
-                description: "Open a specific workspace integration panel or tool (like Gmail, Calendar, Tasks, Keep, Contacts, Drive Explorer, Memories). Call this whenever the user wants to see, write, search, or read notes, emails, calendar entries, tasks, contacts, files, documents, slides, classroom or chat.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    panelName: {
-                      type: Type.STRING,
-                      description: "The name of the workspace panel to open. Allowed values: 'gmail', 'calendar', 'tasks', 'keep', 'contacts', 'drive', 'chat', 'docs', 'forms', 'meet', 'classroom', 'slides', 'memories'."
+              systemInstruction: {
+                parts: [{ text: activeSystemInstruction }]
+              },
+              tools: [{
+                functionDeclarations: [
+                  {
+                    name: "executeBrowserAction",
+                    description: "Open a website or perform a browser action (like opening YouTube, Spotify, or WhatsApp). Call this when the user asks to open a site, play a song, or send a message.",
+                    parameters: {
+                      type: "OBJECT",
+                      properties: {
+                        actionType: { type: "STRING", description: "Type of action: 'open', 'youtube', 'spotify', 'whatsapp'" },
+                        query: { type: "STRING", description: "The search query, website name, or message content." },
+                        target: { type: "STRING", description: "The target phone number for WhatsApp, if applicable." }
+                      },
+                      required: ["actionType", "query"]
                     }
                   },
-                  required: ["panelName"]
-                }
+                  {
+                    name: "openPanel",
+                    description: "Open a specific workspace integration panel or tool (like Gmail, Calendar, Tasks, Keep, Contacts, Drive Explorer, Memories). Call this whenever the user wants to see, write, search, or read notes, emails, calendar entries, tasks, contacts, files, documents, slides, classroom or chat.",
+                    parameters: {
+                      type: "OBJECT",
+                      properties: {
+                        panelName: {
+                          type: "STRING",
+                          description: "The name of the workspace panel to open. Allowed values: 'gmail', 'calendar', 'tasks', 'keep', 'contacts', 'drive', 'chat', 'docs', 'forms', 'meet', 'classroom', 'slides', 'memories'."
+                        }
+                      },
+                      required: ["panelName"]
+                    }
+                  }
+                ]
+              }]
+            }
+          }));
+
+          resolve({
+            sendRealtimeInput: (input: any) => {
+              if (input.audio) {
+                ws.send(JSON.stringify({
+                  realtimeInput: {
+                    mediaChunks: [{
+                      mimeType: input.audio.mimeType,
+                      data: input.audio.data
+                    }]
+                  }
+                }));
+              } else if (input.text) {
+                ws.send(JSON.stringify({
+                  clientContent: {
+                    turns: [{
+                      role: "user",
+                      parts: [{ text: input.text }]
+                    }],
+                    turnComplete: true
+                  }
+                }));
+              } else if (input.video) {
+                ws.send(JSON.stringify({
+                  realtimeInput: {
+                    mediaChunks: [{
+                      mimeType: input.video.mimeType,
+                      data: input.video.data
+                    }]
+                  }
+                }));
               }
-            ]
-          }]
-        },
-        callbacks: {
-          onopen: () => {
-            console.log("Live API Connected");
-            this.onStateChange("listening");
-          },
-          onmessage: async (message: LiveServerMessage) => {
+            },
+            sendToolResponse: (response: any) => {
+              ws.send(JSON.stringify({
+                toolResponse: {
+                  functionResponses: response.functionResponses
+                }
+              }));
+            },
+            close: () => {
+              ws.close();
+            }
+          });
+        };
+
+        ws.onmessage = async (event) => {
+          try {
+            let message: LiveServerMessage;
+            if (event.data instanceof Blob) {
+              const text = await event.data.text();
+              message = JSON.parse(text);
+            } else {
+              message = JSON.parse(event.data);
+            }
+            
+
             // Handle Audio Output
             const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (base64Audio) {
@@ -253,16 +316,21 @@ export class LiveSessionManager {
                 }
               }
             }
-          },
-          onclose: () => {
-            console.log("Live API Closed");
-            this.stop();
-          },
-          onerror: (err) => {
-            console.error("Live API Error:", err);
-            this.stop();
+          
+          } catch(err) {
+            console.error("Error in onmessage:", err);
           }
-        }
+        };
+
+        ws.onclose = () => {
+          console.log("Live API Closed");
+          this.stop();
+        };
+
+        ws.onerror = (err) => {
+          console.error("Live API Error:", err);
+          this.stop();
+        };
       });
 
     } catch (error) {
