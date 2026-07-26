@@ -17,26 +17,48 @@ export default async function handler(req: Request) {
       process.env.GEMINI_API_KEY_3,
       process.env.GEMINI_API_KEY_4,
       process.env.GEMINI_API_KEY_5
-    ].filter(Boolean);
-    const apiKey = keys[Math.floor(Math.random() * keys.length)] || keys[0];
-    if (!apiKey) {
+    ].filter(Boolean) as string[];
+
+    if (keys.length === 0) {
       return new Response(JSON.stringify({ error: 'Missing API Key' }), { status: 500 });
     }
-    const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Kore" },
+    let response;
+    let lastError;
+
+    // Shuffle keys
+    const startIndex = Math.floor(Math.random() * keys.length);
+    const orderedKeys = [...keys.slice(startIndex), ...keys.slice(0, startIndex)];
+
+    for (const apiKey of orderedKeys) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        response = await ai.models.generateContent({
+          model: "gemini-2.5-flash-preview-tts",
+          contents: [{ parts: [{ text }] }],
+          config: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: "Kore" },
+              },
+            },
           },
-        },
-      },
-    });
-    
+        });
+        break; // Successfully got the response!
+      } catch (error: any) {
+        console.warn(`Key failed with error: ${error?.status || error?.message}. Trying next key...`);
+        lastError = error;
+      }
+    }
+
+    if (!response) {
+      return new Response(JSON.stringify({ error: 'All API keys exhausted or failed: ' + lastError?.message }), {
+        status: lastError?.status === 429 ? 429 : 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
 
     return new Response(JSON.stringify({ audioData }), {
