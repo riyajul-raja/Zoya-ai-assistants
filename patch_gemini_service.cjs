@@ -1,6 +1,8 @@
-import { GoogleGenAI } from "@google/genai";
+const fs = require('fs');
 
-const systemInstruction = "Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).";
+const code = `import { GoogleGenAI } from "@google/genai";
+
+const systemInstruction = \`Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).\`;
 
 export async function getZoyaResponseStream(
   prompt: string,
@@ -174,3 +176,6 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
     return null;
   }
 }
+\`;
+
+fs.writeFileSync('src/services/geminiService.ts', code);
