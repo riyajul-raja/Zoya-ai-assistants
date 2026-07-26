@@ -2,7 +2,8 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  const { text } = req.body;
+  const { text: originalText } = req.body;
+  const text = "Generate an audio recording of the following text: " + originalText;
   try {
     const keys = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3, process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY];
     const geminiKey = keys.find(k => k && k.trim().length > 0 && !k.trim().startsWith("ya29."));
