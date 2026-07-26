@@ -20,6 +20,7 @@ import FormsManager from "./components/FormsManager";
 import MeetManager from "./components/MeetManager";
 import KeepManager from "./components/KeepManager";
 import ClassroomManager from "./components/ClassroomManager";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -3476,6 +3477,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           </>
         )}
       </AnimatePresence>
+      <SpeedInsights />
     </div>
   );
 }
