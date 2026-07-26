@@ -1631,10 +1631,9 @@ In your very first response or greeting to the user, you MUST casually and natur
           },
         ]);
       }
-      triggerToast("Error: " + errMsg.substring(0, 50));
       setAppState("idle");
     }
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking, triggerToast]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
 
   useEffect(() => {
     return () => {
