@@ -1,10 +1,17 @@
 const fs = require('fs');
-let code = fs.readFileSync('src/App.tsx', 'utf8');
+let content = fs.readFileSync('src/App.tsx', 'utf8');
 
-const oldToast = `            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] px-4 py-2.5 bg-black/40 border border-white/10 text-white rounded-full shadow-lg backdrop-blur-md flex items-center gap-3 pointer-events-none"`;
-const newToast = `            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[10000] px-4 py-2.5 bg-black/40 border border-white/10 text-white rounded-full shadow-lg backdrop-blur-md flex items-center gap-3 pointer-events-none"`;
+// Find the catch block in handleTextCommand
+const target = `      }
+      setAppState("idle");
+    }
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);`;
 
-code = code.replace(oldToast, newToast);
+const replacement = `      }
+      triggerToast("Error: " + errMsg.substring(0, 50));
+      setAppState("idle");
+    }
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking, triggerToast]);`;
 
-fs.writeFileSync('src/App.tsx', code);
-console.log("Patched App.tsx");
+content = content.replace(target, replacement);
+fs.writeFileSync('src/App.tsx', content);

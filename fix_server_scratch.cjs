@@ -1,4 +1,6 @@
-import fs from "fs";
+const fs = require('fs');
+
+const content = `import fs from "fs";
 import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI } from '@google/genai';
@@ -132,14 +134,14 @@ app.post('/api/chat/stream', async (req, res) => {
     for await (const chunk of responseStream) {
       const chunkText = chunk.text || "";
       if (chunkText) {
-        res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+        res.write(\`data: \${JSON.stringify({ text: chunkText })}\\n\\n\`);
       }
     }
-    res.write('data: [DONE]\n\n');
+    res.write('data: [DONE]\\n\\n');
     res.end();
   } catch (error) {
     console.error("Gemini Stream Error:", error);
-    res.write(`data: ${JSON.stringify({ error: { message: error.message, status: error.status, code: error.code } })}\n\n`);
+    res.write(\`data: \${JSON.stringify({ error: { message: error.message, status: error.status, code: error.code } })}\\n\\n\`);
     res.end();
   }
 });
@@ -185,8 +187,11 @@ async function startServer() {
     });
   }
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(\`Server running on http://localhost:\${PORT}\`);
   });
 }
 
 startServer();
+`;
+
+fs.writeFileSync('server.ts', content);

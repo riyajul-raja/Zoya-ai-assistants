@@ -14,6 +14,10 @@ export async function getZoyaResponseStream(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, history, imageFrames })
     });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errText}`);
+    }
 
     if (!response.body) throw new Error('No response body');
 
@@ -47,9 +51,7 @@ export async function getZoyaResponseStream(
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
     console.error("Gemini Stream Error:", error);
-    const fallback = `API Limit Reached or Error. Zoya is resting. Details: ${error.message || String(error)}`;
-    if (onChunk) onChunk(fallback);
-    return fallback;
+    throw error;
   }
 }
 
@@ -66,6 +68,10 @@ export async function getZoyaResponse(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, history, imageFrames })
     });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errText}`);
+    }
     
     const data = await response.json();
     if (data.error) throw new Error(data.error);
@@ -73,7 +79,7 @@ export async function getZoyaResponse(
     return data.text || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    return `API Limit Reached or Error. Zoya is resting. Details: ${error.message || String(error)}`;
+    throw error;
   }
 }
 
@@ -84,6 +90,10 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
     });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errText}`);
+    }
     
     const data = await response.json();
     if (data.error) throw new Error(data.error);
