@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, transcribeAudio } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
@@ -230,6 +230,8 @@ export default function App() {
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -1830,10 +1832,10 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (isSessionActive) {
       setIsSessionActive(false);
       
-      if (isListening && recognitionRef.current) {
+      if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         isManuallyStoppedRef.current = true;
         try {
-          recognitionRef.current.stop();
+          mediaRecorderRef.current.stop();
         } catch (err) {}
         setIsListening(false);
       }
@@ -1882,20 +1884,12 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
-  const toggleInputDictation = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
-      return;
-    }
-
+  const toggleInputDictation = async () => {
     if (isListening) {
       isManuallyStoppedRef.current = true;
       isListeningRef.current = false;
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (err) {}
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
       }
       setIsListening(false);
       setAppState("idle");
@@ -1903,85 +1897,84 @@ In your very first response or greeting to the user, you MUST casually and natur
       return;
     }
 
-    let speechDetected = false;
-    isManuallyStoppedRef.current = false;
-
     try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.lang = "en-IN";
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
-      recognition.onstart = () => {
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstart = () => {
         isListeningRef.current = true;
         setIsListening(true);
         setAppState("listening");
         setIsSessionActive(true);
+        isManuallyStoppedRef.current = false;
       };
 
-      recognition.onresult = (event: any) => {
-        let newTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            newTranscript += event.results[i][0].transcript + " ";
-          }
-        }
-        
-        if (newTranscript.trim()) {
-          speechDetected = true;
-          // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
-          setTextInput((prev) => {
-            const trimmedPrev = prev.trim();
-            return trimmedPrev ? `${trimmedPrev} ${newTranscript.trim()}` : newTranscript.trim();
-          });
-          // Auto-reveal the text input field when voice is transcribed
-          setShowChat(true);
-        }
-      };
+      mediaRecorder.onstop = async () => {
+        isListeningRef.current = false;
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+        stream.getTracks().forEach(track => track.stop());
 
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          isManuallyStoppedRef.current = true;
-          isListeningRef.current = false;
-          setIsListening(false);
-          setAppState("idle");
-          setIsSessionActive(false);
-        }
-        // Other errors (like 'no-speech', 'network') shouldn't necessarily stop the loop if we want it robust, 
-        // but typically 'no-speech' will lead to 'onend' anyway.
-      };
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          audioChunksRef.current = [];
 
-      recognition.onend = () => {
-        if (!isManuallyStoppedRef.current) {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error("Auto-restart failed:", e);
-            isListeningRef.current = false;
-            setIsListening(false);
-            setAppState("idle");
-            setIsSessionActive(false);
-          }
-        } else {
-          isListeningRef.current = false;
-          setIsListening(false);
-          setAppState("idle");
-          setIsSessionActive(false);
+          // Convert blob to base64
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = async () => {
+            const base64data = reader.result as string;
+            // The data URL contains "data:audio/webm;base64,..."
+            const base64Only = base64data.split(',')[1];
+            
+            try {
+              const transcribedText = await transcribeAudio(base64Only, "audio/webm");
+              if (transcribedText) {
+                setTextInput((prev) => {
+                  const trimmedPrev = prev.trim();
+                  return trimmedPrev ? `${trimmedPrev} ${transcribedText}` : transcribedText;
+                });
+                setShowChat(true);
+              }
+            } catch (err) {
+              console.error("Transcription failed", err);
+            }
+          };
         }
       };
 
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e) {
-      console.error("Speech recognition initialization error:", e);
+      mediaRecorder.onerror = (event: any) => {
+        console.error("MediaRecorder error:", event.error);
+        isManuallyStoppedRef.current = true;
+        isListeningRef.current = false;
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+      };
+
+      mediaRecorder.start();
+    } catch (e: any) {
+      console.error("MediaRecorder initialization error:", e);
       isManuallyStoppedRef.current = true;
       isListeningRef.current = false;
       setIsListening(false);
       setAppState("idle");
       setIsSessionActive(false);
-      if (!speechDetected) {
-        setShowChat(false);
+      
+      const errorMessage = e?.message || "";
+      if (errorMessage.toLowerCase().includes("notallowederror") || errorMessage.toLowerCase().includes("permission denied")) {
+        setShowPermissionModal(true);
+      } else {
+        alert("Microphone access is required for dictation.");
       }
     }
   };
@@ -2038,10 +2031,10 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (!textInput.trim() && selectedImages.length === 0) return;
     
     // Stop voice dictation if active
-    if (isListening && recognitionRef.current) {
+    if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       isManuallyStoppedRef.current = true;
       try {
-        recognitionRef.current.stop();
+        mediaRecorderRef.current.stop();
       } catch (err) {}
       setIsListening(false);
     }
@@ -2887,10 +2880,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => {
-                      if (isListening && recognitionRef.current) {
+                      if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
                         isManuallyStoppedRef.current = true;
                         try {
-                          recognitionRef.current.stop();
+                          mediaRecorderRef.current.stop();
                         } catch (err) {}
                         setIsListening(false);
                       }
