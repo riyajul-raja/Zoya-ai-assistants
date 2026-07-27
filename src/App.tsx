@@ -236,6 +236,7 @@ export default function App() {
 
   const isSessionActiveRef = useRef(isSessionActive);
   const isListeningRef = useRef(isListening);
+  const isManuallyStoppedRef = useRef(true);
 
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
@@ -1830,6 +1831,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       setIsSessionActive(false);
       
       if (isListening && recognitionRef.current) {
+        isManuallyStoppedRef.current = true;
         try {
           recognitionRef.current.stop();
         } catch (err) {}
@@ -1888,6 +1890,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
 
     if (isListening) {
+      isManuallyStoppedRef.current = true;
       isListeningRef.current = false;
       if (recognitionRef.current) {
         try {
@@ -1901,6 +1904,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
 
     let speechDetected = false;
+    isManuallyStoppedRef.current = false;
 
     try {
       const recognition = new SpeechRecognition();
@@ -1938,6 +1942,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          isManuallyStoppedRef.current = true;
           isListeningRef.current = false;
           setIsListening(false);
           setAppState("idle");
@@ -1948,7 +1953,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       };
 
       recognition.onend = () => {
-        if (isListeningRef.current) {
+        if (!isManuallyStoppedRef.current) {
           try {
             recognition.start();
           } catch (e) {
@@ -1959,6 +1964,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             setIsSessionActive(false);
           }
         } else {
+          isListeningRef.current = false;
           setIsListening(false);
           setAppState("idle");
           setIsSessionActive(false);
@@ -1969,6 +1975,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.start();
     } catch (e) {
       console.error("Speech recognition initialization error:", e);
+      isManuallyStoppedRef.current = true;
       isListeningRef.current = false;
       setIsListening(false);
       setAppState("idle");
@@ -2032,6 +2039,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     
     // Stop voice dictation if active
     if (isListening && recognitionRef.current) {
+      isManuallyStoppedRef.current = true;
       try {
         recognitionRef.current.stop();
       } catch (err) {}
@@ -2880,6 +2888,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                     type="button"
                     onClick={() => {
                       if (isListening && recognitionRef.current) {
+                        isManuallyStoppedRef.current = true;
                         try {
                           recognitionRef.current.stop();
                         } catch (err) {}
