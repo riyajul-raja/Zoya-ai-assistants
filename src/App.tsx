@@ -1888,12 +1888,15 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
 
     if (isListening) {
+      isListeningRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch (err) {}
       }
       setIsListening(false);
+      setAppState("idle");
+      setIsSessionActive(false);
       return;
     }
 
@@ -1901,27 +1904,31 @@ In your very first response or greeting to the user, you MUST casually and natur
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = false;
       recognition.lang = "en-IN";
 
       recognition.onstart = () => {
+        isListeningRef.current = true;
         setIsListening(true);
         setAppState("listening");
         setIsSessionActive(true);
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results && event.results[0] && event.results[0][0]
-          ? event.results[0][0].transcript
-          : "";
+        let newTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            newTranscript += event.results[i][0].transcript + " ";
+          }
+        }
         
-        if (transcript && transcript.trim()) {
+        if (newTranscript.trim()) {
           speechDetected = true;
           // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
           setTextInput((prev) => {
             const trimmedPrev = prev.trim();
-            return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
+            return trimmedPrev ? `${trimmedPrev} ${newTranscript.trim()}` : newTranscript.trim();
           });
           // Auto-reveal the text input field when voice is transcribed
           setShowChat(true);
@@ -1930,28 +1937,44 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        setAppState("idle");
-        setIsSessionActive(false);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          isListeningRef.current = false;
+          setIsListening(false);
+          setAppState("idle");
+          setIsSessionActive(false);
+        }
+        // Other errors (like 'no-speech', 'network') shouldn't necessarily stop the loop if we want it robust, 
+        // but typically 'no-speech' will lead to 'onend' anyway.
       };
 
       recognition.onend = () => {
-        setIsListening(false);
-        setAppState("idle");
-        setIsSessionActive(false);
+        if (isListeningRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("Auto-restart failed:", e);
+            isListeningRef.current = false;
+            setIsListening(false);
+            setAppState("idle");
+            setIsSessionActive(false);
+          }
+        } else {
+          setIsListening(false);
+          setAppState("idle");
+          setIsSessionActive(false);
+        }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
     } catch (e) {
       console.error("Speech recognition initialization error:", e);
-      if (!isSessionActiveRef.current) {
-        setIsListening(false);
-        setAppState("idle");
-        setIsSessionActive(false);
-        if (!speechDetected) {
-          setShowChat(false);
-        }
+      isListeningRef.current = false;
+      setIsListening(false);
+      setAppState("idle");
+      setIsSessionActive(false);
+      if (!speechDetected) {
+        setShowChat(false);
       }
     }
   };
