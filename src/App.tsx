@@ -1,7 +1,7 @@
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check, ChevronDown , Activity } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, transcribeAudioWithGemini } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import { GeminiIcon } from "./components/BrandIcons";
@@ -234,7 +234,8 @@ export default function App() {
 
 
   const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<any>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -1011,8 +1012,8 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   // Synchronize Live Session Lifecycle with isCameraActive, isSessionActive, and isMuted
   useEffect(() => {
-    const shouldBeRunning = isCameraActive || isSessionActive;
-    const requiredMic = !!isSessionActive;
+    const shouldBeRunning = isCameraActive;
+    const requiredMic = !!isCameraActive;
 
     const manageSession = async () => {
       const currentSession = liveSessionRef.current;
@@ -1816,23 +1817,22 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (e) {
       e.preventDefault();
     }
+    
     if (isSessionActive) {
-      setIsSessionActive(false);
-      
-      if (isListening && recognitionRef.current) {
+      if (mediaRecorderRef.current) {
         try {
-          recognitionRef.current.stop();
+          mediaRecorderRef.current.stop();
         } catch (err) {}
-        setIsListening(false);
       }
+      setIsSessionActive(false);
+      setIsListening(false);
+      setAppState("idle");
     } else {
       try {
-        // Do not show "Microphone Blocked" before actually requesting microphone permission.
-        // Call navigator.mediaDevices.getUserMedia() first.
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error("Microphone access is not supported by your browser or secure context (ensure HTTPS).");
         }
-
+        
         const stream = await navigator.mediaDevices.getUserMedia({ 
           audio: {
             echoCancellation: true,
@@ -1840,16 +1840,56 @@ In your very first response or greeting to the user, you MUST casually and natur
             autoGainControl: true,
           } 
         });
-        // Release the mic track immediately, as our centralized useEffect will start the live session and request it
-        stream.getTracks().forEach(track => track.stop());
-
-        // Now that permission is granted, toggle state to trigger our centralized Live Session manager
-        setIsSessionActive(true);
         
+        const mediaRecorder = new MediaRecorder(stream);
+        audioChunksRef.current = [];
+        
+        mediaRecorder.onstart = () => {
+          setIsSessionActive(true);
+          setIsListening(true);
+          setAppState("listening");
+        };
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          setIsSessionActive(false);
+          setIsListening(false);
+          setAppState("idle");
+          
+          stream.getTracks().forEach(track => track.stop());
+
+          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
+          if (audioBlob.size > 0) {
+            try {
+              setAppState("thinking");
+              const transcript = await transcribeAudioWithGemini(audioBlob);
+              if (transcript && transcript.trim()) {
+                handleTextCommand(transcript.trim(), true);
+              }
+            } catch (err) {
+              console.error("Transcription error:", err);
+            } finally {
+              setAppState("idle");
+            }
+          }
+        };
+
+        mediaRecorder.onerror = (event: any) => {
+          console.error("MediaRecorder error:", event.error);
+          setIsSessionActive(false);
+          setIsListening(false);
+          setAppState("idle");
+        };
+
+        mediaRecorderRef.current = mediaRecorder;
+        mediaRecorder.start(1000);
       } catch (e: any) {
         console.error("Failed to start session", e);
-        
-        // Show "Microphone Blocked" only if getUserMedia() throws NotAllowedError or PermissionDeniedError
         const errorName = e?.name || "";
         const errorMessage = e?.message || "";
         const isPermissionError = 
@@ -1863,86 +1903,82 @@ In your very first response or greeting to the user, you MUST casually and natur
         } else {
           alert(`Could not start voice session: ${errorMessage || "Unknown error"}`);
         }
-
         setIsSessionActive(false);
+        setIsListening(false);
         setAppState("idle");
       }
     }
   };
-
-  const toggleInputDictation = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
-      return;
-    }
-
+  const toggleInputDictation = async () => {
     if (isListening) {
-      if (recognitionRef.current) {
+      if (mediaRecorderRef.current) {
         try {
-          recognitionRef.current.stop();
+          mediaRecorderRef.current.stop();
         } catch (err) {}
       }
       setIsListening(false);
       return;
     }
 
-    let speechDetected = false;
-
     try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-IN";
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
 
-      recognition.onstart = () => {
+      mediaRecorder.onstart = () => {
         setIsListening(true);
         setAppState("listening");
         setIsSessionActive(true);
       };
 
-      recognition.onresult = (event: any) => {
-        const transcript = event.results && event.results[0] && event.results[0][0]
-          ? event.results[0][0].transcript
-          : "";
-        
-        if (transcript && transcript.trim()) {
-          speechDetected = true;
-          // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
-          setTextInput((prev) => {
-            const trimmedPrev = prev.trim();
-            return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
-          });
-          // Auto-reveal the text input field when voice is transcribed
-          setShowChat(true);
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
         }
       };
 
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
+      mediaRecorder.onstop = async () => {
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+
+        stream.getTracks().forEach((track) => track.stop());
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
+        if (audioBlob.size > 0) {
+          try {
+            setAppState("thinking");
+            const transcript = await transcribeAudioWithGemini(audioBlob);
+            if (transcript && transcript.trim()) {
+              setTextInput((prev) => {
+                const trimmedPrev = prev.trim();
+                return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
+              });
+              setShowChat(true);
+            }
+          } catch (err) {
+            console.error("Transcription error:", err);
+          } finally {
+            setAppState("idle");
+          }
+        }
+      };
+
+      mediaRecorder.onerror = (event: any) => {
+        console.error("MediaRecorder error:", event.error);
         setIsListening(false);
         setAppState("idle");
         setIsSessionActive(false);
       };
 
-      recognition.onend = () => {
-        setIsListening(false);
-        setAppState("idle");
-        setIsSessionActive(false);
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start(1000);
     } catch (e) {
-      console.error("Speech recognition initialization error:", e);
-      if (!isSessionActiveRef.current) {
-        setIsListening(false);
-        setAppState("idle");
-        setIsSessionActive(false);
-        if (!speechDetected) {
-          setShowChat(false);
-        }
-      }
+      console.error("Microphone access error:", e);
+      alert("Microphone access denied or not supported.");
+      setIsListening(false);
+      setAppState("idle");
+      setIsSessionActive(false);
     }
   };
 
@@ -1998,9 +2034,9 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (!textInput.trim() && selectedImages.length === 0) return;
     
     // Stop voice dictation if active
-    if (isListening && recognitionRef.current) {
+    if (isListening && mediaRecorderRef.current) {
       try {
-        recognitionRef.current.stop();
+        mediaRecorderRef.current.stop();
       } catch (err) {}
       setIsListening(false);
     }
@@ -2927,9 +2963,9 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => {
-                      if (isListening && recognitionRef.current) {
+                      if (isListening && mediaRecorderRef.current) {
                         try {
-                          recognitionRef.current.stop();
+                          mediaRecorderRef.current.stop();
                         } catch (err) {}
                         setIsListening(false);
                       }

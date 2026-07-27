@@ -196,3 +196,34 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
     return null;
   }
 }
+export async function transcribeAudioWithGemini(audioBlob: Blob): Promise<string> {
+  const geminiKey = getGeminiKey();
+  if (!geminiKey) throw new Error("Gemini API key not configured.");
+  const ai = new GoogleGenAI({ apiKey: geminiKey });
+  
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(audioBlob);
+    reader.onloadend = async () => {
+      try {
+        const base64data = (reader.result as string).split(',')[1];
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{
+            role: "user",
+            parts: [
+              { text: "Please transcribe this audio accurately. Only return the transcribed text, nothing else." },
+              { inlineData: { mimeType: audioBlob.type, data: base64data } }
+            ]
+          }]
+        });
+        
+        resolve(response.text || "");
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+  });
+}
