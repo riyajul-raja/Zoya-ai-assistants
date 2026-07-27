@@ -1,24 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
-import * as dotenv from 'dotenv';
-dotenv.config();
-const ai = new GoogleGenAI({});
-async function run() {
-  const session = await ai.live.connect({
-    model: "gemini-3.1-flash-live-preview",
-    config: {
-      responseModalities: ["AUDIO"],
-      systemInstruction: { parts: [{ text: "You are Zoya." }] },
-    }
-  });
-  console.log("Connected!");
-  session.sendRealtimeInput({
-    media: { data: "AAAA", mimeType: 'audio/pcm;rate=16000' }
-  });
-  console.log("Sent media!");
-  session.onclose = () => console.log("Closed!");
-  session.onerror = (e) => console.log("Error!", e);
-  session.onmessage = (m) => console.log(JSON.stringify(m));
-  
-  await new Promise(r => setTimeout(r, 5000));
-}
-run().catch(console.error);
+const WebSocket = require('ws');
+const ws = new WebSocket('ws://localhost:3000/api/chat/stream');
+ws.on('open', () => console.log('connected'));
+ws.on('error', (e) => console.log('error:', e.message));
+ws.on('unexpected-response', (req, res) => {
+    console.log('unexpected response:', res.statusCode, res.statusMessage);
+});

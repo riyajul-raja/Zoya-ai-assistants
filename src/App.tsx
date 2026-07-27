@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, transcribeAudio } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
@@ -230,16 +230,12 @@ export default function App() {
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [isStartingSession, setIsStartingSession] = useState(false);
 
   const isSessionActiveRef = useRef(isSessionActive);
   const isListeningRef = useRef(isListening);
-  const isManuallyStoppedRef = useRef(true);
 
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
@@ -1830,20 +1826,16 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (e) {
       e.preventDefault();
     }
-    if (isStartingSession) return;
-    
     if (isSessionActive) {
       setIsSessionActive(false);
       
-      if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        isManuallyStoppedRef.current = true;
+      if (isListening && recognitionRef.current) {
         try {
-          mediaRecorderRef.current.stop();
+          recognitionRef.current.stop();
         } catch (err) {}
         setIsListening(false);
       }
     } else {
-      setIsStartingSession(true);
       try {
         // Do not show "Microphone Blocked" before actually requesting microphone permission.
         // Call navigator.mediaDevices.getUserMedia() first.
@@ -1881,117 +1873,85 @@ In your very first response or greeting to the user, you MUST casually and natur
         } else {
           alert(`Could not start voice session: ${errorMessage || "Unknown error"}`);
         }
+
         setIsSessionActive(false);
         setAppState("idle");
-      } finally {
-        setIsStartingSession(false);
       }
     }
   };
 
-  const toggleInputDictation = async () => {
-    if (isListening) {
-      isManuallyStoppedRef.current = true;
-      isListeningRef.current = false;
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
-      setIsListening(false);
-      setAppState("idle");
-      setIsSessionActive(false);
+  const toggleInputDictation = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
       return;
     }
 
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (err) {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    let speechDetected = false;
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN";
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstart = () => {
-        isListeningRef.current = true;
+      recognition.onstart = () => {
         setIsListening(true);
         setAppState("listening");
         setIsSessionActive(true);
-        isManuallyStoppedRef.current = false;
       };
 
-      mediaRecorder.onstop = async () => {
-        isListeningRef.current = false;
-        setIsListening(false);
-        setIsSessionActive(false);
-        stream.getTracks().forEach(track => track.stop());
-
-        if (audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          audioChunksRef.current = [];
-
-          if (audioBlob.size === 0) {
-            alert("No audio recorded");
-            setAppState("idle");
-            return;
-          }
-
-          setAppState("processing");
-
-          // Convert blob to base64
-          const reader = new FileReader();
-          reader.readAsDataURL(audioBlob);
-          reader.onloadend = async () => {
-            const base64data = reader.result as string;
-            // The data URL contains "data:audio/webm;base64,..."
-            const base64Only = base64data.split(',')[1];
-            
-            try {
-              const transcribedText = await transcribeAudio(base64Only, "audio/webm");
-              if (transcribedText) {
-                setTextInput((prev) => {
-                  const trimmedPrev = prev.trim();
-                  return trimmedPrev ? `${trimmedPrev} ${transcribedText}` : transcribedText;
-                });
-                setShowChat(true);
-              }
-            } catch (err) {
-              console.error("Transcription failed", err);
-            } finally {
-              setAppState("idle");
-            }
-          };
-        } else {
-          alert("No audio recorded");
-          setAppState("idle");
+      recognition.onresult = (event: any) => {
+        const transcript = event.results && event.results[0] && event.results[0][0]
+          ? event.results[0][0].transcript
+          : "";
+        
+        if (transcript && transcript.trim()) {
+          speechDetected = true;
+          // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
+          setTextInput((prev) => {
+            const trimmedPrev = prev.trim();
+            return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
+          });
+          // Auto-reveal the text input field when voice is transcribed
+          setShowChat(true);
         }
       };
 
-      mediaRecorder.onerror = (event: any) => {
-        console.error("MediaRecorder error:", event.error);
-        isManuallyStoppedRef.current = true;
-        isListeningRef.current = false;
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
         setAppState("idle");
         setIsSessionActive(false);
       };
 
-      mediaRecorder.start();
-    } catch (e: any) {
-      console.error("MediaRecorder initialization error:", e);
-      isManuallyStoppedRef.current = true;
-      isListeningRef.current = false;
-      setIsListening(false);
-      setAppState("idle");
-      setIsSessionActive(false);
-      
-      const errorMessage = e?.message || "";
-      if (errorMessage.toLowerCase().includes("notallowederror") || errorMessage.toLowerCase().includes("permission denied")) {
-        setShowPermissionModal(true);
-      } else {
-        alert("Microphone access is required for dictation.");
+      recognition.onend = () => {
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.error("Speech recognition initialization error:", e);
+      if (!isSessionActiveRef.current) {
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+        if (!speechDetected) {
+          setShowChat(false);
+        }
       }
     }
   };
@@ -2048,10 +2008,9 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (!textInput.trim() && selectedImages.length === 0) return;
     
     // Stop voice dictation if active
-    if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      isManuallyStoppedRef.current = true;
+    if (isListening && recognitionRef.current) {
       try {
-        mediaRecorderRef.current.stop();
+        recognitionRef.current.stop();
       } catch (err) {}
       setIsListening(false);
     }
@@ -2897,10 +2856,9 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => {
-                      if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-                        isManuallyStoppedRef.current = true;
+                      if (isListening && recognitionRef.current) {
                         try {
-                          mediaRecorderRef.current.stop();
+                          recognitionRef.current.stop();
                         } catch (err) {}
                         setIsListening(false);
                       }
@@ -3220,13 +3178,10 @@ In your very first response or greeting to the user, you MUST casually and natur
 
           <button
             onClick={toggleListening}
-            disabled={isStartingSession}
             className={`
               group relative flex items-center gap-3 px-8 py-4 rounded-full font-medium tracking-wide transition-all duration-300 shadow-2xl cursor-pointer
               ${
-                isStartingSession 
-                  ? "opacity-50 cursor-not-allowed bg-white/5 border border-white/10 text-white/50"
-                  : isSessionActive
+                isSessionActive
                   ? "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30"
                   : isGhostMode
                   ? "bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:scale-105"

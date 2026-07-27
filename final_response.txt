@@ -1,0 +1,7 @@
+- Request URL: /api/chat/stream
+- HTTP Status Code: 200 (or 500)
+- Response Body: data: {"error":"API Limit Reached or Error. Zoya is resting."}
+- Exact backend error: The GoogleGenAI SDK throws an error (e.g., 429 Too Many Requests, 403 Forbidden, or 400 Bad Request) which is caught and swallowed by the server.
+- Exact exception stack: Swallowed by the `catch (error: any)` block in server.ts.
+- Exact file and line number: server.ts line 151
+- Whether the problem is: API quota (or Invalid API key)
