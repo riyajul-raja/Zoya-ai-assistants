@@ -235,6 +235,7 @@ export default function App() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isStartingSession, setIsStartingSession] = useState(false);
 
   const isSessionActiveRef = useRef(isSessionActive);
   const isListeningRef = useRef(isListening);
@@ -1829,6 +1830,8 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (e) {
       e.preventDefault();
     }
+    if (isStartingSession) return;
+    
     if (isSessionActive) {
       setIsSessionActive(false);
       
@@ -1840,6 +1843,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsListening(false);
       }
     } else {
+      setIsStartingSession(true);
       try {
         // Do not show "Microphone Blocked" before actually requesting microphone permission.
         // Call navigator.mediaDevices.getUserMedia() first.
@@ -1877,9 +1881,10 @@ In your very first response or greeting to the user, you MUST casually and natur
         } else {
           alert(`Could not start voice session: ${errorMessage || "Unknown error"}`);
         }
-
         setIsSessionActive(false);
         setAppState("idle");
+      } finally {
+        setIsStartingSession(false);
       }
     }
   };
@@ -1920,13 +1925,20 @@ In your very first response or greeting to the user, you MUST casually and natur
       mediaRecorder.onstop = async () => {
         isListeningRef.current = false;
         setIsListening(false);
-        setAppState("idle");
         setIsSessionActive(false);
         stream.getTracks().forEach(track => track.stop());
 
         if (audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           audioChunksRef.current = [];
+
+          if (audioBlob.size === 0) {
+            alert("No audio recorded");
+            setAppState("idle");
+            return;
+          }
+
+          setAppState("processing");
 
           // Convert blob to base64
           const reader = new FileReader();
@@ -1947,8 +1959,13 @@ In your very first response or greeting to the user, you MUST casually and natur
               }
             } catch (err) {
               console.error("Transcription failed", err);
+            } finally {
+              setAppState("idle");
             }
           };
+        } else {
+          alert("No audio recorded");
+          setAppState("idle");
         }
       };
 
@@ -3203,10 +3220,13 @@ In your very first response or greeting to the user, you MUST casually and natur
 
           <button
             onClick={toggleListening}
+            disabled={isStartingSession}
             className={`
               group relative flex items-center gap-3 px-8 py-4 rounded-full font-medium tracking-wide transition-all duration-300 shadow-2xl cursor-pointer
               ${
-                isSessionActive
+                isStartingSession 
+                  ? "opacity-50 cursor-not-allowed bg-white/5 border border-white/10 text-white/50"
+                  : isSessionActive
                   ? "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30"
                   : isGhostMode
                   ? "bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:scale-105"

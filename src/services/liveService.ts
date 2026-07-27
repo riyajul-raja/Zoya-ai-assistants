@@ -57,8 +57,6 @@ export class LiveSessionManager {
     history: { sender: "user" | "zoya"; text: string; image?: string }[] = []
   ) {
     try {
-      this.onStateChange("processing");
-      
       // Initialize Audio Contexts
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.playbackContext = new AudioContextClass({ sampleRate: 24000 });
@@ -73,15 +71,19 @@ export class LiveSessionManager {
         }
 
         // Get Microphone
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            channelCount: 1,
-            sampleRate: 16000,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          } 
-        });
+        try {
+          this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              channelCount: 1,
+              sampleRate: 16000,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            } 
+          });
+        } catch (mediaError: any) {
+          throw mediaError;
+        }
 
         this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
         this.analyser = this.audioContext.createAnalyser();
