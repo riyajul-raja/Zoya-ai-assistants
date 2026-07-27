@@ -110,7 +110,7 @@ export class LiveSessionManager {
 
           this.sessionPromise.then(session => {
             session.sendRealtimeInput({
-              audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+              media: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
             });
           }).catch(err => console.error("Error sending audio", err));
         };
@@ -367,7 +367,7 @@ export class LiveSessionManager {
     if (this.sessionPromise) {
       this.sessionPromise.then(session => {
         session.sendRealtimeInput({
-          video: { data: base64Data, mimeType: "image/jpeg" }
+          media: { data: base64Data, mimeType: "image/jpeg" }
         });
       }).catch(err => console.error("Error sending video frame to Live API:", err));
     }
