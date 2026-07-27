@@ -153,28 +153,7 @@ export async function getZoyaResponse(
   }
 }
 
-export async function transcribeAudio(base64Audio: string, mimeType: string = "audio/webm"): Promise<string> {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: [{
-        role: "user",
-        parts: [
-          { text: "Please transcribe this audio exactly as it is spoken. Do not add any commentary, notes, or extra formatting. Only return the transcribed text." },
-          { inlineData: { mimeType, data: base64Audio } }
-        ]
-      }]
-    });
-    return response.text?.trim() || "";
-  } catch (error) {
-    console.error("Transcription Error:", error);
-    return "";
-  }
-}
-
 export async function getZoyaAudio(text: string): Promise<string | null> {
-
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const response = await ai.models.generateContent({

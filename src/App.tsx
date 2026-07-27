@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, transcribeAudio } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
@@ -230,16 +230,12 @@ export default function App() {
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [isStartingSession, setIsStartingSession] = useState(false);
 
   const isSessionActiveRef = useRef(isSessionActive);
   const isListeningRef = useRef(isListening);
-  const isManuallyStoppedRef = useRef(true);
 
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
@@ -1830,20 +1826,16 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (e) {
       e.preventDefault();
     }
-    if (isStartingSession) return;
-    
     if (isSessionActive) {
       setIsSessionActive(false);
       
-      if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        isManuallyStoppedRef.current = true;
+      if (isListening && recognitionRef.current) {
         try {
-          mediaRecorderRef.current.stop();
+          recognitionRef.current.stop();
         } catch (err) {}
         setIsListening(false);
       }
     } else {
-      setIsStartingSession(true);
       try {
         // Do not show "Microphone Blocked" before actually requesting microphone permission.
         // Call navigator.mediaDevices.getUserMedia() first.
@@ -1881,117 +1873,85 @@ In your very first response or greeting to the user, you MUST casually and natur
         } else {
           alert(`Could not start voice session: ${errorMessage || "Unknown error"}`);
         }
+
         setIsSessionActive(false);
         setAppState("idle");
-      } finally {
-        setIsStartingSession(false);
       }
     }
   };
 
-  const toggleInputDictation = async () => {
-    if (isListening) {
-      isManuallyStoppedRef.current = true;
-      isListeningRef.current = false;
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
-      setIsListening(false);
-      setAppState("idle");
-      setIsSessionActive(false);
+  const toggleInputDictation = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
       return;
     }
 
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (err) {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    let speechDetected = false;
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN";
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstart = () => {
-        isListeningRef.current = true;
+      recognition.onstart = () => {
         setIsListening(true);
         setAppState("listening");
         setIsSessionActive(true);
-        isManuallyStoppedRef.current = false;
       };
 
-      mediaRecorder.onstop = async () => {
-        isListeningRef.current = false;
-        setIsListening(false);
-        setIsSessionActive(false);
-        stream.getTracks().forEach(track => track.stop());
-
-        if (audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          audioChunksRef.current = [];
-
-          if (audioBlob.size === 0) {
-            alert("No audio recorded");
-            setAppState("idle");
-            return;
-          }
-
-          setAppState("processing");
-
-          // Convert blob to base64
-          const reader = new FileReader();
-          reader.readAsDataURL(audioBlob);
-          reader.onloadend = async () => {
-            const base64data = reader.result as string;
-            // The data URL contains "data:audio/webm;base64,..."
-            const base64Only = base64data.split(',')[1];
-            
-            try {
-              const transcribedText = await transcribeAudio(base64Only, "audio/webm");
-              if (transcribedText) {
-                setTextInput((prev) => {
-                  const trimmedPrev = prev.trim();
-                  return trimmedPrev ? `${trimmedPrev} ${transcribedText}` : transcribedText;
-                });
-                setShowChat(true);
-              }
-            } catch (err) {
-              console.error("Transcription failed", err);
-            } finally {
-              setAppState("idle");
-            }
-          };
-        } else {
-          alert("No audio recorded");
-          setAppState("idle");
+      recognition.onresult = (event: any) => {
+        const transcript = event.results && event.results[0] && event.results[0][0]
+          ? event.results[0][0].transcript
+          : "";
+        
+        if (transcript && transcript.trim()) {
+          speechDetected = true;
+          // STRICT: Only update the input text state. Do NOT trigger any form submission, sendMessage, or API calls here.
+          setTextInput((prev) => {
+            const trimmedPrev = prev.trim();
+            return trimmedPrev ? `${trimmedPrev} ${transcript.trim()}` : transcript.trim();
+          });
+          // Auto-reveal the text input field when voice is transcribed
+          setShowChat(true);
         }
       };
 
-      mediaRecorder.onerror = (event: any) => {
-        console.error("MediaRecorder error:", event.error);
-        isManuallyStoppedRef.current = true;
-        isListeningRef.current = false;
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
         setAppState("idle");
         setIsSessionActive(false);
       };
 
-      mediaRecorder.start();
-    } catch (e: any) {
-      console.error("MediaRecorder initialization error:", e);
-      isManuallyStoppedRef.current = true;
-      isListeningRef.current = false;
-      setIsListening(false);
-      setAppState("idle");
-      setIsSessionActive(false);
-      
-      const errorMessage = e?.message || "";
-      if (errorMessage.toLowerCase().includes("notallowederror") || errorMessage.toLowerCase().includes("permission denied")) {
-        setShowPermissionModal(true);
-      } else {
-        alert("Microphone access is required for dictation.");
+      recognition.onend = () => {
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.error("Speech recognition initialization error:", e);
+      if (!isSessionActiveRef.current) {
+        setIsListening(false);
+        setAppState("idle");
+        setIsSessionActive(false);
+        if (!speechDetected) {
+          setShowChat(false);
+        }
       }
     }
   };
@@ -2048,10 +2008,9 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (!textInput.trim() && selectedImages.length === 0) return;
     
     // Stop voice dictation if active
-    if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      isManuallyStoppedRef.current = true;
+    if (isListening && recognitionRef.current) {
       try {
-        mediaRecorderRef.current.stop();
+        recognitionRef.current.stop();
       } catch (err) {}
       setIsListening(false);
     }
@@ -2537,214 +2496,247 @@ In your very first response or greeting to the user, you MUST casually and natur
           </button>
 
           {/* Hamburger Menu (Dropdown with Tool Labels) */}
-          <div className="relative flex items-center justify-center" ref={toolMenuRef}>
+          <div className="relative flex items-center justify-center transition-opacity duration-300" ref={toolMenuRef}>
             <button
-              onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
-              className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              onClick={() => {
+                if (showChat) return;
+                setIsToolMenuOpen(!isToolMenuOpen);
+              }}
+              className={`p-2 rounded-full border transition-all duration-300 flex items-center justify-center ${
+                showChat ? "opacity-50 pointer-events-none" : "cursor-pointer pointer-events-auto"
+              } ${
                 isToolMenuOpen
                   ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-[0_0_15px_rgba(139,92,246,0.6)] animate-pulse"
                   : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-violet-400 hover:border-violet-500/30"
               }`}
-              title="Integrations & Tools Menu"
+              title="Settings & Integrations"
             >
               <Menu size={18} className={isToolMenuOpen ? "rotate-90 transition-transform duration-300" : "transition-transform duration-300"} />
             </button>
 
             <AnimatePresence>
               {isToolMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 15, scale: 0.95 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="absolute right-0 mt-3 w-72 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/15 bg-black/95 backdrop-blur-xl p-4 shadow-[0_10px_50px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 z-50 pointer-events-auto select-none"
-                  style={{ top: "100%" }}
-                >
-                  <div className="px-2 pb-2 border-b border-white/10 flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold">Integrations & Tools</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
-                  </div>
-                  
-                  <div className="flex flex-col gap-1.5">
-                    {[
-                      {
-                        id: "gmail",
-                        name: "Google Gmail",
-                        icon: <Mail size={16} />,
-                        active: showGmail,
-                        toggle: () => setShowGmail(!showGmail),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "calendar",
-                        name: "Google Calendar",
-                        icon: <Calendar size={16} />,
-                        active: showCalendar,
-                        toggle: () => setShowCalendar(!showCalendar),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "tasks",
-                        name: "Google Tasks",
-                        icon: <ListTodo size={16} />,
-                        active: showTasks,
-                        toggle: () => setShowTasks(!showTasks),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "slides",
-                        name: "Google Slides",
-                        icon: <Presentation size={16} />,
-                        active: showSlides,
-                        toggle: () => setShowSlides(!showSlides),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "contacts",
-                        name: "Google Contacts",
-                        icon: <Users size={16} />,
-                        active: showContacts,
-                        toggle: () => setShowContacts(!showContacts),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "chat",
-                        name: "Google Chat",
-                        icon: <MessageSquare size={16} />,
-                        active: showGoogleChat,
-                        toggle: () => setShowGoogleChat(!showGoogleChat),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "docs",
-                        name: "Google Docs",
-                        icon: <FileText size={16} />,
-                        active: showDocs,
-                        toggle: () => setShowDocs(!showDocs),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "forms",
-                        name: "Google Forms",
-                        icon: <ClipboardList size={16} />,
-                        active: showForms,
-                        toggle: () => setShowForms(!showForms),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "meet",
-                        name: "Google Meet",
-                        icon: <Video size={16} />,
-                        active: showMeet,
-                        toggle: () => setShowMeet(!showMeet),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "keep",
-                        name: "Google Keep",
-                        icon: <StickyNote size={16} />,
-                        active: showKeep,
-                        toggle: () => setShowKeep(!showKeep),
-                        colorClass: "from-amber-600 to-yellow-600",
-                        accentColor: "text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
-                      },
-                      {
-                        id: "classroom",
-                        name: "Google Classroom",
-                        icon: <GraduationCap size={16} />,
-                        active: showClassroom,
-                        toggle: () => setShowClassroom(!showClassroom),
-                        colorClass: "from-emerald-600 to-teal-600",
-                        accentColor: "text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
-                      },
-                      {
-                        id: "drive",
-                        name: "Drive Explorer",
-                        icon: <HardDrive size={16} />,
-                        active: showDrive,
-                        toggle: () => setShowDrive(!showDrive),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "memories",
-                        name: "Memory Core",
-                        icon: <Brain size={16} />,
-                        active: showMemories,
-                        toggle: () => setShowMemories(!showMemories),
-                        colorClass: "from-red-600 to-rose-600",
-                        accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                      },
-                      {
-                        id: "ar-hologram",
-                        name: "AR Hologram Mode",
-                        icon: (
-                          <Box 
-                            size={16} 
-                            className={`transition-all duration-300 ${
-                              isARMode && isCameraActive ? "animate-spin text-cyan-100" : ""
-                            }`} 
-                            style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
-                          />
-                        ),
-                        active: isARMode,
-                        toggle: toggleAR,
-                        colorClass: "from-cyan-500 to-teal-500",
-                        accentColor: "text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
-                      },
-                      {
-                        id: "floating-core",
-                        name: "Floating Core Mode",
-                        icon: (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
-                            <rect width="20" height="14" x="2" y="3" rx="2" />
-                          </svg>
-                        ),
-                        active: isGlobePiPActive,
-                        toggle: handlePiP,
-                        colorClass: "from-violet-600 to-pink-600",
-                        accentColor: "text-violet-400 border-violet-500/30 shadow-[0_0_10px_rgba(139,92,246,0.4)]",
-                      },
-                    ].map((tool) => (
-                      <button
-                        key={tool.id}
-                        onClick={() => {
-                          tool.toggle();
-                          setIsToolMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
-                          tool.active
-                            ? `bg-gradient-to-r ${tool.colorClass} border-transparent text-white font-medium ${tool.accentColor}`
-                            : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className={tool.active ? "text-white" : "text-white/40"}>
-                            {tool.icon}
-                          </span>
-                          <span className="font-medium tracking-wide">{tool.name}</span>
-                        </div>
-                        
-                        {/* Active indicator dot */}
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          tool.active 
-                            ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
-                            : "bg-white/10"
-                        }`} />
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]"
+                    onClick={() => setIsToolMenuOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ x: "100%" }}
+                    animate={{ x: 0 }}
+                    exit={{ x: "100%" }}
+                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                    className="fixed inset-y-0 right-0 w-80 bg-black/95 backdrop-blur-xl border-l border-white/10 p-6 z-[100] flex flex-col shadow-2xl pointer-events-auto overflow-y-auto"
+                  >
+                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
+                      <span className="text-sm font-mono text-white/70 uppercase tracking-widest font-semibold">Settings</span>
+                      <button onClick={() => setIsToolMenuOpen(false)} className="text-white/50 hover:text-white transition-colors cursor-pointer p-1">
+                        <X size={18} />
                       </button>
-                    ))}
-                  </div>
-                </motion.div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">App Settings</span>
+                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                          <span className="text-xs text-white/70 font-medium tracking-wide">Voice</span>
+                          <span className="text-xs font-mono text-white/40">Zoya (Default)</span>
+                        </div>
+                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                          <span className="text-xs text-white/70 font-medium tracking-wide">Theme</span>
+                          <span className="text-xs font-mono text-white/40">Dark Glass</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">Integrations & Tools</span>
+                        <div className="flex flex-col gap-1.5">
+                          {[
+                            {
+                              id: "gmail",
+                              name: "Google Gmail",
+                              icon: <Mail size={16} />,
+                              active: showGmail,
+                              toggle: () => setShowGmail(!showGmail),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "calendar",
+                              name: "Google Calendar",
+                              icon: <Calendar size={16} />,
+                              active: showCalendar,
+                              toggle: () => setShowCalendar(!showCalendar),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "tasks",
+                              name: "Google Tasks",
+                              icon: <ListTodo size={16} />,
+                              active: showTasks,
+                              toggle: () => setShowTasks(!showTasks),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "slides",
+                              name: "Google Slides",
+                              icon: <Presentation size={16} />,
+                              active: showSlides,
+                              toggle: () => setShowSlides(!showSlides),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "contacts",
+                              name: "Google Contacts",
+                              icon: <Users size={16} />,
+                              active: showContacts,
+                              toggle: () => setShowContacts(!showContacts),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "chat",
+                              name: "Google Chat",
+                              icon: <MessageSquare size={16} />,
+                              active: showGoogleChat,
+                              toggle: () => setShowGoogleChat(!showGoogleChat),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "docs",
+                              name: "Google Docs",
+                              icon: <FileText size={16} />,
+                              active: showDocs,
+                              toggle: () => setShowDocs(!showDocs),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "forms",
+                              name: "Google Forms",
+                              icon: <ClipboardList size={16} />,
+                              active: showForms,
+                              toggle: () => setShowForms(!showForms),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "meet",
+                              name: "Google Meet",
+                              icon: <Video size={16} />,
+                              active: showMeet,
+                              toggle: () => setShowMeet(!showMeet),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "keep",
+                              name: "Google Keep",
+                              icon: <StickyNote size={16} />,
+                              active: showKeep,
+                              toggle: () => setShowKeep(!showKeep),
+                              colorClass: "from-amber-600 to-yellow-600",
+                              accentColor: "text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
+                            },
+                            {
+                              id: "classroom",
+                              name: "Google Classroom",
+                              icon: <GraduationCap size={16} />,
+                              active: showClassroom,
+                              toggle: () => setShowClassroom(!showClassroom),
+                              colorClass: "from-emerald-600 to-teal-600",
+                              accentColor: "text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
+                            },
+                            {
+                              id: "drive",
+                              name: "Drive Explorer",
+                              icon: <HardDrive size={16} />,
+                              active: showDrive,
+                              toggle: () => setShowDrive(!showDrive),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "memories",
+                              name: "Memory Core",
+                              icon: <Brain size={16} />,
+                              active: showMemories,
+                              toggle: () => setShowMemories(!showMemories),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "ar-hologram",
+                              name: "AR Hologram Mode",
+                              icon: (
+                                <Box 
+                                  size={16} 
+                                  className={`transition-all duration-300 ${
+                                    isARMode && isCameraActive ? "animate-spin text-cyan-100" : ""
+                                  }`} 
+                                  style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
+                                />
+                              ),
+                              active: isARMode,
+                              toggle: toggleAR,
+                              colorClass: "from-cyan-500 to-teal-500",
+                              accentColor: "text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
+                            },
+                            {
+                              id: "floating-core",
+                              name: "Floating Core Mode",
+                              icon: (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
+                                  <rect width="20" height="14" x="2" y="3" rx="2" />
+                                </svg>
+                              ),
+                              active: isGlobePiPActive,
+                              toggle: handlePiP,
+                              colorClass: "from-violet-600 to-pink-600",
+                              accentColor: "text-violet-400 border-violet-500/30 shadow-[0_0_10px_rgba(139,92,246,0.4)]",
+                            },
+                          ].map((tool) => (
+                            <button
+                              key={tool.id}
+                              onClick={() => {
+                                tool.toggle();
+                                setIsToolMenuOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
+                                tool.active
+                                  ? `bg-gradient-to-r ${tool.colorClass} border-transparent text-white font-medium ${tool.accentColor}`
+                                  : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className={tool.active ? "text-white" : "text-white/40"}>
+                                  {tool.icon}
+                                </span>
+                                <span className="font-medium tracking-wide">{tool.name}</span>
+                              </div>
+                              
+                              {/* Active indicator dot */}
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                tool.active 
+                                  ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
+                                  : "bg-white/10"
+                              }`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
               )}
             </AnimatePresence>
           </div>
@@ -2897,10 +2889,9 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => {
-                      if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-                        isManuallyStoppedRef.current = true;
+                      if (isListening && recognitionRef.current) {
                         try {
-                          mediaRecorderRef.current.stop();
+                          recognitionRef.current.stop();
                         } catch (err) {}
                         setIsListening(false);
                       }
@@ -3156,7 +3147,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   rows={1}
                 />
                 
-                <div className="flex items-center gap-1 shrink-0 backdrop-blur-md bg-white/5 border border-white/10 rounded-full p-1">
+                <div className="flex items-center gap-2 shrink-0">
                   <input type="file" multiple accept="image/*" className="hidden"
                     ref={fileInputRef}
                     onChange={handleImageUpload}
@@ -3164,7 +3155,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => setIsPlusMenuOpen(true)}
-                    className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
                     title="Media Options"
                   >
                     <PlusCircle size={18} />
@@ -3172,10 +3163,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={toggleInputDictation}
-                    className={`p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                    className={`p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer flex items-center justify-center ${
                       isListening
                         ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105 animate-pulse"
-                        : "text-gray-400 hover:text-white hover:bg-white/10"
+                        : ""
                     }`}
                     title="Dictate message (Speech to Text)"
                   >
@@ -3184,7 +3175,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button 
                     type="submit"
                     disabled={(!textInput.trim() && selectedImages.length === 0) || isLoading}
-                    className="p-2 rounded-full disabled:opacity-50 transition-colors duration-300 cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:hover:bg-white/5 disabled:hover:text-gray-400"
                   >
                     {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                   </button>
@@ -3220,13 +3211,10 @@ In your very first response or greeting to the user, you MUST casually and natur
 
           <button
             onClick={toggleListening}
-            disabled={isStartingSession}
             className={`
               group relative flex items-center gap-3 px-8 py-4 rounded-full font-medium tracking-wide transition-all duration-300 shadow-2xl cursor-pointer
               ${
-                isStartingSession 
-                  ? "opacity-50 cursor-not-allowed bg-white/5 border border-white/10 text-white/50"
-                  : isSessionActive
+                isSessionActive
                   ? "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30"
                   : isGhostMode
                   ? "bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:scale-105"
