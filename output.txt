@@ -1,7 +1,0 @@
-- Request URL: ws://localhost:3000/api/chat/stream (or http://localhost:3000/api/chat/stream during handshake)
-- HTTP Status Code: 200
-- Response Body: (Vite's index.html fallback for SPA routing)
-- Exact backend error: Express is configured with `app.post('/api/chat/stream')` but does not handle the `upgrade` event for WebSockets. Vite middleware intercepts the GET request and serves the `index.html` fallback instead.
-- Exact exception stack: N/A (Browser throws `Error during WebSocket handshake: Unexpected response code: 200`)
-- Exact file and line number: `src/services/liveService.ts` line 141
-- Whether the problem is: WebSocket failure

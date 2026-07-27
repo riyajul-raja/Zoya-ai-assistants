@@ -1,8 +1,10 @@
+import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check, ChevronDown , Activity } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
+import { GeminiIcon } from "./components/BrandIcons";
 import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
 import TypingIndicator from "./components/TypingIndicator";
@@ -177,6 +179,7 @@ export default function App() {
   const [showTasks, setShowTasks] = useState(false);
   const [showSlides, setShowSlides] = useState(false);
   const [showGoogleChat, setShowGoogleChat] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [showForms, setShowForms] = useState(false);
   const [showMeet, setShowMeet] = useState(false);
@@ -187,6 +190,8 @@ export default function App() {
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
   const [isDeepThinking, setIsDeepThinking] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("gemini");
+  const [isModelSelectorExpanded, setIsModelSelectorExpanded] = useState(false);
   const [isInputReadOnly, setIsInputReadOnly] = useState(true);
   const [textInput, setTextInput] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -196,7 +201,7 @@ export default function App() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach((file: any) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
@@ -1343,7 +1348,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
 
     // 1. SAFE URL CREATION
-    const safeImages = capturedImageBase64s.map(img => {
+    const safeImages = capturedImageBase64s.map((img: any) => {
       if (typeof img === 'string') {
         return img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
       }
@@ -1367,7 +1372,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     
     // If live session is active (either because voice is active or camera is ON), send text through it
     // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
-    if (liveSessionRef.current && attachedImageBase64s.length === 0) {
+    if (liveSessionRef.current && attachedImageBase64s.length === 0 && selectedModel === "gemini") {
       liveSessionRef.current.sendText(finalTranscript);
       return;
     }
@@ -1499,34 +1504,39 @@ In your very first response or greeting to the user, you MUST casually and natur
           promptToSend = `[SYSTEM CONTEXT: Engage Deep Thinking Mode. Provide highly advanced, professional, and step-by-step analytical reasoning. Be strictly mindful of token limits—avoid fluff and deliver maximum high-value information.]\n\n${finalTranscript}`;
         }
 
+        let currentActiveModel = selectedModel;
+        
+        const chunkCallback = (currentText: string) => {
+          setIsTyping(false);
+          setIsLoading(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === responseMessageId ? { ...msg, text: currentText } : msg
+            )
+          );
+
+          if (!isMuted && !skipSpeech) {
+            const textToProcess = currentText.slice(lastProcessedIndex);
+            const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
+            let match;
+            let tempIndex = lastProcessedIndex;
+            while ((match = sentenceRegex.exec(textToProcess)) !== null) {
+              const sentence = match[0];
+              queueSentenceSpeak(sentence);
+              tempIndex = lastProcessedIndex + match.index + sentence.length;
+            }
+            lastProcessedIndex = tempIndex;
+          }
+        };
+
         responseText = await getZoyaResponseStream(
           promptToSend,
           messagesRef.current,
           capturedImageBase64s,
           isProfessionalMode,
           environmentContext,
-          (currentText) => {
-            setIsTyping(false);
-            setIsLoading(false);
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === responseMessageId ? { ...msg, text: currentText } : msg
-              )
-            );
-
-            if (!isMuted && !skipSpeech) {
-              const textToProcess = currentText.slice(lastProcessedIndex);
-              const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
-              let match;
-              let tempIndex = lastProcessedIndex;
-              while ((match = sentenceRegex.exec(textToProcess)) !== null) {
-                const sentence = match[0];
-                queueSentenceSpeak(sentence);
-                tempIndex = lastProcessedIndex + match.index + sentence.length;
-              }
-              lastProcessedIndex = tempIndex;
-            }
-          }
+          chunkCallback,
+          selectedModel
         );
         
         setIsTyping(false);
@@ -1555,85 +1565,65 @@ In your very first response or greeting to the user, you MUST casually and natur
 
         console.log(error);
         let errMsg = "";
-        const status = error?.status || error?.statusCode || error?.code;
         let rawMessage = error?.message || String(error);
 
-        const is503 = status === 503 || 
-                      (typeof rawMessage === "string" && (
-                        rawMessage.includes("503") || 
-                        rawMessage.toLowerCase().includes("overloaded") || 
-                        rawMessage.toLowerCase().includes("service unavailable") ||
-                        rawMessage.toLowerCase().includes("high demand")
-                      ));
-
-        if (is503) {
-          errMsg = "Server overloaded (High Demand). Please wait a few minutes.";
-        } else {
-          if (typeof rawMessage === "string") {
+        if (typeof rawMessage === "string") {
+          try {
+            const parsed = JSON.parse(rawMessage);
+            if (parsed?.error?.message) {
+              rawMessage = parsed.error.message;
+            } else if (parsed?.message) {
+              rawMessage = parsed.message;
+            }
+          } catch (e) {
             try {
-              const parsed = JSON.parse(rawMessage);
-              if (parsed?.error?.message) {
-                rawMessage = parsed.error.message;
-              } else if (parsed?.message) {
-                rawMessage = parsed.message;
-              }
-            } catch (e) {
-              try {
-                const startIdx = rawMessage.indexOf("{");
-                const endIdx = rawMessage.lastIndexOf("}");
-                if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-                  const potentialJson = rawMessage.substring(startIdx, endIdx + 1);
-                  const parsedEmbedded = JSON.parse(potentialJson);
-                  if (parsedEmbedded?.error?.message) {
-                    rawMessage = parsedEmbedded.error.message;
-                  } else if (parsedEmbedded?.message) {
-                    rawMessage = parsedEmbedded.message;
-                  }
+              const startIdx = rawMessage.indexOf("{");
+              const endIdx = rawMessage.lastIndexOf("}");
+              if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                const potentialJson = rawMessage.substring(startIdx, endIdx + 1);
+                const parsedEmbedded = JSON.parse(potentialJson);
+                if (parsedEmbedded?.error?.message) {
+                  rawMessage = parsedEmbedded.error.message;
+                } else if (parsedEmbedded?.message) {
+                  rawMessage = parsedEmbedded.message;
                 }
-              } catch (err2) {}
-            }
-
-            rawMessage = rawMessage
-              .replace(/\\"/g, '"')
-              .replace(/\\'/g, "'")
-              .replace(/\\n/g, " ")
-              .trim();
-
-            if (rawMessage.startsWith("{") || rawMessage.includes('{"') || rawMessage.includes('":')) {
-              rawMessage = rawMessage
-                .replace(/[\{\}\[\]"']/g, "")
-                .replace(/error\s*:/gi, "")
-                .replace(/message\s*:/gi, "")
-                .replace(/code\s*:\s*\d+/gi, "")
-                .replace(/\s+/g, " ")
-                .trim();
-            }
+              }
+            } catch (err2) {}
           }
-          errMsg = rawMessage;
-        }
 
-        if (
-          errMsg.toLowerCase().includes("overloaded") || 
-          errMsg.toLowerCase().includes("service unavailable") || 
-          errMsg.includes("503") ||
-          errMsg.toLowerCase().includes("high demand")
-        ) {
-          errMsg = "Server overloaded (High Demand). Please wait a few minutes.";
+          rawMessage = rawMessage
+            .replace(/\"/g, '"')
+            .replace(/\'/g, "'")
+            .replace(/\n/g, " ")
+            .trim();
+
+          if (rawMessage.startsWith("{") || rawMessage.includes('{"') || rawMessage.includes('":')) {
+            rawMessage = rawMessage
+              .replace(/[\{\}\[\]"']/g, "")
+              .replace(/error\s*:/gi, "")
+              .replace(/message\s*:/gi, "")
+              .replace(/code\s*:\s*\d+/gi, "")
+              .replace(/\s+/g, " ")
+              .trim();
+          }
         }
+        
+        errMsg = rawMessage;
 
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString() + "-z",
             sender: "zoya",
-            text: `SYSTEM ERROR: ${errMsg}`,
+            role: "model",
+            text: errMsg,
             isError: true,
           },
         ]);
       }
       setAppState("idle");
     }
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking, selectedModel]);
 
   useEffect(() => {
     return () => {
@@ -2460,6 +2450,12 @@ In your very first response or greeting to the user, you MUST casually and natur
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showDiagnostics && (
+          <DiagnosticsPanel onClose={() => setShowDiagnostics(false)} />
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="absolute top-0 left-0 w-full flex justify-between items-center z-50 shrink-0 px-6 py-4 md:px-12 md:py-6 pointer-events-auto">
         <div className="flex items-center gap-3">
@@ -2468,6 +2464,67 @@ In your very first response or greeting to the user, you MUST casually and natur
           </div>
           <h1 className="text-xl font-serif font-medium tracking-wide opacity-90">Zoya</h1>
         </div>
+
+        {/* Center AI Model Selector */}
+        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-50">
+          <div className="relative">
+            <button
+              onClick={() => setIsModelSelectorExpanded(!isModelSelectorExpanded)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 transition-all cursor-pointer shadow-lg backdrop-blur-md"
+            >
+              <GeminiIcon size={14} />
+              <span className="text-xs font-medium tracking-wide">
+                Gemini
+              </span>
+              <ChevronDown
+                size={14}
+                className={`text-white/50 transition-transform duration-300 ${isModelSelectorExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            <AnimatePresence>
+              {isModelSelectorExpanded && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-56 rounded-2xl border border-white/15 bg-black/95 backdrop-blur-xl p-2 shadow-[0_10px_50px_rgba(0,0,0,0.8)] z-[100]"
+                >
+                  <div className="flex flex-col gap-1">
+                    {[
+                      { id: "gemini", name: "Gemini", desc: "(Default)", icon: <GeminiIcon /> }
+                    ].map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setIsModelSelectorExpanded(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-sm transition-all duration-200 cursor-pointer ${
+                          selectedModel === model.id
+                            ? "bg-white/15 text-white shadow-sm border border-white/10"
+                            : "text-white/60 hover:bg-white/5 hover:text-white border border-transparent"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {model.icon}
+                          <span className="font-medium tracking-wide">
+                            {model.name} <span className="text-white/40 font-normal text-xs">{model.desc}</span>
+                          </span>
+                        </div>
+                        {selectedModel === model.id && <Check size={14} className="text-blue-400" />}
+                      </button>
+                    ))}
+                    
+
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
         <div className="flex items-center gap-2">
           {showInstallBtn && (
             <button
@@ -2495,16 +2552,30 @@ In your very first response or greeting to the user, you MUST casually and natur
             <RefreshCw size={18} className={`transition-transform duration-300 ${isSyncing ? "animate-spin" : "hover:rotate-180"}`} />
           </button>
 
+          {/* Diagnostics Button */}
+          <button
+            onClick={() => setShowDiagnostics(true)}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center hover:text-blue-400 hover:border-blue-500/30"
+            title="System Diagnostics"
+          >
+            <Activity size={18} className="hover:scale-110 transition-transform duration-300" />
+          </button>
+
           {/* Hamburger Menu (Dropdown with Tool Labels) */}
-          <div className="relative flex items-center justify-center" ref={toolMenuRef}>
+          <div className="relative flex items-center justify-center transition-opacity duration-300" ref={toolMenuRef}>
             <button
-              onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
-              className={`p-2 rounded-full border transition-all duration-300 cursor-pointer pointer-events-auto flex items-center justify-center ${
+              onClick={() => {
+                if (showChat) return;
+                setIsToolMenuOpen(!isToolMenuOpen);
+              }}
+              className={`p-2 rounded-full border transition-all duration-300 flex items-center justify-center ${
+                showChat ? "opacity-50 pointer-events-none" : "cursor-pointer pointer-events-auto"
+              } ${
                 isToolMenuOpen
                   ? "bg-gradient-to-r from-violet-600 to-pink-600 border-violet-400/50 text-white shadow-[0_0_15px_rgba(139,92,246,0.6)] animate-pulse"
                   : "bg-white/10 hover:bg-white/20 border-white/25 text-white hover:text-violet-400 hover:border-violet-500/30"
               }`}
-              title="Integrations & Tools Menu"
+              title="Settings & Integrations"
             >
               <Menu size={18} className={isToolMenuOpen ? "rotate-90 transition-transform duration-300" : "transition-transform duration-300"} />
             </button>
@@ -2519,7 +2590,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   className="absolute right-0 mt-3 w-72 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/15 bg-black/95 backdrop-blur-xl p-4 shadow-[0_10px_50px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 z-50 pointer-events-auto select-none"
                   style={{ top: "100%" }}
                 >
-                  <div className="px-2 pb-2 border-b border-white/10 flex items-center justify-between mb-1">
+                  <div className="px-2 pb-2 border-b border-white/10 flex items-center justify-between mb-1 mt-1">
                     <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold">Integrations & Tools</span>
                     <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
                   </div>
@@ -3114,7 +3185,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   rows={1}
                 />
                 
-                <div className="flex items-center gap-1 shrink-0 backdrop-blur-md bg-white/5 border border-white/10 rounded-full p-1">
+                <div className="flex items-center gap-2 shrink-0">
                   <input type="file" multiple accept="image/*" className="hidden"
                     ref={fileInputRef}
                     onChange={handleImageUpload}
@@ -3122,7 +3193,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={() => setIsPlusMenuOpen(true)}
-                    className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
                     title="Media Options"
                   >
                     <PlusCircle size={18} />
@@ -3130,10 +3201,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button
                     type="button"
                     onClick={toggleInputDictation}
-                    className={`p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                    className={`p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer flex items-center justify-center ${
                       isListening
                         ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105 animate-pulse"
-                        : "text-gray-400 hover:text-white hover:bg-white/10"
+                        : ""
                     }`}
                     title="Dictate message (Speech to Text)"
                   >
@@ -3142,7 +3213,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   <button 
                     type="submit"
                     disabled={(!textInput.trim() && selectedImages.length === 0) || isLoading}
-                    className="p-2 rounded-full disabled:opacity-50 transition-colors duration-300 cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:hover:bg-white/5 disabled:hover:text-gray-400"
                   >
                     {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                   </button>
