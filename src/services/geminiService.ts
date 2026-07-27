@@ -5,16 +5,30 @@ const systemInstruction = "Your name is Zoya. You are an Indian female AI assist
 
 function getGeminiKey() {
   try {
-    if (typeof process !== "undefined" && process.env && (process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY)) {
-      return process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
+    // @ts-ignore
+    if (import.meta && import.meta.env) {
+      // @ts-ignore
+      const keys = [
+        import.meta.env.VITE_GEMINI_API_KEY,
+        import.meta.env.GEMINI_API_KEY,
+        import.meta.env.GEMINI_API_KEY_1,
+        import.meta.env.GEMINI_API_KEY_2
+      ];
+      const validKey = keys.find(k => typeof k === 'string' && k.trim() !== "");
+      if (validKey) return validKey;
     }
   } catch (e) {}
 
   try {
-    // @ts-ignore
-    if (import.meta && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) {
-      // @ts-ignore
-      return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || "";
+    if (typeof process !== "undefined" && process.env) {
+      const keys = [
+        process.env.VITE_GEMINI_API_KEY,
+        process.env.GEMINI_API_KEY,
+        process.env.GEMINI_API_KEY_1,
+        process.env.GEMINI_API_KEY_2
+      ];
+      const validKey = keys.find(k => typeof k === 'string' && k.trim() !== "");
+      if (validKey) return validKey;
     }
   } catch (e) {}
 
