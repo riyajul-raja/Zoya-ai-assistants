@@ -35,6 +35,7 @@ export class LiveSessionManager {
   
   // Audio playback state
   private playbackContext: AudioContext | null = null;
+  private chunksSentCount: number = 0;
   private playbackAnalyser: AnalyserNode | null = null;
   private nextPlayTime: number = 0;
   private isPlaying: boolean = false;
@@ -56,8 +57,6 @@ export class LiveSessionManager {
     history: { sender: "user" | "zoya"; text: string; image?: string }[] = []
   ) {
     try {
-      this.onStateChange("processing");
-      
       // Initialize Audio Contexts
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.playbackContext = new AudioContextClass({ sampleRate: 24000 });
@@ -67,17 +66,24 @@ export class LiveSessionManager {
 
       if (useMic) {
         this.audioContext = new AudioContextClass({ sampleRate: 16000 });
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
 
         // Get Microphone
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            channelCount: 1,
-            sampleRate: 16000,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          } 
-        });
+        try {
+          this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              channelCount: 1,
+              sampleRate: 16000,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            } 
+          });
+        } catch (mediaError: any) {
+          throw mediaError;
+        }
 
         this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
         this.analyser = this.audioContext.createAnalyser();
@@ -108,9 +114,11 @@ export class LiveSessionManager {
           }
           const base64Data = btoa(binary);
 
+          this.chunksSentCount++;
+          if (this.chunksSentCount <= 5) { console.log("Sent audio chunk " + this.chunksSentCount); }
           this.sessionPromise.then(session => {
             session.sendRealtimeInput({
-              audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+              media: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
             });
           }).catch(err => console.error("Error sending audio", err));
         };
@@ -367,7 +375,7 @@ export class LiveSessionManager {
     if (this.sessionPromise) {
       this.sessionPromise.then(session => {
         session.sendRealtimeInput({
-          video: { data: base64Data, mimeType: "image/jpeg" }
+          media: { data: base64Data, mimeType: "image/jpeg" }
         });
       }).catch(err => console.error("Error sending video frame to Live API:", err));
     }
