@@ -35,6 +35,7 @@ export class LiveSessionManager {
   
   // Audio playback state
   private playbackContext: AudioContext | null = null;
+  private chunksSentCount: number = 0;
   private playbackAnalyser: AnalyserNode | null = null;
   private nextPlayTime: number = 0;
   private isPlaying: boolean = false;
@@ -67,6 +68,9 @@ export class LiveSessionManager {
 
       if (useMic) {
         this.audioContext = new AudioContextClass({ sampleRate: 16000 });
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
 
         // Get Microphone
         this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -108,6 +112,8 @@ export class LiveSessionManager {
           }
           const base64Data = btoa(binary);
 
+          this.chunksSentCount++;
+          if (this.chunksSentCount <= 5) { console.log("Sent audio chunk " + this.chunksSentCount); }
           this.sessionPromise.then(session => {
             session.sendRealtimeInput({
               media: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
