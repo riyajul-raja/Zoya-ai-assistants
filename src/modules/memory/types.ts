@@ -46,3 +46,10 @@ export interface ClassificationResult {
   importance: number;
   reason: string;
 }
+
+export interface MemoryUpdateDecision {
+  action: "create" | "update" | "ignore";
+  reason: string;
+  memoryId?: string;
+  updateData?: UpdateMemoryDTO;
+}

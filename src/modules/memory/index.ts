@@ -10,3 +10,4 @@ export * from "./types";
 export { MemoryService } from "./MemoryService";
 export { MemoryManager } from "./MemoryManager";
 export { MemoryClassifier, memoryClassifier } from "./MemoryClassifier";
+export { MemoryUpdater, memoryUpdater } from "./MemoryUpdater";
