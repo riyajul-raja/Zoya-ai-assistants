@@ -53,3 +53,10 @@ export interface MemoryUpdateDecision {
   memoryId?: string;
   updateData?: UpdateMemoryDTO;
 }
+
+export interface ProcessMemoryResult {
+  action: "create" | "update" | "ignore";
+  success: boolean;
+  reason: string;
+  memory?: Memory;
+}
