@@ -20,6 +20,7 @@ import FormsManager from "./components/FormsManager";
 import MeetManager from "./components/MeetManager";
 import KeepManager from "./components/KeepManager";
 import ClassroomManager from "./components/ClassroomManager";
+import { memoryOrchestrator } from "./modules/memory";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -1301,6 +1302,15 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (!finalTranscript.trim() && attachedImageBase64s.length === 0) {
       setAppState("idle");
       return;
+    }
+
+    // Process memory in the background (fire and forget)
+    if (finalTranscript.trim()) {
+      memoryOrchestrator.processMemory(finalTranscript, "chat").catch(error => {
+        if (import.meta.env.DEV) {
+          console.error("[Memory] Background memory processing failed:", error);
+        }
+      });
     }
 
     autoTriggerUIFromText(finalTranscript);
