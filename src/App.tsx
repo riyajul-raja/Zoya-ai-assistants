@@ -1299,6 +1299,8 @@ In your very first response or greeting to the user, you MUST casually and natur
   };
 
   const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false, attachedImageBase64s: string[] = []) => {
+    const currentHistory = [...messagesRef.current];
+    
     if (!finalTranscript.trim() && attachedImageBase64s.length === 0) {
       setAppState("idle");
       return;
@@ -1530,7 +1532,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
         responseText = await getZoyaResponseStream(
           promptToSend,
-          messagesRef.current,
+          currentHistory,
           capturedImageBase64s,
           isProfessionalMode,
           environmentContext,

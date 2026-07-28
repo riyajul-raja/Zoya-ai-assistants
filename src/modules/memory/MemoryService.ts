@@ -85,7 +85,7 @@ export class MemoryService {
       const searchOptions = typeof options === 'string' ? { query: options } : options;
       const { query: searchTerm, category, tags, limit } = searchOptions;
       
-      const lowerTerm = searchTerm.toLowerCase();
+      const lowerTerm = searchTerm ? searchTerm.toLowerCase().trim() : "";
 
       // Filter
       memories = memories.filter(m => {
@@ -102,18 +102,6 @@ export class MemoryService {
           }
         }
 
-        // Text match
-        if (lowerTerm) {
-          const isExactMatch = m.text.toLowerCase() === lowerTerm;
-          const isPartialMatch = m.text.toLowerCase().includes(lowerTerm);
-          const isTagMatch = m.tags.some(t => t.toLowerCase().includes(lowerTerm));
-          const isCategoryMatch = m.category.toLowerCase().includes(lowerTerm);
-          
-          if (!isExactMatch && !isPartialMatch && !isTagMatch && !isCategoryMatch) {
-            return false;
-          }
-        }
-
         return true;
       });
 
@@ -123,17 +111,15 @@ export class MemoryService {
         let scoreB = 0;
 
         if (lowerTerm) {
-          // Exact match gets highest relevance
-          if (a.text.toLowerCase() === lowerTerm) scoreA += 100;
-          if (b.text.toLowerCase() === lowerTerm) scoreB += 100;
-          
-          // Partial match
-          if (a.text.toLowerCase().includes(lowerTerm)) scoreA += 10;
-          if (b.text.toLowerCase().includes(lowerTerm)) scoreB += 10;
-
-          // Tag match
-          if (a.tags.some(t => t.toLowerCase().includes(lowerTerm))) scoreA += 5;
-          if (b.tags.some(t => t.toLowerCase().includes(lowerTerm))) scoreB += 5;
+          const searchWords = lowerTerm.split(/[\s?.,]+/).filter(w => w.length > 2);
+          for (const w of searchWords) {
+            if (a.text.toLowerCase().includes(w)) scoreA += 5;
+            if (b.text.toLowerCase().includes(w)) scoreB += 5;
+            if (a.tags.some(t => t.toLowerCase().includes(w))) scoreA += 2;
+            if (b.tags.some(t => t.toLowerCase().includes(w))) scoreB += 2;
+            if (a.category.toLowerCase().includes(w)) scoreA += 1;
+            if (b.category.toLowerCase().includes(w)) scoreB += 1;
+          }
         }
 
         // Sort by Relevance (Descending)

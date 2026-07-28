@@ -98,13 +98,13 @@ export class MemoryClassifier {
 
     // Default fallback: if it doesn't match specific save-worthy patterns, do not save
     if (import.meta.env.DEV) {
-      console.log(`[MemoryClassifier] Text did not match any save-worthy rules: "${text}"`);
+      console.log(`[MemoryClassifier] Text did not match any specific save-worthy rules, but saving as uncategorized: "${text}"`);
     }
     return {
-      shouldSave: false,
+      shouldSave: true,
       category: "uncategorized",
-      importance: 0,
-      reason: "Did not match any save-worthy information patterns."
+      importance: 1,
+      reason: "Saved as general context."
     };
   }
 
