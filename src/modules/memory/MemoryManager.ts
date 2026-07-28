@@ -1,5 +1,5 @@
 import { MemoryService } from "./MemoryService";
-import { CreateMemoryDTO, UpdateMemoryDTO, Memory, SaveMemoryResult } from "./types";
+import { CreateMemoryDTO, UpdateMemoryDTO, Memory, SaveMemoryResult, SearchMemoryOptions } from "./types";
 
 export class MemoryManager {
   private service: MemoryService;
@@ -61,8 +61,31 @@ export class MemoryManager {
     return this.service.deleteMemory(id);
   }
 
-  async searchMemories(searchTerm: string): Promise<Memory[]> {
-    return this.service.searchMemories(searchTerm);
+  async searchMemories(options: SearchMemoryOptions | string): Promise<Memory[]> {
+    try {
+      if (typeof options === "string" && (!options || options.trim().length === 0)) {
+         return [];
+      }
+      
+      if (typeof options !== "string" && (!options.query || options.query.trim().length === 0)) {
+         // Maybe just filtering by category/tags, that's fine. 
+         // If they provide completely empty string with no category/tags, we can just return all or empty.
+         // Let's pass it down and let the service handle it.
+      }
+
+      const results = await this.service.searchMemories(options);
+      
+      if (import.meta.env.DEV) {
+        console.log(`[MemoryManager] Search returned ${results.length} results.`);
+      }
+      
+      return results;
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("[MemoryManager] Search failed:", error);
+      }
+      return []; // Never crash, return empty array
+    }
   }
 
   async getAllMemories(): Promise<Memory[]> {

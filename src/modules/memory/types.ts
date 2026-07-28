@@ -32,3 +32,10 @@ export interface SaveMemoryResult {
   memory?: Memory;
   error?: string;
 }
+
+export interface SearchMemoryOptions {
+  query: string;
+  category?: string;
+  tags?: string[];
+  limit?: number;
+}
