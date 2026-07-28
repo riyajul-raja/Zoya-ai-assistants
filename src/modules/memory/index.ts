@@ -9,3 +9,4 @@ export const getAllMemories = memoryManager.getAllMemories.bind(memoryManager);
 export * from "./types";
 export { MemoryService } from "./MemoryService";
 export { MemoryManager } from "./MemoryManager";
+export { MemoryClassifier, memoryClassifier } from "./MemoryClassifier";

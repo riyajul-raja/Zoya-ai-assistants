@@ -39,3 +39,10 @@ export interface SearchMemoryOptions {
   tags?: string[];
   limit?: number;
 }
+
+export interface ClassificationResult {
+  shouldSave: boolean;
+  category: string;
+  importance: number;
+  reason: string;
+}
