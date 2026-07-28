@@ -20,7 +20,7 @@ import FormsManager from "./components/FormsManager";
 import MeetManager from "./components/MeetManager";
 import KeepManager from "./components/KeepManager";
 import ClassroomManager from "./components/ClassroomManager";
-import { memoryOrchestrator } from "./modules/memory";
+import { memoryOrchestrator, searchMemories } from "./modules/memory";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
@@ -1504,9 +1504,28 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         };
 
+        let memoryContext = "";
+        try {
+          const topMemories = await searchMemories({
+            query: finalTranscript,
+            limit: 5
+          });
+          if (topMemories && topMemories.length > 0) {
+            memoryContext = "\n\nKnown user information:\n" + topMemories.map((m: any) => `- ${m.text}`).join("\n");
+          }
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            console.error("[Memory] Failed to retrieve memories:", error);
+          }
+        }
+
         let promptToSend = finalTranscript;
         if (isDeepThinking) {
           promptToSend = `[SYSTEM CONTEXT: Engage Deep Thinking Mode. Provide highly advanced, professional, and step-by-step analytical reasoning. Be strictly mindful of token limits—avoid fluff and deliver maximum high-value information.]\n\n${finalTranscript}`;
+        }
+
+        if (memoryContext) {
+          promptToSend = `${promptToSend}${memoryContext}`;
         }
 
         responseText = await getZoyaResponseStream(
