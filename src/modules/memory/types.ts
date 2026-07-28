@@ -26,3 +26,9 @@ export interface UpdateMemoryDTO {
   importance?: number;
   tags?: string[];
 }
+
+export interface SaveMemoryResult {
+  success: boolean;
+  memory?: Memory;
+  error?: string;
+}

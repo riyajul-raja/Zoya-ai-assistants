@@ -1,5 +1,5 @@
 import { MemoryService } from "./MemoryService";
-import { CreateMemoryDTO, UpdateMemoryDTO, Memory } from "./types";
+import { CreateMemoryDTO, UpdateMemoryDTO, Memory, SaveMemoryResult } from "./types";
 
 export class MemoryManager {
   private service: MemoryService;
@@ -8,8 +8,49 @@ export class MemoryManager {
     this.service = new MemoryService();
   }
 
-  async saveMemory(data: CreateMemoryDTO): Promise<Memory> {
-    return this.service.saveMemory(data);
+  async saveMemory(data: CreateMemoryDTO): Promise<SaveMemoryResult> {
+    try {
+      // 1. Validate data
+      if (!data.text || data.text.trim().length === 0) {
+        if (import.meta.env.DEV) console.warn("[MemoryManager] Save rejected: empty text");
+        return { success: false, error: "Memory text cannot be empty" };
+      }
+
+      if (!data.category || data.category.trim().length === 0) {
+        if (import.meta.env.DEV) console.warn("[MemoryManager] Save rejected: invalid category");
+        return { success: false, error: "Memory category is invalid" };
+      }
+
+      if (typeof data.importance !== "number" || data.importance < 1 || data.importance > 5) {
+        if (import.meta.env.DEV) console.warn("[MemoryManager] Save rejected: invalid importance");
+        return { success: false, error: "Importance must be between 1 and 5" };
+      }
+
+      // 2. Prevent duplicate memories
+      const existingMemories = await this.service.getAllMemories();
+      const isDuplicate = existingMemories.some(
+        (m) => m.text.trim().toLowerCase() === data.text.trim().toLowerCase()
+      );
+
+      if (isDuplicate) {
+        if (import.meta.env.DEV) {
+          console.log(`[MemoryManager] Duplicate memory prevented: "${data.text.substring(0, 20)}..."`);
+        }
+        return { success: false, error: "Duplicate memory" };
+      }
+
+      // 3. Save memory
+      const memory = await this.service.saveMemory(data);
+      if (import.meta.env.DEV) {
+        console.log(`[MemoryManager] Memory saved successfully: ${memory.id}`);
+      }
+      return { success: true, memory };
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("[MemoryManager] Failed to save memory:", error);
+      }
+      return { success: false, error: error.message || "Failed to save memory" };
+    }
   }
 
   async updateMemory(id: string, data: UpdateMemoryDTO): Promise<void> {
