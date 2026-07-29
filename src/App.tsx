@@ -2866,6 +2866,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             setIsInputReadOnly={setIsInputReadOnly}
             handleImageUpload={handleImageUpload}
             setIsPlusMenuOpen={setIsPlusMenuOpen}
+            setMessages={setMessages}
             textareaRef={textareaRef}
             fileInputRef={fileInputRef}
             chatContainerRef={chatContainerRef}

@@ -3,6 +3,7 @@ import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, B
 import { motion, AnimatePresence } from "motion/react";
 import TypingIndicator from "./TypingIndicator";
 import { ChatMessage } from '../App';
+import ChatSidebar, { ChatSession } from './ChatSidebar';
 
 interface ChatPageProps {
   messages: ChatMessage[];
@@ -26,6 +27,7 @@ interface ChatPageProps {
   setIsInputReadOnly: (val: boolean) => void;
   handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   setIsPlusMenuOpen: (val: boolean) => void;
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   chatContainerRef: React.RefObject<HTMLFormElement>;
@@ -54,6 +56,7 @@ export default function ChatPage({
   setIsInputReadOnly,
   handleImageUpload,
   setIsPlusMenuOpen,
+  setMessages,
   textareaRef,
   fileInputRef,
   chatContainerRef,
@@ -62,6 +65,77 @@ export default function ChatPage({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isLocalPlusMenuOpen, setIsLocalPlusMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  const [chats, setChats] = useState<ChatSession[]>(() => {
+    const saved = localStorage.getItem('zoya_sidebar_chats');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((c: any) => ({ ...c, timestamp: new Date(c.timestamp) }));
+      } catch (e) {}
+    }
+    return [];
+  });
+  const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    localStorage.setItem('zoya_sidebar_chats', JSON.stringify(chats));
+  }, [chats]);
+
+  // Sync current chat to list if messages exist
+  useEffect(() => {
+    if (messages.length > 0) {
+      const currentId = activeChatId || 'default-chat';
+      if (!activeChatId) {
+        setActiveChatId(currentId);
+      }
+      
+      const title = messages.find(m => m.role === 'user')?.text?.slice(0, 30) || 'New Chat';
+      const lastMsg = messages[messages.length - 1];
+      const preview = lastMsg.text?.slice(0, 40) || 'Image...';
+      
+      setChats(prev => {
+        const existing = prev.find(c => c.id === currentId);
+        if (existing) {
+          return prev.map(c => c.id === currentId ? { ...c, title, preview, timestamp: new Date() } : c);
+        } else {
+          return [...prev, { id: currentId, title, preview, timestamp: new Date(), pinned: false }];
+        }
+      });
+      
+      // Save messages per chat so we can switch
+      localStorage.setItem(`zoya_chat_msgs_${currentId}`, JSON.stringify(messages));
+    }
+  }, [messages, activeChatId]);
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setActiveChatId(Date.now().toString());
+  };
+
+  const handleSelectChat = (id: string) => {
+    const savedMsgs = localStorage.getItem(`zoya_chat_msgs_${id}`);
+    if (savedMsgs) {
+      try {
+        setMessages(JSON.parse(savedMsgs));
+        setActiveChatId(id);
+        setIsSidebarOpen(false);
+      } catch (e) {}
+    }
+  };
+
+  const handleUpdateChat = (id: string, updates: Partial<ChatSession>) => {
+    setChats(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const handleDeleteChat = (id: string) => {
+    setChats(prev => prev.filter(c => c.id !== id));
+    localStorage.removeItem(`zoya_chat_msgs_${id}`);
+    if (activeChatId === id) {
+      handleNewChat();
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,10 +165,22 @@ export default function ChatPage({
               : "bg-[#0a0a0a]"
       }`}
     >
+      <ChatSidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        chats={chats}
+        activeChatId={activeChatId}
+        onNewChat={handleNewChat}
+        onSelectChat={handleSelectChat}
+        onUpdateChat={handleUpdateChat}
+        onDeleteChat={handleDeleteChat}
+      />
+      
       {/* Top bar: Left (Menu), Right (Close) */}
       <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0 bg-black/50 backdrop-blur-md">
         <button
           type="button"
+          onClick={() => setIsSidebarOpen(true)}
           className="p-2 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
         >
           <Menu size={20} />
