@@ -1,4 +1,7 @@
-import React from "react";
+const fs = require('fs');
+let content = fs.readFileSync('src/components/TypingIndicator.tsx', 'utf8');
+
+const newContent = `import React from "react";
 import { motion } from "motion/react";
 
 interface TypingIndicatorProps {
@@ -15,11 +18,11 @@ export default function TypingIndicator({ isGhostMode = false }: TypingIndicator
       className="flex flex-col max-w-[85%] self-start items-start"
     >
       <div
-        className={`w-fit px-5 py-3 rounded-[20px] backdrop-blur-2xl flex items-center gap-3 ${
+        className={\`w-fit px-5 py-3 rounded-[20px] backdrop-blur-2xl flex items-center gap-3 \${
           isGhostMode
             ? "bg-rose-950/45 border border-rose-500/45 text-rose-100 rounded-bl-[4px] shadow-[0_8px_32px_rgba(244,63,94,0.15)]"
             : "bg-white/[0.04] border border-white/10 text-neutral-100 rounded-bl-[4px] shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
-        }`}
+        }\`}
       >
         <div className="relative flex items-center justify-center">
           <div className="absolute inset-[-4px] rounded-full border-t-[1.5px] border-white/50 animate-spin"></div>
@@ -39,3 +42,6 @@ export default function TypingIndicator({ isGhostMode = false }: TypingIndicator
     </motion.div>
   );
 }
+`;
+
+fs.writeFileSync('src/components/TypingIndicator.tsx', newContent);

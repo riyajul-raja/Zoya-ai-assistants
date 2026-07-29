@@ -199,7 +199,7 @@ export default function App() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach((file: File) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
@@ -1362,7 +1362,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         return img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
       }
       if ((img as any) instanceof File || (img as any) instanceof Blob) {
-        return URL.createObjectURL(img);
+        return URL.createObjectURL(img as Blob);
       }
       return "";
     }).filter(Boolean);
@@ -2055,7 +2055,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       }
       if ((img as any) instanceof File || (img as any) instanceof Blob) {
         try {
-          return URL.createObjectURL(img);
+          return URL.createObjectURL(img as Blob);
         } catch (e) {
           return "";
         }

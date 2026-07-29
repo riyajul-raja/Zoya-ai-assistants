@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw } from "lucide-react";
+import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw, Copy, ThumbsUp, ThumbsDown, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import TypingIndicator from "./TypingIndicator";
 import { ChatMessage } from '../App';
@@ -86,12 +86,25 @@ export default function ChatPage({
   // Sync current chat to list if messages exist
   useEffect(() => {
     if (messages.length > 0) {
-      const currentId = activeChatId || 'default-chat';
+      const currentId = activeChatId || Date.now().toString();
       if (!activeChatId) {
         setActiveChatId(currentId);
       }
       
-      const title = messages.find(m => m.role === 'user')?.text?.slice(0, 30) || 'New Chat';
+      const firstUserMsg = messages.find(m => m.role === 'user')?.text;
+      let title = 'New Chat';
+      if (firstUserMsg) {
+        // Simple heuristic to extract a short title
+        const words = firstUserMsg.split(/[\s\n]+/);
+        // Take up to 4 words
+        title = words.slice(0, 4).join(' ').replace(/[^a-zA-Z0-9 ]/g, '').trim();
+        if (title.length > 30) {
+          title = title.substring(0, 30).trim() + "...";
+        }
+        // Capitalize words
+        title = title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      }
+      if (!title) title = 'New Chat';
       const lastMsg = messages[messages.length - 1];
       const preview = lastMsg.text?.slice(0, 40) || 'Image...';
       
@@ -100,7 +113,7 @@ export default function ChatPage({
         if (existing) {
           return prev.map(c => c.id === currentId ? { ...c, title, preview, timestamp: new Date() } : c);
         } else {
-          return [...prev, { id: currentId, title, preview, timestamp: new Date(), pinned: false }];
+          return [{ id: currentId, title, preview, timestamp: new Date(), pinned: false }, ...prev];
         }
       });
       
@@ -135,6 +148,28 @@ export default function ChatPage({
     if (activeChatId === id) {
       handleNewChat();
     }
+  };
+
+  const handleDuplicateChat = (id: string) => {
+    const chatToDuplicate = chats.find(c => c.id === id);
+    if (!chatToDuplicate) return;
+    
+    const newId = Date.now().toString();
+    const newChat = {
+      ...chatToDuplicate,
+      id: newId,
+      title: chatToDuplicate.title + " (Copy)",
+      timestamp: new Date()
+    };
+    
+    // Copy messages
+    const existingMsgs = localStorage.getItem(`zoya_chat_msgs_${id}`);
+    if (existingMsgs) {
+      localStorage.setItem(`zoya_chat_msgs_${newId}`, existingMsgs);
+    }
+    
+    setChats(prev => [newChat, ...prev]);
+    setActiveChatId(newId);
   };
 
   useEffect(() => {
@@ -174,20 +209,24 @@ export default function ChatPage({
         onSelectChat={handleSelectChat}
         onUpdateChat={handleUpdateChat}
         onDeleteChat={handleDeleteChat}
+        onDuplicateChat={handleDuplicateChat}
       />
       
       {/* Top bar: Left (Menu), Right (Close) */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0 bg-black/50 backdrop-blur-md">
+      <div className="flex items-center justify-between px-5 py-4 shrink-0 hyper-glass z-50 sticky top-0 rounded-b-[24px]">
         <button
           type="button"
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
+          className="p-2 rounded-xl hyper-glass hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] text-white/70 hover:text-white transition-all duration-300 cursor-pointer group"
         >
-          <Menu size={20} />
+          <Menu size={20} className="group-hover:scale-105 transition-transform" />
         </button>
-
-        <div className="font-sans text-sm font-semibold tracking-wide text-white text-center flex-1">
-          Zoya
+        
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-[15px] text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] border border-white/20">
+            Z
+          </div>
+          <span className="text-[17px] font-serif font-medium text-white/95 tracking-wide">Zoya</span>
         </div>
         
         <button
@@ -200,15 +239,15 @@ export default function ChatPage({
             }
             setShowChat(false);
           }}
-          className="p-2 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
+          className="p-2 rounded-xl hyper-glass hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] text-white/70 hover:text-white transition-all duration-300 cursor-pointer group"
           title="Close Chat"
         >
-          <X size={20} />
+          <X size={20} className="group-hover:rotate-90 transition-transform duration-300" />
         </button>
       </div>
 
       {/* Chat History Display Area */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pb-4 pt-6 flex flex-col min-h-0 bg-gradient-to-b from-transparent to-black/40">
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pb-4 pt-6 flex flex-col min-h-0">
         <div className="flex flex-col gap-6 mt-auto w-full max-w-3xl mx-auto">
           <AnimatePresence initial={false}>
             {messages.map((msg) => {
@@ -223,20 +262,16 @@ export default function ChatPage({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  className={`flex flex-col max-w-[85%] min-h-0 ${
-                    msg.sender === "user" ? "self-end items-end" : "self-start items-start"
+                  className={`flex flex-col max-w-[90%] md:max-w-[85%] min-h-0 ${
+                    msg.sender === "user" ? "self-end items-end" : "self-start items-start group"
                   }`}
                 >
-                  <div className={`relative px-4 py-3 rounded-2xl text-[15px] transition-all duration-300 h-fit w-fit min-h-0 leading-relaxed max-w-full overflow-hidden break-words ${
+                  <div className={`relative px-5 py-3.5 rounded-[20px] text-[15px] transition-all duration-300 h-fit w-fit min-h-0 leading-relaxed max-w-full overflow-hidden break-words ${
                     msg.isError
                       ? "bg-red-950/85 border border-red-500/50 text-red-200 shadow-[0_0_12px_rgba(239,68,68,0.25)]"
                       : msg.sender === "user"
-                          ? isGhostMode
-                          ? "bg-red-600 text-white rounded-br-sm shadow-md"
-                          : "bg-blue-600 text-white rounded-br-sm shadow-md"
-                          : isGhostMode
-                          ? "bg-neutral-800/80 border border-white/5 text-neutral-100 rounded-bl-sm shadow-sm"
-                          : "bg-neutral-800/80 border border-white/5 text-neutral-100 rounded-bl-sm shadow-sm"
+                          ? "bg-[#10b981]/20 border border-[#10b981]/30 text-white rounded-br-[4px] shadow-[0_8px_32px_rgba(16,185,129,0.15)] backdrop-blur-2xl"
+                          : "bg-white/[0.04] border border-white/10 text-neutral-100 rounded-bl-[4px] shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-2xl"
                   }`}>
                     {hasImage && (
                       <div className="mb-3 flex flex-wrap gap-2">
@@ -248,8 +283,30 @@ export default function ChatPage({
                         {msg.generatedImageUrl && <img src={msg.generatedImageUrl} className="max-w-[200px] max-h-[200px] rounded-lg border border-white/10" alt="Generated" />}
                       </div>
                     )}
-                    {hasText && <div className="whitespace-pre-wrap">{msg.text}</div>}
+                    {hasText && <div className="whitespace-pre-wrap leading-relaxed tracking-wide">{msg.text}</div>}
                   </div>
+                  
+                  {/* Actions for Assistant */}
+                  {msg.sender !== "user" && !msg.isError && (
+                    <div className="flex items-center gap-1.5 mt-2 ml-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
+                      <button type="button" onClick={() => navigator.clipboard.writeText(msg.text || '')} className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Copy">
+                        <Copy size={15} />
+                      </button>
+                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Read Aloud">
+                        <Volume2 size={15} />
+                      </button>
+                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Regenerate">
+                        <RefreshCw size={15} />
+                      </button>
+                      <div className="w-px h-3 bg-white/10 mx-1" />
+                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Good response">
+                        <ThumbsUp size={15} />
+                      </button>
+                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Bad response">
+                        <ThumbsDown size={15} />
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               );
             })}
@@ -282,7 +339,7 @@ export default function ChatPage({
       )}
 
       {/* Bottom Input Area */}
-      <div className="p-4 bg-black/60 backdrop-blur-xl border-t border-white/10 shrink-0 relative">
+      <div className="p-4 md:px-8 pb-6 bg-transparent shrink-0 relative">
         <AnimatePresence>
           {isLocalPlusMenuOpen && (
             <motion.div key="plus-menu-container" className="absolute inset-0 z-50">
@@ -386,14 +443,14 @@ export default function ChatPage({
                     }
                   }}
                   placeholder="Describe your image..."
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[15px] text-white placeholder:text-white/40 focus:outline-none focus:border-white/20 resize-none min-h-[48px] max-h-[120px] overflow-y-auto leading-normal scrollbar-hide"
+                  className="flex-1 hyper-glass rounded-[24px] px-5 py-3.5 text-[15px] text-white placeholder:text-white/40 focus:outline-none focus:shadow-[0_0_30px_rgba(255,255,255,0.06)] focus:border-white/20 resize-none min-h-[48px] max-h-[120px] overflow-y-auto leading-normal scrollbar-hide"
                   rows={1}
                 />
                 <button
                   type="button"
                   onClick={handleTextSubmit}
                   disabled={!textInput.trim()}
-                  className="p-3.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-white transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                  className="p-4 rounded-[20px] bg-purple-500 hover:bg-purple-400 text-white transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.4)] active:scale-[0.96]"
                   title="Generate Image"
                 >
                   <Sparkles size={20} />
@@ -415,11 +472,11 @@ export default function ChatPage({
                   </button>
                 </div>
               )}
-              <div className="flex items-center gap-2 w-full bg-neutral-900 border border-white/10 rounded-2xl pl-2 pr-2 py-1.5 focus-within:border-white/30 transition-colors">
+              <div className="flex items-center gap-2 w-full hyper-glass rounded-[24px] pl-2 pr-2 py-2 focus-within:shadow-[0_0_30px_rgba(255,255,255,0.06)] focus-within:border-white/20 transition-all duration-300 group">
                 <button
                   type="button"
                   onClick={() => setIsLocalPlusMenuOpen(!isLocalPlusMenuOpen)}
-                  className={`p-2.5 rounded-full hover:bg-white/10 transition-all cursor-pointer ${isLocalPlusMenuOpen ? 'bg-white/10 text-white' : 'text-neutral-400 hover:text-white'}`}
+                  className={`p-2.5 rounded-full transition-all duration-300 cursor-pointer active:scale-95 ${isLocalPlusMenuOpen ? 'bg-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'text-neutral-400 hover:text-white hover:bg-white/10 hover:shadow-[0_0_10px_rgba(255,255,255,0.05)]'}`}
                   title="Media Options"
                 >
                   <PlusCircle size={22} />
@@ -452,10 +509,10 @@ export default function ChatPage({
                   <button
                     type="button"
                     onClick={toggleInputDictation}
-                    className={`p-2.5 rounded-full hover:bg-white/10 text-neutral-400 hover:text-white transition-all cursor-pointer flex items-center justify-center ${
+                    className={`p-2.5 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center active:scale-95 ${
                       isListening
-                        ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
-                        : ""
+                        ? "bg-red-500/20 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                        : "text-neutral-400 hover:text-white hover:bg-white/10 hover:shadow-[0_0_10px_rgba(255,255,255,0.05)]"
                     }`}
                     title="Dictate message (Speech to Text)"
                   >
@@ -464,7 +521,7 @@ export default function ChatPage({
                   <button 
                     type="submit"
                     disabled={(!textInput.trim() && selectedImages.length === 0) || isLoading}
-                    className="p-2.5 rounded-full bg-white text-black hover:bg-neutral-200 transition-all cursor-pointer disabled:opacity-50 disabled:bg-neutral-800 disabled:text-neutral-500 ml-1"
+                    className="p-2.5 rounded-[18px] bg-white text-black hover:bg-neutral-200 transition-all duration-300 cursor-pointer disabled:opacity-40 disabled:bg-neutral-800 disabled:text-neutral-500 ml-1 hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] active:scale-95"
                   >
                     {isLoading ? <Loader2 className="animate-spin text-neutral-400" size={20} /> : <Send size={20} />}
                   </button>
