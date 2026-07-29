@@ -87,6 +87,24 @@ function getCacheKey(prompt: string, history: any[], imageFrames: any): string {
   return prompt.trim().toLowerCase();
 }
 
+function is503Error(error: any): boolean {
+  if (!error) return false;
+  const statusStr = String(error.status || "").toLowerCase();
+  const statusTextStr = String(error.statusText || "").toLowerCase();
+  const messageStr = String(error.message || error || "").toLowerCase();
+
+  return (
+    statusStr.includes("503") ||
+    statusStr.includes("unavailable") ||
+    statusTextStr.includes("503") ||
+    statusTextStr.includes("unavailable") ||
+    messageStr.includes("503") ||
+    messageStr.includes("unavailable") ||
+    messageStr.includes("high demand") ||
+    messageStr.includes("overloaded")
+  );
+}
+
 let requestCount = 0;
 export async function getZoyaResponseStream(
   prompt: string,
@@ -175,33 +193,94 @@ export async function getZoyaResponseStream(
       }
     ];
 
-    const responseStream = await ai.models.generateContentStream({
-      model: "gemini-3.5-flash",
-      config: {
-        systemInstruction,
-      },
-      contents: finalContents,
-    });
+    const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash"];
+    let lastError: any = null;
+    let lastModelUsed = "gemini-3.5-flash";
 
-    let accumulatedText = "";
-    for await (const chunk of responseStream) {
-      const chunkText = chunk.text || "";
-      if (chunkText) {
-        accumulatedText += chunkText;
-        if (onChunk) {
-          onChunk(accumulatedText);
+    for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
+      const currentModel = modelsToTry[mIdx];
+      lastModelUsed = currentModel;
+
+      if (mIdx > 0) {
+        console.log("Fallback Model Used");
+      }
+
+      let retryCount = 0;
+      const maxRetries = 1;
+
+      while (retryCount <= maxRetries) {
+        try {
+          const responseStream = await ai.models.generateContentStream({
+            model: currentModel,
+            config: {
+              systemInstruction,
+            },
+            contents: finalContents,
+          });
+
+          let accumulatedText = "";
+          for await (const chunk of responseStream) {
+            const chunkText = chunk.text || "";
+            if (chunkText) {
+              accumulatedText += chunkText;
+              if (onChunk) {
+                onChunk(accumulatedText);
+              }
+            }
+          }
+
+          if (cacheKey && accumulatedText) {
+            responseCache.set(cacheKey, { response: accumulatedText, timestamp: Date.now() });
+          }
+          const finalText = accumulatedText || "Ugh, fine. I have nothing to say.";
+          return {
+            text: finalText,
+            debugInfo: {
+              intent: "GEMINI",
+              apiUsed: true,
+              modelName: currentModel,
+              isCached: false,
+              responseTimeMs: Date.now() - startTime,
+              status: "Success"
+            }
+          };
+
+        } catch (error: any) {
+          lastError = error;
+          console.error(`Gemini Error on ${currentModel}:`, error);
+
+          if (is503Error(error)) {
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`Retry #${retryCount}`);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            } else {
+              break;
+            }
+          } else {
+            throw error;
+          }
         }
       }
     }
 
-    
-    if (cacheKey && accumulatedText) {
-      responseCache.set(cacheKey, { response: accumulatedText, timestamp: Date.now() });
+    const busyMessage = "Gemini servers are currently busy.\nPlease try again in a few moments.";
+    if (onChunk) {
+      onChunk(busyMessage);
     }
-    const finalText = accumulatedText || "Ugh, fine. I have nothing to say.";
     return {
-      text: finalText,
-      debugInfo: { intent: "GEMINI", apiUsed: true, modelName: "gemini-3.5-flash", isCached: false, responseTimeMs: Date.now() - startTime, status: "Success" }
+      text: busyMessage,
+      debugInfo: {
+        intent: "GEMINI",
+        apiUsed: true,
+        modelName: lastModelUsed,
+        isCached: false,
+        responseTimeMs: Date.now() - startTime,
+        status: "Error",
+        httpStatus: "503",
+        errorCode: "UNAVAILABLE",
+        errorMessage: busyMessage
+      }
     };
 
   } catch (error: any) {
@@ -282,19 +361,53 @@ export async function getZoyaResponse(
       }
     ];
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      config: {
-        systemInstruction,
-      },
-      contents: finalContents,
-    });
+    const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash"];
 
-    const text = response.text || "Ugh, fine. I have nothing to say.";
-    if (cacheKey && text) {
-      responseCache.set(cacheKey, { response: text, timestamp: Date.now() });
+    for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
+      const currentModel = modelsToTry[mIdx];
+
+      if (mIdx > 0) {
+        console.log("Fallback Model Used");
+      }
+
+      let retryCount = 0;
+      const maxRetries = 1;
+
+      while (retryCount <= maxRetries) {
+        try {
+          const response = await ai.models.generateContent({
+            model: currentModel,
+            config: {
+              systemInstruction,
+            },
+            contents: finalContents,
+          });
+
+          const text = response.text || "Ugh, fine. I have nothing to say.";
+          if (cacheKey && text) {
+            responseCache.set(cacheKey, { response: text, timestamp: Date.now() });
+          }
+          return text;
+
+        } catch (error: any) {
+          console.error(`Gemini Error on ${currentModel}:`, error);
+
+          if (is503Error(error)) {
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`Retry #${retryCount}`);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            } else {
+              break;
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
     }
-    return text;
+
+    return "Gemini servers are currently busy.\nPlease try again in a few moments.";
 
   } catch (error) {
     console.error("Gemini Error:", error);

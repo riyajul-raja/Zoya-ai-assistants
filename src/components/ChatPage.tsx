@@ -11,6 +11,14 @@ interface DebugPopupProps {
   onClose: () => void;
 }
 
+function formatResponseTime(ms: number | undefined): string {
+  if (ms === undefined || ms === null || ms <= 0) return "N/A";
+  if (ms < 1000) {
+    return `${Math.round(ms)} ms`;
+  }
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
 function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
   useEffect(() => {
     console.log("Popup Mounted");
@@ -76,7 +84,7 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-white/50">Response Time:</span>
-          <span className="text-white/90 font-medium">{responseTimeMs > 0 ? `${responseTimeMs} ms` : "N/A"}</span>
+          <span className="text-white/90 font-medium">{formatResponseTime(responseTimeMs)}</span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-white/50">Status:</span>
