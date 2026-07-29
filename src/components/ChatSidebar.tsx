@@ -154,9 +154,9 @@ export default function ChatSidebar({
                     e.stopPropagation();
                     setActiveMenuId(activeMenuId === chat.id ? null : chat.id);
                   }}
-                  className="p-2 rounded-full hyper-glass border border-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors shadow-sm"
+                  className="p-2 text-neutral-400 hover:text-white transition-all duration-200 opacity-60 hover:opacity-100 active:scale-95"
                 >
-                  <MoreVertical size={16} />
+                  <MoreVertical size={18} />
                 </button>
 
                 {/* Context Menu Dropdown */}
@@ -169,16 +169,22 @@ export default function ChatSidebar({
                           e.stopPropagation();
                           setActiveMenuId(null);
                         }}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(null);
+                        }}
                       />
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.1 }}
-                        className="absolute right-0 top-full mt-1 w-40 bg-neutral-900/90 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl py-1 z-50 overflow-hidden"
+                        initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                        transition={{ duration: 0.15, ease: "easeOut" }}
+                        className="absolute right-0 top-full mt-2 w-48 bg-[#1a0509]/85 backdrop-blur-2xl border border-red-500/20 shadow-[0_12px_40px_rgba(220,38,38,0.15)] rounded-2xl py-2 z-50 overflow-hidden"
                       >
-                        <button 
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        <motion.button 
+                          whileHover={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+                          whileTap={{ scale: 0.97, backgroundColor: "rgba(255,255,255,0.1)" }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-white/90 transition-colors cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             const newTitle = prompt('Enter new title:', chat.title);
@@ -186,42 +192,50 @@ export default function ChatSidebar({
                             setActiveMenuId(null);
                           }}
                         >
-                          <Edit3 size={14} /> Rename Chat
-                        </button>
-                        <button 
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
+                          <Edit3 size={16} /> Rename Chat
+                        </motion.button>
+                        <motion.button 
+                          whileHover={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+                          whileTap={{ scale: 0.97, backgroundColor: "rgba(255,255,255,0.1)" }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-white/90 transition-colors cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             onUpdateChat(chat.id, { pinned: !chat.pinned });
                             setActiveMenuId(null);
                           }}
                         >
-                          {chat.pinned ? <><PinOff size={14} /> Unpin Chat</> : <><Pin size={14} /> Pin Chat</>}
-                        </button>
-                        <div className="h-px bg-white/10 my-1" />
-                        <button 
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
+                          {chat.pinned ? <><PinOff size={16} /> Unpin Chat</> : <><Pin size={16} /> Pin Chat</>}
+                        </motion.button>
+                        <div className="h-px bg-white/5 my-1.5 mx-2" />
+                        <motion.button 
+                          whileHover={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+                          whileTap={{ scale: 0.97, backgroundColor: "rgba(255,255,255,0.1)" }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-white/90 transition-colors cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onDuplicateChat) onDuplicateChat(chat.id);
                             setActiveMenuId(null);
                           }}
                         >
-                          <Copy size={14} /> Duplicate Chat
-                        </button>
-                        <button 
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
+                          <Copy size={16} /> Duplicate Chat
+                        </motion.button>
+                        <motion.button 
+                          whileHover={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+                          whileTap={{ scale: 0.97, backgroundColor: "rgba(255,255,255,0.1)" }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-white/90 transition-colors cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             alert("Chat shared! (Simulation)");
                             setActiveMenuId(null);
                           }}
                         >
-                          <Share size={14} /> Share Chat
-                        </button>
-                        <div className="h-px bg-white/10 my-1" />
-                        <button 
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          <Share size={16} /> Share Chat
+                        </motion.button>
+                        <div className="h-px bg-white/5 my-1.5 mx-2" />
+                        <motion.button 
+                          whileHover={{ backgroundColor: "rgba(239,68,68,0.1)" }}
+                          whileTap={{ scale: 0.97, backgroundColor: "rgba(239,68,68,0.15)" }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-red-400 transition-colors cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (window.confirm("Are you sure you want to delete this chat?")) {
@@ -230,8 +244,8 @@ export default function ChatSidebar({
                             setActiveMenuId(null);
                           }}
                         >
-                          <Trash2 size={14} /> Delete Chat
-                        </button>
+                          <Trash2 size={16} /> Delete Chat
+                        </motion.button>
                       </motion.div>
                     </>
                   )}
