@@ -1302,6 +1302,7 @@ In your very first response or greeting to the user, you MUST casually and natur
   };
 
   const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false, attachedImageBase64s: string[] = []) => {
+    console.log("[handleTextCommand] Called with:", finalTranscript.substring(0, 30));
     const currentHistory = [...messagesRef.current];
     
     if (!finalTranscript.trim() && attachedImageBase64s.length === 0) {

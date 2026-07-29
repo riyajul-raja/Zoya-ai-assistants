@@ -69,11 +69,13 @@ export default function ChatPage({
   const [isLocalPlusMenuOpen, setIsLocalPlusMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text || '');
     setCopiedMsgId(id);
-    setTimeout(() => {
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => {
       setCopiedMsgId(null);
     }, 2000);
   };
