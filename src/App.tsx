@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Settings, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, User, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ChevronRight, ArrowLeft, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
 import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -185,6 +185,7 @@ export default function App() {
   const [showKeep, setShowKeep] = useState(false);
   const [showClassroom, setShowClassroom] = useState(false);
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
+  const [isSettingsPageOpen, setIsSettingsPageOpen] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
@@ -1360,7 +1361,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (typeof img === 'string') {
         return img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
       }
-      if (img instanceof File || img instanceof Blob) {
+      if ((img as any) instanceof File || (img as any) instanceof Blob) {
         return URL.createObjectURL(img);
       }
       return "";
@@ -2052,7 +2053,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (typeof img === 'string') {
         return img.startsWith('data:') || img.startsWith('blob:') || img.startsWith('http') ? img : `data:image/jpeg;base64,${img}`;
       }
-      if (img instanceof File || img instanceof Blob) {
+      if ((img as any) instanceof File || (img as any) instanceof Blob) {
         try {
           return URL.createObjectURL(img);
         } catch (e) {
@@ -2558,217 +2559,101 @@ In your very first response or greeting to the user, you MUST casually and natur
                     onClick={() => setIsToolMenuOpen(false)}
                   />
                   <motion.div
-                    initial={{ x: "100%" }}
+                    initial={{ x: "-100%" }}
                     animate={{ x: 0 }}
-                    exit={{ x: "100%" }}
+                    exit={{ x: "-100%" }}
                     transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                    className="fixed inset-y-0 right-0 w-80 bg-black/95 backdrop-blur-xl border-l border-white/10 p-6 z-[100] flex flex-col shadow-2xl pointer-events-auto overflow-y-auto"
+                    className="fixed inset-y-0 left-0 w-[82%] max-w-[320px] bg-[#0a0a0a]/95 backdrop-blur-3xl border-r border-white/10 z-[100] flex flex-col shadow-2xl pointer-events-auto overflow-y-auto"
                   >
-                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
-                      <span className="text-sm font-mono text-white/70 uppercase tracking-widest font-semibold">Settings</span>
-                      <button onClick={() => setIsToolMenuOpen(false)} className="text-white/50 hover:text-white transition-colors cursor-pointer p-1">
-                        <X size={18} />
+                    {/* Top Row */}
+                    <div className="flex items-center justify-between px-6 py-5 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-[15px] text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] border border-white/20">
+                          Z
+                        </div>
+                        <span className="text-[17px] font-serif font-medium text-white/95 tracking-wide">Zoya</span>
+                      </div>
+                      <button onClick={() => setIsToolMenuOpen(false)} className="text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer p-2 hover:bg-white/10 rounded-xl hyper-glass hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                        <X size={20} />
                       </button>
                     </div>
-                    
-                    <div className="flex flex-col gap-6">
-                      <div className="flex flex-col gap-3">
-                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">App Settings</span>
-                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
-                          <span className="text-xs text-white/70 font-medium tracking-wide">Voice</span>
-                          <span className="text-xs font-mono text-white/40">Zoya (Default)</span>
-                        </div>
-                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
-                          <span className="text-xs text-white/70 font-medium tracking-wide">Theme</span>
-                          <span className="text-xs font-mono text-white/40">Dark Glass</span>
-                        </div>
-                      </div>
 
-                      <div className="flex flex-col gap-3">
-                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">Integrations & Tools</span>
-                        <div className="flex flex-col gap-1.5">
-                          {[
-                            {
-                              id: "gmail",
-                              name: "Google Gmail",
-                              icon: <Mail size={16} />,
-                              active: showGmail,
-                              toggle: () => setShowGmail(!showGmail),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "calendar",
-                              name: "Google Calendar",
-                              icon: <Calendar size={16} />,
-                              active: showCalendar,
-                              toggle: () => setShowCalendar(!showCalendar),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "tasks",
-                              name: "Google Tasks",
-                              icon: <ListTodo size={16} />,
-                              active: showTasks,
-                              toggle: () => setShowTasks(!showTasks),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "slides",
-                              name: "Google Slides",
-                              icon: <Presentation size={16} />,
-                              active: showSlides,
-                              toggle: () => setShowSlides(!showSlides),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "contacts",
-                              name: "Google Contacts",
-                              icon: <Users size={16} />,
-                              active: showContacts,
-                              toggle: () => setShowContacts(!showContacts),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "chat",
-                              name: "Google Chat",
-                              icon: <MessageSquare size={16} />,
-                              active: showGoogleChat,
-                              toggle: () => setShowGoogleChat(!showGoogleChat),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "docs",
-                              name: "Google Docs",
-                              icon: <FileText size={16} />,
-                              active: showDocs,
-                              toggle: () => setShowDocs(!showDocs),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "forms",
-                              name: "Google Forms",
-                              icon: <ClipboardList size={16} />,
-                              active: showForms,
-                              toggle: () => setShowForms(!showForms),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "meet",
-                              name: "Google Meet",
-                              icon: <Video size={16} />,
-                              active: showMeet,
-                              toggle: () => setShowMeet(!showMeet),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "keep",
-                              name: "Google Keep",
-                              icon: <StickyNote size={16} />,
-                              active: showKeep,
-                              toggle: () => setShowKeep(!showKeep),
-                              colorClass: "from-amber-600 to-yellow-600",
-                              accentColor: "text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
-                            },
-                            {
-                              id: "classroom",
-                              name: "Google Classroom",
-                              icon: <GraduationCap size={16} />,
-                              active: showClassroom,
-                              toggle: () => setShowClassroom(!showClassroom),
-                              colorClass: "from-emerald-600 to-teal-600",
-                              accentColor: "text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
-                            },
-                            {
-                              id: "drive",
-                              name: "Drive Explorer",
-                              icon: <HardDrive size={16} />,
-                              active: showDrive,
-                              toggle: () => setShowDrive(!showDrive),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "memories",
-                              name: "Memory Core",
-                              icon: <Brain size={16} />,
-                              active: showMemories,
-                              toggle: () => setShowMemories(!showMemories),
-                              colorClass: "from-red-600 to-rose-600",
-                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-                            },
-                            {
-                              id: "ar-hologram",
-                              name: "AR Hologram Mode",
-                              icon: (
-                                <Box 
-                                  size={16} 
-                                  className={`transition-all duration-300 ${
-                                    isARMode && isCameraActive ? "animate-spin text-cyan-100" : ""
-                                  }`} 
-                                  style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
-                                />
-                              ),
-                              active: isARMode,
-                              toggle: toggleAR,
-                              colorClass: "from-cyan-500 to-teal-500",
-                              accentColor: "text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
-                            },
-                            {
-                              id: "floating-core",
-                              name: "Floating Core Mode",
-                              icon: (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
-                                  <rect width="20" height="14" x="2" y="3" rx="2" />
-                                </svg>
-                              ),
-                              active: isGlobePiPActive,
-                              toggle: handlePiP,
-                              colorClass: "from-violet-600 to-pink-600",
-                              accentColor: "text-violet-400 border-violet-500/30 shadow-[0_0_10px_rgba(139,92,246,0.4)]",
-                            },
-                          ].map((tool) => (
-                            <button
-                              key={tool.id}
-                              onClick={() => {
-                                tool.toggle();
-                                setIsToolMenuOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
-                                tool.active
-                                  ? `bg-gradient-to-r ${tool.colorClass} border-transparent text-white font-medium ${tool.accentColor}`
-                                  : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <span className={tool.active ? "text-white" : "text-white/40"}>
-                                  {tool.icon}
-                                </span>
-                                <span className="font-medium tracking-wide">{tool.name}</span>
-                              </div>
-                              
-                              {/* Active indicator dot */}
-                              <span className={`w-1.5 h-1.5 rounded-full ${
-                                tool.active 
-                                  ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
-                                  : "bg-white/10"
-                              }`} />
-                            </button>
-                          ))}
+                    {/* Menu Items */}
+                    <div className="flex flex-col p-4 gap-3 overflow-y-auto mt-2">
+                      <motion.button 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        onClick={() => {
+                          setIsSettingsPageOpen(true);
+                          setIsToolMenuOpen(false);
+                        }}
+                        className="flex items-center justify-between p-4 rounded-[18px] hyper-glass transition-all duration-300 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer text-left w-full group"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-11 h-11 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                            <Settings size={20} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[15px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Settings</span>
+                            <span className="text-[11px] text-neutral-400 tracking-wide">Manage preferences</span>
+                          </div>
                         </div>
-                      </div>
+                        <ChevronRight size={20} className="text-neutral-500 group-hover:text-white transition-colors" />
+                      </motion.button>
                     </div>
                   </motion.div>
               </>)}
+              
+              {isSettingsPageOpen && (
+                <motion.div
+                  initial={{ x: "100%", opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: "100%", opacity: 0 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                  className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[200] flex flex-col pointer-events-auto"
+                >
+                  <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
+                    <button 
+                      onClick={() => {
+                        setIsSettingsPageOpen(false);
+                        setIsToolMenuOpen(true);
+                      }}
+                      className="flex items-center gap-2 text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer group px-4 py-2.5 hyper-glass rounded-xl hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.96]"
+                    >
+                      <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                      <span className="text-sm font-medium tracking-wide">Back</span>
+                    </button>
+                    <span className="text-base font-serif font-medium text-white tracking-widest uppercase">Settings</span>
+                    <div className="w-[88px]"></div> {/* Spacer for centering (matches button width) */}
+                  </div>
+                  
+                  <motion.div 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.1, duration: 0.4 }}
+                    className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center"
+                  >
+                    <div className="w-full max-w-2xl flex flex-col gap-4">
+                      
+                      <button className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left">
+                        <div className="flex items-center gap-5">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                            <User size={22} />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[16px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Personal</span>
+                            <span className="text-[12px] text-neutral-400 tracking-wide">Your Name • Gemini • Music • YouTube</span>
+                          </div>
+                        </div>
+                        <ChevronRight size={22} className="text-neutral-500 group-hover:text-white transition-colors" />
+                      </button>
+
+
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
 
