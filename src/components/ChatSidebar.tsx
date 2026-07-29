@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -47,6 +47,27 @@ export default function ChatSidebar({
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLongPressRef = useRef<number>(0);
+
+  const startLongPress = (id: string) => {
+    cancelLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(50); } catch (e) {}
+      }
+      setActiveMenuId(id);
+      lastLongPressRef.current = Date.now();
+    }, 500);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   const filteredChats = useMemo(() => {
     if (!searchQuery.trim()) return chats;
     const lowerQ = searchQuery.toLowerCase();
@@ -94,7 +115,23 @@ export default function ChatSidebar({
               transition={{ duration: 0.3, delay: index * 0.05 }}
               whileTap={{ scale: 0.98 }}
               className={`group relative rounded-[18px] transition-all duration-300 cursor-pointer flex items-center justify-between p-4 hyper-glass hover:shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:bg-white/[0.05] hover:border-white/20 hover:-translate-y-0.5 active:scale-[0.98] ${activeChatId === chat.id ? 'border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.2)] bg-violet-500/10' : ''}`}
-              onClick={() => onSelectChat(chat.id)}
+              onClick={(e) => {
+                if (Date.now() - lastLongPressRef.current < 500) {
+                  e.preventDefault();
+                  return;
+                }
+                onSelectChat(chat.id);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setActiveMenuId(chat.id);
+              }}
+              onTouchStart={() => startLongPress(chat.id)}
+              onTouchEnd={cancelLongPress}
+              onTouchMove={cancelLongPress}
+              onMouseDown={() => startLongPress(chat.id)}
+              onMouseUp={cancelLongPress}
+              onMouseLeave={cancelLongPress}
             >
               <div className="flex items-start gap-3 flex-1 min-w-0 pr-4">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-neutral-400 shrink-0 mt-0.5">
@@ -110,14 +147,14 @@ export default function ChatSidebar({
               </div>
               
               {/* Context Menu Button */}
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2">
+              <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setActiveMenuId(activeMenuId === chat.id ? null : chat.id);
                   }}
-                  className="p-1.5 rounded-md hover:bg-white/20 text-neutral-400 hover:text-white transition-colors"
+                  className="p-2 rounded-full hyper-glass border border-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors shadow-sm"
                 >
                   <MoreVertical size={16} />
                 </button>
@@ -138,7 +175,7 @@ export default function ChatSidebar({
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.1 }}
-                        className="absolute right-0 top-full mt-1 w-36 bg-neutral-900 border border-white/10 rounded-lg shadow-2xl py-1 z-50 overflow-hidden"
+                        className="absolute right-0 top-full mt-1 w-40 bg-neutral-900/90 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl py-1 z-50 overflow-hidden"
                       >
                         <button 
                           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -149,7 +186,7 @@ export default function ChatSidebar({
                             setActiveMenuId(null);
                           }}
                         >
-                          <Edit3 size={14} /> Rename
+                          <Edit3 size={14} /> Rename Chat
                         </button>
                         <button 
                           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -159,7 +196,7 @@ export default function ChatSidebar({
                             setActiveMenuId(null);
                           }}
                         >
-                          {chat.pinned ? <><PinOff size={14} /> Unpin</> : <><Pin size={14} /> Pin</>}
+                          {chat.pinned ? <><PinOff size={14} /> Unpin Chat</> : <><Pin size={14} /> Pin Chat</>}
                         </button>
                         <div className="h-px bg-white/10 my-1" />
                         <button 
@@ -170,7 +207,7 @@ export default function ChatSidebar({
                             setActiveMenuId(null);
                           }}
                         >
-                          <Copy size={14} /> Duplicate
+                          <Copy size={14} /> Duplicate Chat
                         </button>
                         <button 
                           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -180,18 +217,20 @@ export default function ChatSidebar({
                             setActiveMenuId(null);
                           }}
                         >
-                          <Share size={14} /> Share
+                          <Share size={14} /> Share Chat
                         </button>
                         <div className="h-px bg-white/10 my-1" />
                         <button 
                           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onDeleteChat(chat.id);
+                            if (window.confirm("Are you sure you want to delete this chat?")) {
+                              onDeleteChat(chat.id);
+                            }
                             setActiveMenuId(null);
                           }}
                         >
-                          <Trash2 size={14} /> Delete
+                          <Trash2 size={14} /> Delete Chat
                         </button>
                       </motion.div>
                     </>
