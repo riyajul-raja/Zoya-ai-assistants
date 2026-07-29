@@ -36,6 +36,7 @@ export interface ChatMessage {
   isHighThinking?: boolean;
   generatedImageUrl?: string;
   generatedImagePrompt?: string;
+  feedback?: "like" | "dislike";
 }
 
 declare global {
@@ -2751,6 +2752,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             setIsInputReadOnly={setIsInputReadOnly}
             handleImageUpload={handleImageUpload}
             setIsPlusMenuOpen={setIsPlusMenuOpen}
+            handleRegenerateMessage={handleRegenerateMessage}
             setMessages={setMessages}
             textareaRef={textareaRef}
             fileInputRef={fileInputRef}

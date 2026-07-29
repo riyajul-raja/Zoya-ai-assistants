@@ -28,6 +28,7 @@ interface ChatPageProps {
   handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   setIsPlusMenuOpen: (val: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+  handleRegenerateMessage: (msgId: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   chatContainerRef: React.RefObject<HTMLFormElement>;
@@ -57,6 +58,7 @@ export default function ChatPage({
   handleImageUpload,
   setIsPlusMenuOpen,
   setMessages,
+  handleRegenerateMessage,
   textareaRef,
   fileInputRef,
   chatContainerRef,
@@ -66,6 +68,57 @@ export default function ChatPage({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isLocalPlusMenuOpen, setIsLocalPlusMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [activeMobileMenuId, setActiveMobileMenuId] = useState<string | null>(null);
+  const msgLongPressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const startMsgLongPress = (id: string) => {
+    if (msgLongPressTimer.current) clearTimeout(msgLongPressTimer.current);
+    msgLongPressTimer.current = setTimeout(() => {
+      if (navigator.vibrate) try { navigator.vibrate(50); } catch (e) {}
+      setActiveMobileMenuId(id);
+    }, 500);
+  };
+  const cancelMsgLongPress = () => {
+    if (msgLongPressTimer.current) {
+      clearTimeout(msgLongPressTimer.current);
+      msgLongPressTimer.current = null;
+    }
+  };
+  
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMobileMenuId(null);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
+
+  const handleCopy = (id: string, text: string) => {
+    navigator.clipboard.writeText(text || '');
+    setCopiedMsgId(id);
+    setTimeout(() => {
+      setCopiedMsgId(null);
+    }, 2000);
+  };
+
+  const handleReadAloud = (text: string) => {
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    let voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+    if (!voice && voices.length > 0) voice = voices[0];
+    if (voice) utterance.voice = voice;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleFeedback = (id: string, feedback: 'like' | 'dislike') => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, feedback: m.feedback === feedback ? undefined : feedback } : m));
+  };
   
   const [chats, setChats] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem('zoya_sidebar_chats');
@@ -279,6 +332,18 @@ export default function ChatPage({
                   className={`flex flex-col max-w-[90%] md:max-w-[85%] min-h-0 ${
                     msg.sender === "user" ? "self-end items-end" : "self-start items-start group"
                   }`}
+                  onTouchStart={() => msg.sender !== "user" && !msg.isError && startMsgLongPress(msg.id)}
+                  onTouchEnd={cancelMsgLongPress}
+                  onTouchMove={cancelMsgLongPress}
+                  onMouseDown={() => msg.sender !== "user" && !msg.isError && startMsgLongPress(msg.id)}
+                  onMouseUp={cancelMsgLongPress}
+                  onMouseLeave={cancelMsgLongPress}
+                  onContextMenu={(e) => {
+                    if (msg.sender !== "user" && !msg.isError) {
+                      e.preventDefault();
+                      setActiveMobileMenuId(msg.id);
+                    }
+                  }}
                 >
                   <div className={`relative px-5 py-3.5 rounded-[20px] text-[15px] transition-all duration-300 h-fit w-fit min-h-0 leading-relaxed max-w-full overflow-hidden break-words ${
                     msg.isError
@@ -302,23 +367,37 @@ export default function ChatPage({
                   
                   {/* Actions for Assistant */}
                   {msg.sender !== "user" && !msg.isError && (
-                    <div className="flex items-center gap-1.5 mt-2 ml-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-                      <button type="button" onClick={() => navigator.clipboard.writeText(msg.text || '')} className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Copy">
+                    <div className={`relative flex items-center gap-1.5 mt-2 ml-3 transition-all duration-300 ${activeMobileMenuId === msg.id ? 'opacity-100 translate-y-0' : 'opacity-0 lg:opacity-0 lg:group-hover:opacity-100 translate-y-1 lg:group-hover:translate-y-0'}`} onClick={(e) => e.stopPropagation()}>
+                      
+                      <AnimatePresence>
+                        {copiedMsgId === msg.id && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                            className="absolute -top-8 left-0 flex items-center gap-1.5 px-3 py-1.5 bg-[#1a0509]/90 backdrop-blur-xl border border-red-500/20 shadow-[0_4px_20px_rgba(220,38,38,0.15)] rounded-full text-xs font-medium text-white/90 z-10"
+                          >
+                            <span className="text-red-400">✓</span> Copied
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <motion.button whileTap={{ scale: 0.9 }} type="button" onClick={() => handleCopy(msg.id, msg.text || '')} className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Copy">
                         <Copy size={15} />
-                      </button>
-                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Read Aloud">
+                      </motion.button>
+                      <motion.button whileTap={{ scale: 0.9 }} type="button" onClick={() => handleReadAloud(msg.text || '')} className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Read Aloud">
                         <Volume2 size={15} />
-                      </button>
-                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Regenerate">
+                      </motion.button>
+                      <motion.button whileTap={{ scale: 0.9 }} type="button" onClick={() => handleRegenerateMessage(msg.id)} className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Regenerate">
                         <RefreshCw size={15} />
-                      </button>
+                      </motion.button>
                       <div className="w-px h-3 bg-white/10 mx-1" />
-                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Good response">
+                      <motion.button whileTap={{ scale: 0.9 }} type="button" onClick={() => handleFeedback(msg.id, 'like')} className={`p-1.5 rounded-md transition-colors cursor-pointer ${msg.feedback === 'like' ? 'text-red-400 bg-red-500/10' : 'text-neutral-500 hover:text-white hover:bg-white/10'}`} title="Good response">
                         <ThumbsUp size={15} />
-                      </button>
-                      <button type="button" className="p-1.5 text-neutral-500 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer" title="Bad response">
+                      </motion.button>
+                      <motion.button whileTap={{ scale: 0.9 }} type="button" onClick={() => handleFeedback(msg.id, 'dislike')} className={`p-1.5 rounded-md transition-colors cursor-pointer ${msg.feedback === 'dislike' ? 'text-red-400 bg-red-500/10' : 'text-neutral-500 hover:text-white hover:bg-white/10'}`} title="Bad response">
                         <ThumbsDown size={15} />
-                      </button>
+                      </motion.button>
                     </div>
                   )}
                 </motion.div>
