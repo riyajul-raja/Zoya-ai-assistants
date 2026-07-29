@@ -77,7 +77,17 @@ export default function ChatPage({
     }
     return [];
   });
-  const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
+  const [activeChatId, setActiveChatId] = useState<string | undefined>(() => {
+    return localStorage.getItem('zoya_active_chat_id') || undefined;
+  });
+
+  useEffect(() => {
+    if (activeChatId) {
+      localStorage.setItem('zoya_active_chat_id', activeChatId);
+    } else {
+      localStorage.removeItem('zoya_active_chat_id');
+    }
+  }, [activeChatId]);
 
   useEffect(() => {
     localStorage.setItem('zoya_sidebar_chats', JSON.stringify(chats));
@@ -111,7 +121,8 @@ export default function ChatPage({
       setChats(prev => {
         const existing = prev.find(c => c.id === currentId);
         if (existing) {
-          return prev.map(c => c.id === currentId ? { ...c, title, preview, timestamp: new Date() } : c);
+          const newTitle = (existing.title === 'New Chat' || !existing.title) ? title : existing.title;
+          return prev.map(c => c.id === currentId ? { ...c, title: newTitle, preview, timestamp: new Date() } : c);
         } else {
           return [{ id: currentId, title, preview, timestamp: new Date(), pinned: false }, ...prev];
         }
@@ -169,6 +180,9 @@ export default function ChatPage({
     }
     
     setChats(prev => [newChat, ...prev]);
+    if (existingMsgs) {
+      setMessages(JSON.parse(existingMsgs));
+    }
     setActiveChatId(newId);
   };
 
