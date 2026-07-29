@@ -1,14 +1,27 @@
 import { GoogleGenAI } from "@google/genai";
 
+export interface DebugInfo {
+  intent: "LOCAL" | "GEMINI";
+  apiUsed: boolean;
+  modelName: string;
+  isCached: boolean;
+  responseTimeMs: number;
+  status: "Success" | "Error";
+  httpStatus?: string;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+
 const systemInstruction = "Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).";
 
-function formatGeminiError(error: any, modelName: string): string {
+function formatGeminiError(error: any, modelName: string): { formatted: string; status: string; errorCode: string; errorMessage: string } {
   let status = "Unknown";
   let errorCode = "UNKNOWN_ERROR";
   let errorMessage = error.message || String(error);
   
-  if (error.status) status = error.status;
-  if (error.statusText) errorCode = error.statusText;
+  if (error.status) status = String(error.status);
+  if (error.statusText) errorCode = String(error.statusText);
   
   const errStr = errorMessage.toLowerCase();
   if (errStr.includes("429") || errStr.includes("quota") || errStr.includes("resource_exhausted")) {
@@ -56,7 +69,22 @@ function formatGeminiError(error: any, modelName: string): string {
   console.error("Full stack trace:", error.stack || error);
   console.error("===============================");
 
-  return `❌ ${status} ${errorCode}\n${errorMessage}\n\nModel:\n${modelName}\n\nStatus:\n${status}\n\nError:\n${errorCode}\n\nMessage:\n${errorMessage}\n\nOriginal Error:\n${error.message || String(error)}`;
+  const formatted = `❌ ${status} ${errorCode}\n${errorMessage}\n\nModel:\n${modelName}\n\nStatus:\n${status}\n\nError:\n${errorCode}\n\nMessage:\n${errorMessage}\n\nOriginal Error:\n${error.message || String(error)}`;
+  return { formatted, status, errorCode, errorMessage };
+}
+
+
+interface CacheEntry {
+  response: string;
+  timestamp: number;
+}
+const responseCache: Map<string, CacheEntry> = new Map();
+const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+
+function getCacheKey(prompt: string, history: any[], imageFrames: any): string {
+  if (imageFrames && imageFrames.length > 0) return ""; // don't cache images for now
+  // We can just use the prompt as a simple cache key for exact match
+  return prompt.trim().toLowerCase();
 }
 
 let requestCount = 0;
@@ -67,8 +95,33 @@ export async function getZoyaResponseStream(
   isProfessionalMode: boolean = false,
   environmentContext: string = "",
   onChunk?: (text: string) => void
-): Promise<string> {
+): Promise<{text: string, debugInfo: Partial<DebugInfo>}> {
+  const startTime = Date.now();
   try {
+
+    const cacheKey = getCacheKey(prompt, history, imageFrames);
+    if (cacheKey) {
+      const cached = responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        console.log(`[Cache Hit] Serving cached response for prompt: "${prompt.substring(0, 30)}..."`);
+        if (onChunk) {
+          // Simulate streaming
+          setTimeout(() => onChunk(cached.response), 10);
+        }
+        return {
+          text: cached.response,
+          debugInfo: {
+            intent: "GEMINI",
+            apiUsed: false,
+            modelName: "gemini-3.5-flash",
+            isCached: true,
+            responseTimeMs: Date.now() - startTime,
+            status: "Success"
+          }
+        };
+      }
+    }
+
     requestCount++;
     console.log(`[API Request] Sending request #${requestCount} for prompt: "${prompt.substring(0, 30)}..."`);
     
@@ -140,12 +193,29 @@ export async function getZoyaResponseStream(
         }
       }
     }
-    return accumulatedText || "Ugh, fine. I have nothing to say.";
+
+    
+    if (cacheKey && accumulatedText) {
+      responseCache.set(cacheKey, { response: accumulatedText, timestamp: Date.now() });
+    }
+    const finalText = accumulatedText || "Ugh, fine. I have nothing to say.";
+    return {
+      text: finalText,
+      debugInfo: { intent: "GEMINI", apiUsed: true, modelName: "gemini-3.5-flash", isCached: false, responseTimeMs: Date.now() - startTime, status: "Success" }
+    };
+
   } catch (error: any) {
     console.error("Gemini Stream Error:", error);
-    const fallback = formatGeminiError(error, "gemini-3.5-flash");
-    if (onChunk) onChunk(fallback);
-    return fallback;
+    const parsed = formatGeminiError(error, "gemini-3.5-flash");
+    if (onChunk) onChunk(parsed.formatted);
+    return {
+      text: parsed.formatted,
+      debugInfo: { 
+        intent: "GEMINI", apiUsed: true, modelName: "gemini-3.5-flash", isCached: false, 
+        responseTimeMs: Date.now() - startTime, status: "Error", 
+        httpStatus: parsed.status, errorCode: parsed.errorCode, errorMessage: parsed.errorMessage 
+      }
+    };
   }
 }
 
@@ -157,6 +227,16 @@ export async function getZoyaResponse(
   environmentContext: string = ""
 ): Promise<string> {
   try {
+
+    const cacheKey = getCacheKey(prompt, history, imageFrames);
+    if (cacheKey) {
+      const cached = responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        console.log(`[Cache Hit] Serving cached response for prompt: "${prompt.substring(0, 30)}..."`);
+        return cached.response;
+      }
+    }
+
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
     let formattedHistory: any[] = [];
@@ -209,10 +289,16 @@ export async function getZoyaResponse(
       },
       contents: finalContents,
     });
-    return response.text || "Ugh, fine. I have nothing to say.";
+
+    const text = response.text || "Ugh, fine. I have nothing to say.";
+    if (cacheKey && text) {
+      responseCache.set(cacheKey, { response: text, timestamp: Date.now() });
+    }
+    return text;
+
   } catch (error) {
     console.error("Gemini Error:", error);
-    return formatGeminiError(error, "gemini-3.5-flash");
+    return formatGeminiError(error, "gemini-3.5-flash").formatted;
   }
 }
 

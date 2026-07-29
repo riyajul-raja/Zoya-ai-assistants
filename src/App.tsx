@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Settings, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, User, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ChevronRight, ArrowLeft, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, DebugInfo } from "./services/geminiService";
+import { detectIntent } from "./services/intentService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
@@ -37,6 +38,7 @@ export interface ChatMessage {
   generatedImageUrl?: string;
   generatedImagePrompt?: string;
   feedback?: "like" | "dislike";
+  debugInfo?: Partial<DebugInfo>;
 }
 
 declare global {
@@ -1161,6 +1163,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   const liveSessionRef = useRef<LiveSessionManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isProcessingRequestRef = useRef(false);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -1307,6 +1310,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     
     if (!finalTranscript.trim() && attachedImageBase64s.length === 0) {
       setAppState("idle");
+      isProcessingRequestRef.current = false;
       return;
     }
 
@@ -1385,6 +1389,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
     if (liveSessionRef.current && attachedImageBase64s.length === 0) {
       liveSessionRef.current.sendText(finalTranscript);
+      isProcessingRequestRef.current = false;
       return;
     }
 
@@ -1423,13 +1428,43 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (!isMuted && !skipSpeech) {
         speakMessageText("Here is the image you requested");
       }
+      isProcessingRequestRef.current = false;
       return;
     }
 
     // 1. Check for browser commands
     const commandResult = processCommand(finalTranscript);
 
+
     let responseText = "";
+
+    // 0. Smart Intent Router
+    if (attachedImageBase64s.length === 0) {
+      const intentResult = detectIntent(finalTranscript);
+      console.log(
+        `\n==================================================\n` +
+        `Intent: ${intentResult.type}\n` +
+        `Module Used: ${intentResult.module || 'Gemini'}\n` +
+        `API Called: ${intentResult.type === 'GEMINI' ? 'YES' : 'NO'}\n` +
+        `==================================================\n`
+      );
+      
+      if (intentResult.type === "LOCAL" && intentResult.response) {
+        console.log(`[Intent Router] Executing locally. No Gemini API will be called.`);
+        const responseMessageId = Date.now().toString() + "-z";
+        setMessages((prev) => [
+          ...prev,
+          { id: responseMessageId, sender: "zoya", role: "model", text: intentResult.response || "", debugInfo: { intent: "LOCAL", apiUsed: false, modelName: "N/A", isCached: false, responseTimeMs: 0, status: "Success" } }
+        ]);
+        setAppState("idle");
+        
+        if (!isMuted && !skipSpeech) {
+          speakMessageText(intentResult.response);
+        }
+        isProcessingRequestRef.current = false;
+        return; // Halt here, don't call Gemini
+      }
+    }
 
     if (commandResult.isBrowserAction) {
       responseText = commandResult.action;
@@ -1534,7 +1569,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           promptToSend = `${promptToSend}${memoryContext}`;
         }
 
-        responseText = await getZoyaResponseStream(
+        const responseStreamResult = await getZoyaResponseStream(
           promptToSend,
           currentHistory,
           capturedImageBase64s,
@@ -1564,6 +1599,13 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         );
         
+        responseText = responseStreamResult.text;
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === responseMessageId ? { ...msg, text: responseText, debugInfo: responseStreamResult.debugInfo } : msg
+          )
+        );
+
         setIsTyping(false);
         setIsLoading(false);
 
@@ -1668,6 +1710,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       }
       setAppState("idle");
     }
+    isProcessingRequestRef.current = false;
   }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
 
   useEffect(() => {
@@ -1857,63 +1900,79 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
+  
   const toggleListening = async (e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
     }
-    if (isSessionActive) {
-      setIsSessionActive(false);
-      
-      if (isListening && recognitionRef.current) {
+    
+    // Instead of using Live API (which is continuous and expensive), we use one-shot STT
+    // and pipe it to our Smart Intent Router.
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch (err) {}
+      }
+      setIsListening(false);
+      setAppState("idle");
+      return;
+    }
+
+    let speechDetected = false;
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setAppState("listening");
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results && event.results[0] && event.results[0][0]
+          ? event.results[0][0].transcript
+          : "";
+          
+        if (transcript && transcript.trim()) {
+          speechDetected = true;
+          console.log("[toggleListening] Voice Transcript:", transcript);
+          // Pass to the intent router via handleTextCommand directly
+          handleTextCommand(transcript, false, []);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
-      }
-    } else {
-      try {
-        // Do not show "Microphone Blocked" before actually requesting microphone permission.
-        // Call navigator.mediaDevices.getUserMedia() first.
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("Microphone access is not supported by your browser or secure context (ensure HTTPS).");
-        }
-
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          } 
-        });
-        // Release the mic track immediately, as our centralized useEffect will start the live session and request it
-        stream.getTracks().forEach(track => track.stop());
-
-        // Now that permission is granted, toggle state to trigger our centralized Live Session manager
-        setIsSessionActive(true);
-        
-      } catch (e: any) {
-        console.error("Failed to start session", e);
-        
-        // Show "Microphone Blocked" only if getUserMedia() throws NotAllowedError or PermissionDeniedError
-        const errorName = e?.name || "";
-        const errorMessage = e?.message || "";
-        const isPermissionError = 
-          errorName === "NotAllowedError" || 
-          errorName === "PermissionDeniedError" ||
-          errorMessage.toLowerCase().includes("permission denied") ||
-          errorMessage.toLowerCase().includes("notallowederror");
-
-        if (isPermissionError) {
-          setShowPermissionModal(true);
-        } else {
-          alert(`Could not start voice session: ${errorMessage || "Unknown error"}`);
-        }
-
-        setIsSessionActive(false);
         setAppState("idle");
-      }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        if (appState === "listening") {
+            setAppState("idle");
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e: any) {
+      console.error("Speech recognition initialization error:", e);
+      setIsListening(false);
+      setAppState("idle");
     }
   };
+
 
   const toggleInputDictation = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1943,7 +2002,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.onstart = () => {
         setIsListening(true);
         setAppState("listening");
-        setIsSessionActive(true);
+        
       };
 
       recognition.onresult = (event: any) => {
@@ -1967,13 +2026,13 @@ In your very first response or greeting to the user, you MUST casually and natur
         console.error("Speech recognition error:", event.error);
         setIsListening(false);
         setAppState("idle");
-        setIsSessionActive(false);
+        
       };
 
       recognition.onend = () => {
         setIsListening(false);
         setAppState("idle");
-        setIsSessionActive(false);
+        
       };
 
       recognitionRef.current = recognition;
@@ -1983,7 +2042,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (!isSessionActiveRef.current) {
         setIsListening(false);
         setAppState("idle");
-        setIsSessionActive(false);
+        
         if (!speechDetected) {
           setShowChat(false);
         }
