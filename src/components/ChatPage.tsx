@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
 import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Volume2, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import TypingIndicator from "./TypingIndicator";
@@ -8,6 +8,7 @@ import { DebugInfo } from '../services/geminiService';
 
 interface DebugPopupProps {
   debugInfo?: Partial<DebugInfo>;
+  targetElement?: HTMLElement | null;
   onClose: () => void;
 }
 
@@ -24,8 +25,56 @@ function cleanModelName(model?: string) {
   return model.replace(/^models\//, '');
 }
 
-function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
+function DebugPopup({ debugInfo, targetElement, onClose }: DebugPopupProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number; isAbove: boolean } | null>(null);
+
+  const updatePosition = () => {
+    if (!targetElement) return;
+    const rect = targetElement.getBoundingClientRect();
+    const popupWidth = Math.min(280, window.innerWidth - 24);
+    const estimatedHeight = 220; // Default collapsed height estimate
+
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    const isAbove = spaceAbove >= estimatedHeight || spaceAbove >= spaceBelow;
+
+    let left = rect.left;
+    if (left + popupWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popupWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    if (isAbove) {
+      setCoords({
+        bottom: Math.max(12, window.innerHeight - rect.top + 8),
+        left,
+        isAbove: true,
+      });
+    } else {
+      setCoords({
+        top: Math.max(12, rect.bottom + 8),
+        left,
+        isAbove: false,
+      });
+    }
+  };
+
+  useLayoutEffect(() => {
+    updatePosition();
+  }, [targetElement, showAdvanced]);
+
+  useEffect(() => {
+    updatePosition();
+    const handleResize = () => updatePosition();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [targetElement]);
 
   useEffect(() => {
     console.log("Popup Mounted");
@@ -94,11 +143,18 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92, y: 8 }}
+      initial={{ opacity: 0, scale: 0.92, y: coords?.isAbove ? 6 : -6 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.92, y: 8 }}
+      exit={{ opacity: 0, scale: 0.92, y: coords?.isAbove ? 6 : -6 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
-      className="absolute bottom-full left-0 mb-2 p-3 rounded-2xl bg-black/95 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] w-[280px] max-w-[90vw] max-h-[320px] shadow-[0_12px_40px_rgba(0,0,0,0.7)] select-none pointer-events-auto flex flex-col overflow-hidden"
+      style={{
+        position: 'fixed',
+        left: coords ? `${coords.left}px` : '12px',
+        ...(coords?.top !== undefined ? { top: `${coords.top}px` } : {}),
+        ...(coords?.bottom !== undefined ? { bottom: `${coords.bottom}px` } : {}),
+        zIndex: 999999,
+      }}
+      className="p-3 rounded-2xl bg-black/95 backdrop-blur-xl border border-white/15 text-xs text-white w-[280px] max-w-[calc(100vw-24px)] max-h-[320px] shadow-[0_12px_40px_rgba(0,0,0,0.8)] select-none pointer-events-auto flex flex-col overflow-hidden"
       onClick={(e) => {
         e.stopPropagation();
       }}
@@ -358,11 +414,12 @@ export default function ChatPage({
   recognitionRef
 }: ChatPageProps) {
   const [activeDebugMsgId, setActiveDebugMsgId] = useState<string | null>(null);
+  const [activeDebugTarget, setActiveDebugTarget] = useState<HTMLElement | null>(null);
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const isPressingRef = useRef<boolean>(false);
 
-  const startPress = (msg: ChatMessage, x: number, y: number) => {
+  const startPress = (msg: ChatMessage, x: number, y: number, targetElem?: HTMLElement) => {
     if (msg.sender === "user") return;
     console.log("Touch Start");
     isPressingRef.current = true;
@@ -374,7 +431,15 @@ export default function ChatPage({
 
     pressTimerRef.current = setTimeout(() => {
       console.log("Long Press Triggered");
-      setActiveDebugMsgId((prev) => (prev === msg.id ? null : msg.id));
+      if (activeDebugMsgId === msg.id) {
+        setActiveDebugMsgId(null);
+        setActiveDebugTarget(null);
+      } else {
+        setActiveDebugMsgId(msg.id);
+        if (targetElem) {
+          setActiveDebugTarget(targetElem);
+        }
+      }
       pressTimerRef.current = null;
       isPressingRef.current = false;
     }, 800);
@@ -399,43 +464,6 @@ export default function ChatPage({
       endPress();
     }
   };
-
-  useEffect(() => {
-    if (!activeDebugMsgId) return;
-
-    const handleOutsideClick = () => {
-      setActiveDebugMsgId(null);
-    };
-
-    const timer = setTimeout(() => {
-      window.addEventListener('click', handleOutsideClick);
-      window.addEventListener('touchstart', handleOutsideClick);
-    }, 50);
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('click', handleOutsideClick);
-      window.removeEventListener('touchstart', handleOutsideClick);
-    };
-  }, [activeDebugMsgId]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (activeDebugMsgId) {
-        setActiveDebugMsgId(null);
-      }
-    };
-    const container = chatContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      if (container) container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [chatContainerRef, activeDebugMsgId]);
-  
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isLocalPlusMenuOpen, setIsLocalPlusMenuOpen] = useState(false);
@@ -593,7 +621,6 @@ export default function ChatPage({
 
   return (
     <motion.form 
-      onClick={() => setActiveDebugMsgId(null)}
       ref={chatContainerRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -663,7 +690,7 @@ export default function ChatPage({
       </div>
 
       {/* Chat History Display Area */}
-      <div onScroll={() => setActiveDebugMsgId(null)} className="flex-1 overflow-y-auto scrollbar-hide px-4 pb-4 pt-6 flex flex-col min-h-0">
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pb-4 pt-6 flex flex-col min-h-0">
         <div className="flex flex-col gap-6 mt-auto w-full max-w-3xl mx-auto">
           <AnimatePresence initial={false}>
             {messages.map((msg) => {
@@ -687,7 +714,7 @@ export default function ChatPage({
                     onTouchStart={(e) => {
                       const touch = e.touches[0];
                       if (touch) {
-                        startPress(msg, touch.clientX, touch.clientY);
+                        startPress(msg, touch.clientX, touch.clientY, e.currentTarget);
                       }
                     }}
                     onTouchMove={(e) => {
@@ -700,7 +727,7 @@ export default function ChatPage({
                     onTouchCancel={() => endPress()}
                     onPointerDown={(e) => {
                       if (e.pointerType === 'touch') return;
-                      startPress(msg, e.clientX, e.clientY);
+                      startPress(msg, e.clientX, e.clientY, e.currentTarget);
                     }}
                     onPointerMove={(e) => {
                       if (e.pointerType === 'touch') return;
@@ -736,15 +763,6 @@ export default function ChatPage({
                       </div>
                     )}
                     {hasText && <div className="whitespace-pre-wrap leading-relaxed tracking-wide">{msg.text}</div>}
-                    
-                    <AnimatePresence>
-                      {activeDebugMsgId === msg.id && msg.sender !== "user" && (
-                        <DebugPopup
-                          debugInfo={msg.debugInfo}
-                          onClose={() => setActiveDebugMsgId(null)}
-                        />
-                      )}
-                    </AnimatePresence>
                   </div>
                   
                   {/* Actions for Assistant */}
@@ -1010,6 +1028,19 @@ export default function ChatPage({
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {activeDebugMsgId && activeDebugTarget && (
+          <DebugPopup
+            debugInfo={messages.find((m) => m.id === activeDebugMsgId)?.debugInfo}
+            targetElement={activeDebugTarget}
+            onClose={() => {
+              setActiveDebugMsgId(null);
+              setActiveDebugTarget(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </motion.form>
   );
 }
