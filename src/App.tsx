@@ -326,6 +326,8 @@ export default function App() {
 
   const isSessionActiveRef = useRef(isSessionActive);
   const isListeningRef = useRef(isListening);
+  const listeningTimeoutRef = useRef<any>(null);
+  const handleTextCommandRef = useRef<any>(null);
 
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
@@ -1094,9 +1096,9 @@ In your very first response or greeting to the user, you MUST casually and natur
     return () => clearInterval(intervalId);
   }, [isCameraActive, cameraStream]);
 
-  // Synchronize Live Session Lifecycle with isCameraActive, isSessionActive, and isMuted
+  // Synchronize Live Session Lifecycle with isCameraActive and isMuted
   useEffect(() => {
-    const shouldBeRunning = isCameraActive || isSessionActive;
+    const shouldBeRunning = isCameraActive;
     const requiredMic = !!isSessionActive;
 
     const manageSession = async () => {
@@ -1259,6 +1261,129 @@ In your very first response or greeting to the user, you MUST casually and natur
     scrollToBottom();
   }, [messages, showChat]);
 
+  const startListeningLoop = useCallback(() => {
+    if (!isSessionActiveRef.current) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
+      setIsSessionActive(false);
+      isSessionActiveRef.current = false;
+      setAppState("idle");
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+      console.log("[startListeningLoop] Speech synthesis active, deferring STT start...");
+      return;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN";
+
+      recognition.onstart = () => {
+        if (isSessionActiveRef.current) {
+          setIsListening(true);
+          setAppState("listening");
+        }
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        if (event.results) {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i] && event.results[i][0]) {
+              transcript += event.results[i][0].transcript;
+            }
+          }
+          if (!transcript && event.results[0] && event.results[0][0]) {
+            transcript = event.results[0][0].transcript;
+          }
+        }
+
+        if (transcript && transcript.trim()) {
+          console.log("[startListeningLoop] Voice Transcript:", transcript);
+          try {
+            recognition.stop();
+          } catch (e) {}
+          setIsListening(false);
+          setAppState("processing");
+
+          if (handleTextCommandRef.current) {
+            handleTextCommandRef.current(transcript.trim(), false, []);
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn("[startListeningLoop] Speech recognition error:", event.error);
+        if (isSessionActiveRef.current) {
+          clearTimeout(listeningTimeoutRef.current);
+          listeningTimeoutRef.current = setTimeout(() => {
+            if (isSessionActiveRef.current && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+              startListeningLoop();
+            }
+          }, 350);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        if (isSessionActiveRef.current) {
+          clearTimeout(listeningTimeoutRef.current);
+          listeningTimeoutRef.current = setTimeout(() => {
+            if (isSessionActiveRef.current && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+              startListeningLoop();
+            }
+          }, 250);
+        } else {
+          setAppState("idle");
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e: any) {
+      console.error("[startListeningLoop] Initialization error:", e);
+      if (isSessionActiveRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+        listeningTimeoutRef.current = setTimeout(() => {
+          if (isSessionActiveRef.current && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+            startListeningLoop();
+          }
+        }, 500);
+      }
+    }
+  }, []);
+
+  const finishSpeechOrTurn = useCallback(() => {
+    if (isSessionActiveRef.current) {
+      setAppState("listening");
+      clearTimeout(listeningTimeoutRef.current);
+      listeningTimeoutRef.current = setTimeout(() => {
+        if (isSessionActiveRef.current) {
+          startListeningLoop();
+        }
+      }, 300);
+    } else {
+      setAppState("idle");
+    }
+  }, [startListeningLoop]);
+
   const speakMessageText = useCallback((text: string) => {
     if (!text || !text.trim()) return;
     try {
@@ -1300,7 +1425,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       utterance.onend = () => {
         activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
         if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-          setAppState("idle");
+          finishSpeechOrTurn();
         }
       };
 
@@ -1319,7 +1444,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           }, 150);
         } else {
           if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-            setAppState("idle");
+            finishSpeechOrTurn();
           }
         }
       };
@@ -1332,7 +1457,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         if (!isRetry) {
           setTimeout(() => speakSentence(sentenceText, true), 150);
         } else {
-          setAppState("idle");
+          finishSpeechOrTurn();
         }
       }
     };
@@ -1340,7 +1465,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     sentences.forEach((sentence) => {
       speakSentence(sentence, false);
     });
-  }, [getZoyaVoice]);
+  }, [getZoyaVoice, finishSpeechOrTurn]);
 
   const autoTriggerUIFromText = useCallback((text: string) => {
     if (!text) return;
@@ -1742,7 +1867,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           utterance.onend = () => {
             activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
             if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-              setAppState("idle");
+              finishSpeechOrTurn();
             }
           };
 
@@ -1761,7 +1886,7 @@ In your very first response or greeting to the user, you MUST casually and natur
               }, 150);
             } else {
               if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-                setAppState("idle");
+                finishSpeechOrTurn();
               }
             }
           };
@@ -1774,7 +1899,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             if (!isRetry) {
               setTimeout(() => queueSentenceSpeak(sentence, true), 150);
             } else {
-              setAppState("idle");
+              finishSpeechOrTurn();
             }
           }
         };
@@ -1863,7 +1988,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
         // Wait a brief moment to ensure idle state updates if needed, though onend handles it
         if (isMuted || skipSpeech || (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
-          setAppState("idle");
+          finishSpeechOrTurn();
         }
       } catch (error: any) {
         setIsTyping(false);
@@ -1950,10 +2075,14 @@ In your very first response or greeting to the user, you MUST casually and natur
           },
         ]);
       }
-      setAppState("idle");
+      finishSpeechOrTurn();
     }
     isProcessingRequestRef.current = false;
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking, finishSpeechOrTurn]);
+
+  useEffect(() => {
+    handleTextCommandRef.current = handleTextCommand;
+  }, [handleTextCommand]);
 
   useEffect(() => {
     return () => {
@@ -2147,72 +2276,39 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (e) {
       e.preventDefault();
     }
-    
-    // Instead of using Live API (which is continuous and expensive), we use one-shot STT
-    // and pipe it to our Smart Intent Router.
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
-      return;
-    }
 
-    if (isListening) {
+    if (isSessionActiveRef.current) {
+      // Stop Session clicked
+      setIsSessionActive(false);
+      isSessionActiveRef.current = false;
+      setIsListening(false);
+      setAppState("idle");
+
+      clearTimeout(listeningTimeoutRef.current);
+
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.onstart = null;
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onend = null;
           recognitionRef.current.stop();
         } catch (err) {}
+        recognitionRef.current = null;
       }
-      setIsListening(false);
-      setAppState("idle");
+
+      try {
+        if (typeof window !== "undefined" && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+      } catch (err) {}
       return;
     }
 
-    let speechDetected = false;
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-IN";
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setAppState("listening");
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results && event.results[0] && event.results[0][0]
-          ? event.results[0][0].transcript
-          : "";
-          
-        if (transcript && transcript.trim()) {
-          speechDetected = true;
-          console.log("[toggleListening] Voice Transcript:", transcript);
-          // Pass to the intent router via handleTextCommand directly
-          handleTextCommand(transcript, false, []);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        setAppState("idle");
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        if (appState === "listening") {
-            setAppState("idle");
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e: any) {
-      console.error("Speech recognition initialization error:", e);
-      setIsListening(false);
-      setAppState("idle");
-    }
+    // Start Session clicked
+    setIsSessionActive(true);
+    isSessionActiveRef.current = true;
+    startListeningLoop();
   };
 
 
