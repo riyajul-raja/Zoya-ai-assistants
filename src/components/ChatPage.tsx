@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
 import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Volume2, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import TypingIndicator from "./TypingIndicator";
+import MarkdownRenderer from "./MarkdownRenderer";
 import { ChatMessage } from '../App';
 import ChatSidebar, { ChatSession } from './ChatSidebar';
 import { DebugInfo } from '../services/geminiService';
@@ -468,6 +469,15 @@ export default function ChatPage({
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef<boolean>(true);
+
+  const handleScroll = () => {
+    if (!messagesScrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesScrollContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 80;
+    shouldAutoScrollRef.current = isAtBottom;
+  };
   const [isLocalPlusMenuOpen, setIsLocalPlusMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
@@ -618,7 +628,16 @@ export default function ChatPage({
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: isTyping ? "auto" : "smooth" });
+    if (shouldAutoScrollRef.current) {
+      if (messagesScrollContainerRef.current) {
+        messagesScrollContainerRef.current.scrollTo({
+          top: messagesScrollContainerRef.current.scrollHeight,
+          behavior: isTyping ? "auto" : "smooth",
+        });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: isTyping ? "auto" : "smooth" });
+      }
+    }
   }, [messages, isTyping]);
 
   return (
@@ -628,7 +647,10 @@ export default function ChatPage({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      onSubmit={handleTextSubmit}
+      onSubmit={(e) => {
+        shouldAutoScrollRef.current = true;
+        handleTextSubmit(e);
+      }}
       style={{
         zIndex: 9999,
         position: "fixed",
@@ -692,11 +714,17 @@ export default function ChatPage({
       </div>
 
       {/* Chat History Display Area */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pb-4 pt-6 flex flex-col min-h-0">
+      <div 
+        ref={messagesScrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto scrollbar-hide px-4 pb-4 pt-6 flex flex-col min-h-0"
+      >
         <div className="flex flex-col gap-6 mt-auto w-full max-w-3xl mx-auto">
           <AnimatePresence initial={false}>
             {messages.map((msg) => {
-              const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
+              const isLastMsg = messages[messages.length - 1]?.id === msg.id;
+              const isStreamingThisMsg = isLastMsg && msg.sender !== "user" && (isTyping || isLoading);
+              const hasText = typeof msg.text === "string" && (msg.text.trim().length > 0 || isStreamingThisMsg);
               const hasImage = !!((Array.isArray(msg.images) && msg.images.length > 0) || msg.image || (msg as any).imageUrl || msg.generatedImageUrl);
               if (!hasText && !hasImage) return null;
               
@@ -742,8 +770,6 @@ export default function ChatPage({
                     }}
                     style={{
                       WebkitTouchCallout: 'none',
-                      WebkitUserSelect: 'none',
-                      userSelect: 'none',
                       touchAction: 'manipulation'
                     }}
                     className={`relative px-5 py-3.5 rounded-[20px] text-[15px] transition-all duration-300 h-fit w-fit min-h-0 leading-relaxed max-w-full break-words ${
@@ -764,7 +790,9 @@ export default function ChatPage({
                         {msg.generatedImageUrl && <img src={msg.generatedImageUrl} className="max-w-[200px] max-h-[200px] rounded-lg border border-white/10" alt="Generated" />}
                       </div>
                     )}
-                    {hasText && <div className="whitespace-pre-wrap leading-relaxed tracking-wide">{msg.text}</div>}
+                    {hasText && (
+                      <MarkdownRenderer content={msg.text || ''} isUser={msg.sender === "user"} isStreaming={isStreamingThisMsg} />
+                    )}
 
                     {(msg.showOpenSettingsButton || (msg.text && msg.text.includes("Gemini API Key add kar dijiye"))) && (
                       <button
