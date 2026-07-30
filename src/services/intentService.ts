@@ -20,20 +20,16 @@ export interface IntentResult {
 }
 
 // Salutation / Address lookup
-function getUserAddress(): string {
+export function getUserAddress(): string {
   try {
     const directName = localStorage.getItem("zoya_user_name") || localStorage.getItem("user_name");
     if (directName && directName.trim().length > 0) {
       return directName.trim();
     }
-    const customAddress = localStorage.getItem("zoya_user_address") || localStorage.getItem("user_address") || localStorage.getItem("zoya_salutation");
-    if (customAddress && customAddress.trim().length > 0) {
-      return customAddress.trim();
-    }
   } catch (e) {
     // Ignore error
   }
-  return "Boss";
+  return "";
 }
 
 // Greeting Template Collections
@@ -256,7 +252,14 @@ export function detectIntent(text: string): IntentResult {
 
   if (selectedResponse) {
     const address = getUserAddress();
-    selectedResponse = selectedResponse.replace(/{ADDRESS}/g, address);
+    if (address) {
+      selectedResponse = selectedResponse.replace(/{ADDRESS}/g, address);
+      selectedResponse = selectedResponse.replace(/\bBoss\b/gi, address);
+    } else {
+      selectedResponse = selectedResponse.replace(/,?\s*{ADDRESS}/g, "");
+      selectedResponse = selectedResponse.replace(/,?\s*\bBoss\b/gi, "");
+      selectedResponse = selectedResponse.replace(/\s+/g, " ").replace(/\s+([!?,.])/g, "$1").trim();
+    }
 
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
     const totalMs = routingMs + 2; // under 10 ms

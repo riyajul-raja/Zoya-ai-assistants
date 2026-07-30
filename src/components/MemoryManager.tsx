@@ -51,7 +51,7 @@ export default function MemoryManager({ onClose, isGhostMode = false, onToast }:
     note: [
       "Noted. Hope you don't forget this in 5 minutes.",
       "Saved to my neural core. Don't worry, my brain works better than yours.",
-      "Another note? Writing an autobiography or what, Boss?"
+      "Another note? Writing an autobiography or what?"
     ],
     reminder: [
       "Remind you? Ugh, fine. I am basically your manager now.",
@@ -65,7 +65,7 @@ export default function MemoryManager({ onClose, isGhostMode = false, onToast }:
     ],
     todo: [
       "Added to the infinite todo list. Let's see if you actually complete it.",
-      "Another task? Look at you trying to be productive today, Boss!",
+      "Another task? Look at you trying to be productive today!",
       "Task logged. Get to work, don't make me roll my virtual eyes."
     ]
   };

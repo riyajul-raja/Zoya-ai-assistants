@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
-import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Volume2, ChevronDown, ChevronUp } from "lucide-react";
+import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Volume2, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import TypingIndicator from "./TypingIndicator";
 import { ChatMessage } from '../App';
@@ -382,6 +382,7 @@ interface ChatPageProps {
   fileInputRef: React.RefObject<HTMLInputElement>;
   chatContainerRef: React.RefObject<HTMLFormElement>;
   recognitionRef: React.MutableRefObject<any>;
+  onOpenSettings?: () => void;
 }
 
 export default function ChatPage({
@@ -411,7 +412,8 @@ export default function ChatPage({
   textareaRef,
   fileInputRef,
   chatContainerRef,
-  recognitionRef
+  recognitionRef,
+  onOpenSettings
 }: ChatPageProps) {
   const [activeDebugMsgId, setActiveDebugMsgId] = useState<string | null>(null);
   const [activeDebugTarget, setActiveDebugTarget] = useState<HTMLElement | null>(null);
@@ -763,6 +765,22 @@ export default function ChatPage({
                       </div>
                     )}
                     {hasText && <div className="whitespace-pre-wrap leading-relaxed tracking-wide">{msg.text}</div>}
+
+                    {(msg.showOpenSettingsButton || (msg.text && msg.text.includes("Gemini API Key add kar dijiye"))) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenSettings) {
+                            onOpenSettings();
+                          }
+                        }}
+                        className="mt-3.5 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500/25 to-orange-500/25 hover:from-amber-500/35 hover:to-orange-500/35 active:scale-[0.98] border border-amber-400/40 text-amber-200 font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-lg cursor-pointer"
+                      >
+                        <Settings size={16} className="text-amber-300" />
+                        <span>⚙️ Open Settings</span>
+                      </button>
+                    )}
                   </div>
                   
                   {/* Actions for Assistant */}

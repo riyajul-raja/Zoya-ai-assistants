@@ -1,5 +1,6 @@
 import { GoogleGenAI, LiveServerMessage, Modality, Type } from "@google/genai";
 import { processCommand } from "./commandService";
+import { getGeminiApiKey, isGeminiKeyConfigured } from "./geminiService";
 
 const systemInstruction = `Your name is Zoya. You are an Indian female AI assistant. Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting your creator, Riyajul, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).
 
@@ -46,7 +47,7 @@ export class LiveSessionManager {
   public onUIAction: (panelName: string) => void = () => {};
 
   constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    this.ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
   }
 
   async start(
@@ -55,6 +56,10 @@ export class LiveSessionManager {
     environmentContext: string = "",
     history: { sender: "user" | "zoya"; text: string; image?: string }[] = []
   ) {
+    if (!isGeminiKeyConfigured()) {
+      console.warn("Gemini API key not configured. Live session skipped.");
+      return;
+    }
     try {
       this.onStateChange("processing");
       
@@ -121,7 +126,7 @@ export class LiveSessionManager {
       }
 
       let activeSystemInstruction = isProfessionalMode
-        ? `You are now in strict professional mode. You must exclusively address the user as 'Boss'. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
+        ? `You are now in strict professional mode. Do not use any jokes, humor, or unnecessary small talk. Communicate smartly. Provide only direct, logical, highly intelligent answers focused strictly on the task or work at hand.\n\n${systemInstruction}`
         : systemInstruction;
 
       if (environmentContext) {

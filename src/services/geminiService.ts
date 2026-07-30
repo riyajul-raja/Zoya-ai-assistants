@@ -33,11 +33,45 @@ export interface DebugInfo {
   reasoningTimeMs?: number;
 }
 
+export const LOCKED_MODE_MESSAGE = `👋 Hello!
+
+Main abhi aapki help karna chahti hoon, lekin meri AI Brain abhi activate nahi hui hai.
+
+Bas ek chhota sa setup baaki hai.
+
+⚙️ Settings me jaakar apni Gemini API Key add kar dijiye.
+
+Jaise hi aapki API Key verify ho jayegi, main turant activate ho jaungi. Uske baad aap mujhse chat kar sakenge, voice me baat kar sakenge aur mere saare AI features ka istemal kar sakenge.
+
+Main yahin aapka intezar karungi. 😊`;
+
+export function getGeminiApiKey(): string {
+  if (typeof window !== 'undefined') {
+    const savedKey = localStorage.getItem('zoya_gemini_api_key') || localStorage.getItem('gemini_api_key') || localStorage.getItem('zoya_api_key');
+    if (savedKey !== null && savedKey !== undefined && savedKey.trim().length > 0) {
+      return savedKey.trim();
+    }
+  }
+  return (process.env.GEMINI_API_KEY || '').trim();
+}
+
+export function isGeminiKeyConfigured(): boolean {
+  if (typeof window !== 'undefined') {
+    const savedKey = localStorage.getItem('zoya_gemini_api_key') || localStorage.getItem('gemini_api_key') || localStorage.getItem('zoya_api_key');
+    if (savedKey !== null && savedKey !== undefined) {
+      return savedKey.trim().length > 0;
+    }
+  }
+  return Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
+}
+
 let globalAiClient: GoogleGenAI | null = null;
+let lastUsedKey: string = '';
 
 function getAIClient(): GoogleGenAI {
-  if (!globalAiClient) {
-    const key = process.env.GEMINI_API_KEY || '';
+  const key = getGeminiApiKey();
+  if (!globalAiClient || lastUsedKey !== key) {
+    lastUsedKey = key;
     globalAiClient = new GoogleGenAI({
       apiKey: key,
       httpOptions: {
@@ -100,7 +134,7 @@ Do NOT trigger research mode for simple greetings or casual conversation.
 - During normal greetings (e.g., "Hi", "Hello", "Good morning", "Hlo"), respond ONLY to the greeting warmly and naturally. NEVER introduce yourself or mention your name, creator, or technology during a greeting!
 - Credit your creator Riyajul ("Mere creator aur developer Riyajul hain") ONLY if explicitly asked about who built/created you.
 - Mention Google Gemini strictly as the underlying AI engine ONLY if explicitly asked about your underlying technology or model.
-- Address the user naturally as "Boss" (or by their custom set address if provided in context).
+- If the user's saved name is provided in the context, address them by their name (e.g., "Hi Riyajul!"). If no name is saved, do NOT use any name or title like "Boss", "sir", or guess a name. Use neutral polite greetings only (e.g., "Hi!", "Hello!", "Good Morning!").
 
 ==================================================
 6. HUMAN CONVERSATION & REPLY STYLE
@@ -212,6 +246,21 @@ export async function getZoyaResponseStream(
 ): Promise<{text: string, debugInfo: Partial<DebugInfo>}> {
   const startTime = performance.now();
   try {
+    if (!isGeminiKeyConfigured()) {
+      if (onChunk) onChunk(LOCKED_MODE_MESSAGE);
+      return {
+        text: LOCKED_MODE_MESSAGE,
+        debugInfo: {
+          intent: "GEMINI",
+          apiUsed: false,
+          modelName: "N/A",
+          isCached: false,
+          responseTimeMs: 0,
+          status: "Success",
+          decision: "Locked Mode (No Gemini API Key)"
+        }
+      };
+    }
 
     const cacheKey = getCacheKey(prompt, history, imageFrames);
     if (cacheKey) {

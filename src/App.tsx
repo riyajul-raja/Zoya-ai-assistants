@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Settings, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, User, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ChevronRight, ArrowLeft, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, DebugInfo } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured } from "./services/geminiService";
 import { detectIntent } from "./services/intentService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -22,6 +22,8 @@ import FormsManager from "./components/FormsManager";
 import MeetManager from "./components/MeetManager";
 import KeepManager from "./components/KeepManager";
 import ClassroomManager from "./components/ClassroomManager";
+import PersonalSettings from "./components/PersonalSettings";
+import ActivationSuccessModal from "./components/ActivationSuccessModal";
 import { memoryOrchestrator, searchMemories } from "./modules/memory";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
@@ -39,6 +41,7 @@ export interface ChatMessage {
   generatedImagePrompt?: string;
   feedback?: "like" | "dislike";
   debugInfo?: Partial<DebugInfo>;
+  showOpenSettingsButton?: boolean;
 }
 
 declare global {
@@ -189,6 +192,33 @@ export default function App() {
   const [showClassroom, setShowClassroom] = useState(false);
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
   const [isSettingsPageOpen, setIsSettingsPageOpen] = useState(false);
+  const [isPersonalSettingsOpen, setIsPersonalSettingsOpen] = useState(false);
+  const [autoFocusApiKey, setAutoFocusApiKey] = useState(false);
+  const [showActivationSuccessModal, setShowActivationSuccessModal] = useState(false);
+
+  const handleApiKeyVerified = () => {
+    setShowActivationSuccessModal(true);
+    speakMessageText("Hello! Main ab poori tarah activate ho chuki hoon. Meri AI Brain safaltapoorvak activate ho gayi hai aur ab main aapki madad ke liye taiyar hoon. Chaliye, baat shuru karte hain!");
+  };
+
+  const handleStartChatFromActivationModal = () => {
+    setShowActivationSuccessModal(false);
+    setIsPersonalSettingsOpen(false);
+    setAutoFocusApiKey(false);
+    setShowChat(true);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 100);
+  };
+
+  const handleCloseActivationSuccessModal = () => {
+    setShowActivationSuccessModal(false);
+  };
+
+  const handleOpenSettingsFromLockedMode = () => {
+    setIsPersonalSettingsOpen(true);
+    setAutoFocusApiKey(true);
+  };
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
@@ -318,8 +348,8 @@ export default function App() {
             },
             user: {
               id: new Uint8Array([1, 2, 3, 4]),
-              name: "Boss",
-              displayName: "Boss"
+              name: localStorage.getItem("zoya_user_name") || "User",
+              displayName: localStorage.getItem("zoya_user_name") || "User"
             },
             pubKeyCredParams: [
               { type: "public-key", alg: -7 },
@@ -651,7 +681,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 - Current Weather: ${temp}°C, ${cond}.
 
 INSTRUCTION FOR FIRST GREETING:
-In your very first response or greeting to the user, you MUST casually and naturally mention this current time of day and the current weather temperature/conditions (e.g., "Good morning Boss, it's 25 degrees outside..." or similar natural, sassy/professional greeting depending on your active mode). Keep it short, witty, and perfectly fitting your Zoya persona.`;
+In your very first response or greeting to the user, you MUST casually and naturally mention this current time of day and the current weather temperature/conditions (e.g., "Good morning, it's 25 degrees outside..." or similar natural, sassy/professional greeting depending on your active mode). Keep it short, witty, and perfectly fitting your Zoya persona.`;
               setEnvironmentContext(fullCtx);
             } else {
               setFallbackContext();
@@ -1385,6 +1415,55 @@ In your very first response or greeting to the user, you MUST casually and natur
       },
     ]);
     
+    // LOCKED MODE (NO GEMINI API KEY)
+    if (!isGeminiKeyConfigured()) {
+      setIsLoading(true);
+      setAppState("processing");
+
+      await new Promise(r => setTimeout(r, 400));
+
+      const responseMessageId = Date.now().toString() + "-z";
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: responseMessageId,
+          sender: "zoya",
+          role: "model",
+          text: LOCKED_MODE_MESSAGE,
+          showOpenSettingsButton: true,
+          debugInfo: {
+            intent: "LOCAL",
+            apiUsed: false,
+            modelName: "N/A",
+            isCached: false,
+            responseTimeMs: 400,
+            status: "Success",
+            routingMs: 2,
+            apiMs: 0,
+            streamingMs: 0,
+            renderingMs: 5,
+            totalMs: 400,
+            intentConfidence: 100,
+            contextConfidence: 100,
+            memoryConfidence: 100,
+            overallConfidence: 100,
+            decision: "Locked Mode (No Gemini API Key)"
+          }
+        }
+      ]);
+
+      setAppState("idle");
+      setIsLoading(false);
+
+      if (!isMuted && !skipSpeech) {
+        speakMessageText(LOCKED_MODE_MESSAGE);
+      }
+
+      isProcessingRequestRef.current = false;
+      return;
+    }
+
     // If live session is active (either because voice is active or camera is ON), send text through it
     // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
     if (liveSessionRef.current && attachedImageBase64s.length === 0) {
@@ -2737,7 +2816,10 @@ In your very first response or greeting to the user, you MUST casually and natur
                   >
                     <div className="w-full max-w-2xl flex flex-col gap-4">
                       
-                      <button className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left">
+                      <button 
+                        onClick={() => setIsPersonalSettingsOpen(true)}
+                        className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left"
+                      >
                         <div className="flex items-center gap-5">
                           <div className="w-12 h-12 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
                             <User size={22} />
@@ -2755,7 +2837,24 @@ In your very first response or greeting to the user, you MUST casually and natur
                   </motion.div>
                 </motion.div>
               )}
+
+              {isPersonalSettingsOpen && (
+                <PersonalSettings 
+                  onBack={() => {
+                    setIsPersonalSettingsOpen(false);
+                    setAutoFocusApiKey(false);
+                  }}
+                  autoFocusApiKey={autoFocusApiKey}
+                  onApiKeyVerified={handleApiKeyVerified}
+                />
+              )}
             </AnimatePresence>
+
+            <ActivationSuccessModal
+              isOpen={showActivationSuccessModal}
+              onClose={handleCloseActivationSuccessModal}
+              onStartChat={handleStartChatFromActivationModal}
+            />
           </div>
 
           
@@ -2858,6 +2957,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             fileInputRef={fileInputRef}
             chatContainerRef={chatContainerRef}
             recognitionRef={recognitionRef}
+            onOpenSettings={handleOpenSettingsFromLockedMode}
           />
         )}
       </AnimatePresence>
