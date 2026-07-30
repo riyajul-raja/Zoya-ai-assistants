@@ -54,15 +54,8 @@ export default function ActivationSuccessModal({
           navigator.vibrate([50, 30, 50]);
         } catch (e) {}
       }
-
-      // Auto close after 4 seconds
-      const timer = setTimeout(() => {
-        onStartChat();
-      }, 4000);
-
-      return () => clearTimeout(timer);
     }
-  }, [isOpen, onStartChat]);
+  }, [isOpen]);
 
   return (
     <AnimatePresence>
