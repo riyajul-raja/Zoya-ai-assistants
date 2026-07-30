@@ -804,6 +804,9 @@ export default function ChatPage({
                             onOpenSettings();
                           }
                         }}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
                         className="mt-3.5 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500/25 to-orange-500/25 hover:from-amber-500/35 hover:to-orange-500/35 active:scale-[0.98] border border-amber-400/40 text-amber-200 font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-lg cursor-pointer pointer-events-auto relative z-10"
                       >
                         <Settings size={16} className="text-amber-300" />

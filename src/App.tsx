@@ -2791,70 +2791,6 @@ In your very first response or greeting to the user, you MUST casually and natur
                     </div>
                   </motion.div>
               </>)}
-              
-              {isSettingsPageOpen && (
-                <motion.div
-                  initial={{ x: "100%", opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: "100%", opacity: 0 }}
-                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                  className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[10020] flex flex-col pointer-events-auto"
-                >
-                  <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
-                    <button 
-                      onClick={() => {
-                        setIsSettingsPageOpen(false);
-                        setIsToolMenuOpen(true);
-                      }}
-                      className="flex items-center gap-2 text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer group px-4 py-2.5 hyper-glass rounded-xl hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.96]"
-                    >
-                      <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                      <span className="text-sm font-medium tracking-wide">Back</span>
-                    </button>
-                    <span className="text-base font-serif font-medium text-white tracking-widest uppercase">Settings</span>
-                    <div className="w-[88px]"></div> {/* Spacer for centering (matches button width) */}
-                  </div>
-                  
-                  <motion.div 
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1, duration: 0.4 }}
-                    className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center"
-                  >
-                    <div className="w-full max-w-2xl flex flex-col gap-4">
-                      
-                      <button 
-                        onClick={() => setIsPersonalSettingsOpen(true)}
-                        className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left"
-                      >
-                        <div className="flex items-center gap-5">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                            <User size={22} />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[16px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Personal</span>
-                            <span className="text-[12px] text-neutral-400 tracking-wide">Your Name • Gemini • Music • YouTube</span>
-                          </div>
-                        </div>
-                        <ChevronRight size={22} className="text-neutral-500 group-hover:text-white transition-colors" />
-                      </button>
-
-
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
-
-              {isPersonalSettingsOpen && (
-                <PersonalSettings 
-                  onBack={() => {
-                    setIsPersonalSettingsOpen(false);
-                    setAutoFocusApiKey(false);
-                  }}
-                  autoFocusApiKey={autoFocusApiKey}
-                  onApiKeyVerified={handleApiKeyVerified}
-                />
-              )}
             </AnimatePresence>
 
             <ActivationSuccessModal
@@ -2965,6 +2901,72 @@ In your very first response or greeting to the user, you MUST casually and natur
             chatContainerRef={chatContainerRef}
             recognitionRef={recognitionRef}
             onOpenSettings={handleOpenSettingsFromLockedMode}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Global Settings & Personal Settings Overlays (outside header so z-index is higher than ChatPage z-9999) */}
+      <AnimatePresence>
+        {isSettingsPageOpen && (
+          <motion.div
+            initial={{ x: "100%", opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[10020] flex flex-col pointer-events-auto"
+          >
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
+              <button 
+                onClick={() => {
+                  setIsSettingsPageOpen(false);
+                  setIsToolMenuOpen(true);
+                }}
+                className="flex items-center gap-2 text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer group px-4 py-2.5 hyper-glass rounded-xl hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.96]"
+              >
+                <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                <span className="text-sm font-medium tracking-wide">Back</span>
+              </button>
+              <span className="text-base font-serif font-medium text-white tracking-widest uppercase">Settings</span>
+              <div className="w-[88px]"></div> {/* Spacer for centering (matches button width) */}
+            </div>
+            
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+              className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center"
+            >
+              <div className="w-full max-w-2xl flex flex-col gap-4">
+                
+                <button 
+                  onClick={() => setIsPersonalSettingsOpen(true)}
+                  className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left"
+                >
+                  <div className="flex items-center gap-5">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                      <User size={22} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[16px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Personal</span>
+                      <span className="text-[12px] text-neutral-400 tracking-wide">Your Name • Gemini • Music • YouTube</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={22} className="text-neutral-500 group-hover:text-white transition-colors" />
+                </button>
+
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {isPersonalSettingsOpen && (
+          <PersonalSettings 
+            onBack={() => {
+              setIsPersonalSettingsOpen(false);
+              setAutoFocusApiKey(false);
+            }}
+            autoFocusApiKey={autoFocusApiKey}
+            onApiKeyVerified={handleApiKeyVerified}
           />
         )}
       </AnimatePresence>
