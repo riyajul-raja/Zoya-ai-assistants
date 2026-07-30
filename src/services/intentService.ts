@@ -57,7 +57,7 @@ const NIGHT_TEMPLATES = [
 
 const GENERAL_GREETING_TEMPLATES = [
   "Hello, {ADDRESS}! 😊 Main ready hoon. Aaj kis cheez me help karun?",
-  "Hey, {ADDRESS}! 👋 Main Zoya hoon, ready whenever you are. Bataiye kya karna hai?",
+  "Hey, {ADDRESS}! 👋 Main ready hoon, ready whenever you are. Bataiye kya karna hai?",
   "Hi, {ADDRESS}! ✨ Welcome back. Aaj kis topic par baat karni hai?",
   "Namaste, {ADDRESS}! 🙏 Main ready hoon, boliyega kya help chahiye?"
 ];
@@ -163,7 +163,7 @@ export function detectIntent(text: string): IntentResult {
   const nightRegex = /^(good\s*night|gd\s*night|gud\s*night|gn)(\s+(zoya|there|ji))?$/i;
   const thanksRegex = /^(thanks|thank\s*you|thx|ty|thanku|thank\s*u|many\s*thanks|thanks\s*a\s*lot|thank\s*you\s*so\s*much|thank\s*you\s*zoya|thanks\s*zoya)(\s+(zoya|there|ji))?$/i;
   const byeRegex = /^(bye|goodbye|bye\s*bye|see\s*ya|see\s*you|ttyl|cya|bye\s*zoya|goodbye\s*zoya)(\s+(zoya|there|ji))?$/i;
-  const identityRegex = /^(who\s*are\s*you|what\s*is\s*your\s*name|whats\s*your\s*name|your\s*name|tell\s*me\s*about\s*yourself|introduce\s*yourself|who\s*is\s*zoya|tum\s*kaun\s*ho|tumhara\s*naam\s*kya\s*hai|who\s*are\s*u|what\s*are\s*you)(\s+(zoya))?$/i;
+  const identityRegex = /^(who\s*are\s*you|what\s*is\s*your\s*name|whats\s*your\s*name|your\s*name|tell\s*me\s*about\s*yourself|introduce\s*yourself|who\s*is\s*zoya|tum\s*kaun\s*ho|tumhara\s*naam\s*kya\s*hai|who\s*are\s*u|what\s*are\s*you|apne\s*bare\s*me\s*batao|apne\s*baare\s*mein\s*batao|apne\s*bare\s*me\s*bataiye|apne\s*baare\s*mein\s*bataiye)(\s+(zoya))?$/i;
 
   // Creator & Identity Regex Patterns
   const ownerRegex = /^(who\s*owns\s*(you|zoya)|who\s*is\s*your\s*owner|zoya\s*ka\s*malik\s*kaun\s*hai|zoya\s*kiski\s*hai|zoya\s*ka\s*owner\s*kaun\s*hai|tumhara\s*owner\s*kaun\s*hai|tumhara\s*malik\s*kaun\s*hai|tum\s*kiski\s*ho|who\s*is\s*the\s*owner\s*of\s*zoya)$/i;
