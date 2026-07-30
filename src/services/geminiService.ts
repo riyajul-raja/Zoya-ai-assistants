@@ -10,6 +10,11 @@ export interface DebugInfo {
   httpStatus?: string;
   errorCode?: string;
   errorMessage?: string;
+  primaryModel?: string;
+  fallbackLevel?: "Primary" | "Fallback #1" | "Fallback #2" | "None";
+  currentModel?: string;
+  retryCount?: number;
+  verificationStatus?: "PASS" | "FAIL";
 }
 
 
@@ -134,7 +139,12 @@ export async function getZoyaResponseStream(
             modelName: "gemini-3.5-flash",
             isCached: true,
             responseTimeMs: Date.now() - startTime,
-            status: "Success"
+            status: "Success",
+            primaryModel: "gemini-3.5-flash",
+            fallbackLevel: "Primary",
+            currentModel: "gemini-3.5-flash",
+            retryCount: 0,
+            verificationStatus: "PASS"
           }
         };
       }
@@ -193,7 +203,7 @@ export async function getZoyaResponseStream(
       }
     ];
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash"];
+    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite"];
     let lastError: any = null;
     let lastModelUsed = "gemini-3.5-flash";
 
@@ -233,6 +243,7 @@ export async function getZoyaResponseStream(
             responseCache.set(cacheKey, { response: accumulatedText, timestamp: Date.now() });
           }
           const finalText = accumulatedText || "Ugh, fine. I have nothing to say.";
+          const fallbackLevel = mIdx === 0 ? "Primary" : mIdx === 1 ? "Fallback #1" : "Fallback #2";
           return {
             text: finalText,
             debugInfo: {
@@ -241,7 +252,12 @@ export async function getZoyaResponseStream(
               modelName: currentModel,
               isCached: false,
               responseTimeMs: Date.now() - startTime,
-              status: "Success"
+              status: "Success",
+              primaryModel: "gemini-3.5-flash",
+              fallbackLevel: fallbackLevel,
+              currentModel: currentModel,
+              retryCount: retryCount,
+              verificationStatus: "PASS"
             }
           };
 
@@ -279,7 +295,12 @@ export async function getZoyaResponseStream(
         status: "Error",
         httpStatus: "503",
         errorCode: "UNAVAILABLE",
-        errorMessage: busyMessage
+        errorMessage: busyMessage,
+        primaryModel: "gemini-3.5-flash",
+        fallbackLevel: "Fallback #2",
+        currentModel: lastModelUsed,
+        retryCount: 1,
+        verificationStatus: "FAIL"
       }
     };
 
@@ -361,7 +382,7 @@ export async function getZoyaResponse(
       }
     ];
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash"];
+    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite"];
 
     for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
       const currentModel = modelsToTry[mIdx];

@@ -29,7 +29,11 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
 
   const intent = debugInfo?.intent || "GEMINI";
   const apiUsed = debugInfo?.apiUsed !== false;
-  const modelName = debugInfo?.modelName || "gemini-3.5-flash";
+  const primaryModel = debugInfo?.primaryModel || "gemini-3.5-flash";
+  const fallbackLevel = debugInfo?.fallbackLevel || "Primary";
+  const currentModel = debugInfo?.currentModel || debugInfo?.modelName || "gemini-3.5-flash";
+  const retryCount = debugInfo?.retryCount !== undefined ? debugInfo.retryCount : 0;
+  const verificationStatus = debugInfo?.verificationStatus || "PASS";
   const isCached = !!debugInfo?.isCached;
   const responseTimeMs = debugInfo?.responseTimeMs !== undefined ? debugInfo.responseTimeMs : 0;
   const status = debugInfo?.status || "Success";
@@ -40,7 +44,7 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.92, y: 8 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="absolute bottom-full left-0 mb-2 p-3.5 rounded-2xl bg-black/90 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] min-w-[240px] shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none pointer-events-auto"
+      className="absolute bottom-full left-0 mb-2 p-3.5 rounded-2xl bg-black/90 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] min-w-[250px] shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none pointer-events-auto"
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -65,6 +69,28 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
 
       <div className="flex flex-col gap-1.5 font-mono text-[11px] leading-relaxed">
         <div className="flex justify-between gap-4">
+          <span className="text-white/50">Primary Model:</span>
+          <span className="text-white/90 font-medium">{primaryModel}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Fallback Level:</span>
+          <span className="text-white/90 font-medium">{fallbackLevel}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Current Model:</span>
+          <span className="text-white/90 font-medium">{currentModel}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Retry Count:</span>
+          <span className="text-white/90 font-medium">{retryCount}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Verification Status:</span>
+          <span className={verificationStatus === "PASS" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+            {verificationStatus}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
           <span className="text-white/50">Intent:</span>
           <span className={intent === "LOCAL" ? "text-emerald-400 font-bold" : "text-sky-400 font-bold"}>
             {intent}
@@ -73,10 +99,6 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
         <div className="flex justify-between gap-4">
           <span className="text-white/50">API Used:</span>
           <span className="text-white/90 font-medium">{apiUsed ? "YES" : "NO"}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Model:</span>
-          <span className="text-white/90 font-medium">{modelName}</span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-white/50">Cache:</span>
