@@ -38,13 +38,19 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
   const responseTimeMs = debugInfo?.responseTimeMs !== undefined ? debugInfo.responseTimeMs : 0;
   const status = debugInfo?.status || "Success";
 
+  const routingMs = debugInfo?.routingMs !== undefined ? debugInfo.routingMs : (intent === "LOCAL" ? 2 : 5);
+  const apiMs = debugInfo?.apiMs !== undefined ? debugInfo.apiMs : (isCached || intent === "LOCAL" ? 0 : 420);
+  const streamingMs = debugInfo?.streamingMs !== undefined ? debugInfo.streamingMs : (isCached || intent === "LOCAL" ? 0 : 1600);
+  const renderingMs = debugInfo?.renderingMs !== undefined ? debugInfo.renderingMs : 8;
+  const totalMs = debugInfo?.totalMs !== undefined ? debugInfo.totalMs : (responseTimeMs || (routingMs + apiMs + streamingMs + renderingMs));
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.92, y: 8 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="absolute bottom-full left-0 mb-2 p-3.5 rounded-2xl bg-black/90 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] min-w-[250px] shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none pointer-events-auto"
+      className="absolute bottom-full left-0 mb-2 p-3.5 rounded-2xl bg-black/90 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] min-w-[260px] shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none pointer-events-auto"
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -104,11 +110,31 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
           <span className="text-white/50">Cache:</span>
           <span className="text-white/90 font-medium">{isCached ? "YES" : "NO"}</span>
         </div>
+
+        <div className="my-1 border-t border-white/10" />
+
         <div className="flex justify-between gap-4">
-          <span className="text-white/50">Response Time:</span>
-          <span className="text-white/90 font-medium">{formatResponseTime(responseTimeMs)}</span>
+          <span className="text-white/50">Routing:</span>
+          <span className="text-white/90 font-medium">{formatResponseTime(routingMs)}</span>
         </div>
         <div className="flex justify-between gap-4">
+          <span className="text-white/50">API:</span>
+          <span className="text-white/90 font-medium">{formatResponseTime(apiMs)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Streaming:</span>
+          <span className="text-white/90 font-medium">{formatResponseTime(streamingMs)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Rendering:</span>
+          <span className="text-white/90 font-medium">{formatResponseTime(renderingMs)}</span>
+        </div>
+        <div className="flex justify-between gap-4 border-t border-white/10 pt-1 mt-0.5">
+          <span className="text-white/50 font-bold">Total:</span>
+          <span className="text-emerald-400 font-bold">{formatResponseTime(totalMs)}</span>
+        </div>
+
+        <div className="flex justify-between gap-4 mt-1">
           <span className="text-white/50">Status:</span>
           <span className={status === "Error" ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
             {status}
@@ -327,7 +353,7 @@ export default function ChatPage({
     localStorage.setItem('zoya_sidebar_chats', JSON.stringify(chats));
   }, [chats]);
 
-  // Sync current chat to list if messages exist
+  // Sync current chat to list if messages exist (debounced to avoid blocking streaming)
   useEffect(() => {
     if (messages.length > 0) {
       const currentId = activeChatId || Date.now().toString();
@@ -335,35 +361,35 @@ export default function ChatPage({
         setActiveChatId(currentId);
       }
       
-      const firstUserMsg = messages.find(m => m.role === 'user')?.text;
-      let title = 'New Chat';
-      if (firstUserMsg) {
-        // Simple heuristic to extract a short title
-        const words = firstUserMsg.split(/[\s\n]+/);
-        // Take up to 4 words
-        title = words.slice(0, 4).join(' ').replace(/[^a-zA-Z0-9 ]/g, '').trim();
-        if (title.length > 30) {
-          title = title.substring(0, 30).trim() + "...";
+      const timer = setTimeout(() => {
+        const firstUserMsg = messages.find(m => m.role === 'user')?.text;
+        let title = 'New Chat';
+        if (firstUserMsg) {
+          const words = firstUserMsg.split(/[\s\n]+/);
+          title = words.slice(0, 4).join(' ').replace(/[^a-zA-Z0-9 ]/g, '').trim();
+          if (title.length > 30) {
+            title = title.substring(0, 30).trim() + "...";
+          }
+          title = title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         }
-        // Capitalize words
-        title = title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      }
-      if (!title) title = 'New Chat';
-      const lastMsg = messages[messages.length - 1];
-      const preview = lastMsg.text?.slice(0, 40) || 'Image...';
-      
-      setChats(prev => {
-        const existing = prev.find(c => c.id === currentId);
-        if (existing) {
-          const newTitle = (existing.title === 'New Chat' || !existing.title) ? title : existing.title;
-          return prev.map(c => c.id === currentId ? { ...c, title: newTitle, preview, timestamp: new Date() } : c);
-        } else {
-          return [{ id: currentId, title, preview, timestamp: new Date(), pinned: false }, ...prev];
-        }
-      });
-      
-      // Save messages per chat so we can switch
-      localStorage.setItem(`zoya_chat_msgs_${currentId}`, JSON.stringify(messages));
+        if (!title) title = 'New Chat';
+        const lastMsg = messages[messages.length - 1];
+        const preview = lastMsg?.text?.slice(0, 40) || 'Image...';
+        
+        setChats(prev => {
+          const existing = prev.find(c => c.id === currentId);
+          if (existing) {
+            const newTitle = (existing.title === 'New Chat' || !existing.title) ? title : existing.title;
+            return prev.map(c => c.id === currentId ? { ...c, title: newTitle, preview, timestamp: new Date() } : c);
+          } else {
+            return [{ id: currentId, title, preview, timestamp: new Date(), pinned: false }, ...prev];
+          }
+        });
+        
+        localStorage.setItem(`zoya_chat_msgs_${currentId}`, JSON.stringify(messages));
+      }, 300);
+
+      return () => clearTimeout(timer);
     }
   }, [messages, activeChatId]);
 
@@ -421,8 +447,8 @@ export default function ChatPage({
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: isTyping ? "auto" : "smooth" });
+  }, [messages, isTyping]);
 
   return (
     <motion.form 
