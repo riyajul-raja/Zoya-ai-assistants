@@ -1437,10 +1437,11 @@ In your very first response or greeting to the user, you MUST casually and natur
 
 
     let responseText = "";
+    let intentResult: any = null;
 
     // 0. Smart Intent Router
     if (attachedImageBase64s.length === 0) {
-      const intentResult = detectIntent(finalTranscript);
+      intentResult = detectIntent(finalTranscript);
       console.log(
         `\n==================================================\n` +
         `Intent: ${intentResult.type}\n` +

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Volume2 } from "lucide-react";
+import { Menu, X, Trash2, Mic, Send, Loader2, PlusCircle, Sparkles, ImageIcon, Brain, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Volume2, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import TypingIndicator from "./TypingIndicator";
 import { ChatMessage } from '../App';
@@ -11,15 +11,22 @@ interface DebugPopupProps {
   onClose: () => void;
 }
 
-function formatResponseTime(ms: number | undefined): string {
-  if (ms === undefined || ms === null || ms <= 0) return "N/A";
+function formatResponseTime(ms?: number) {
+  if (ms === undefined || ms === null || ms <= 0) return "0 ms";
   if (ms < 1000) {
     return `${Math.round(ms)} ms`;
   }
   return `${(ms / 1000).toFixed(1)} s`;
 }
 
+function cleanModelName(model?: string) {
+  if (!model) return "gemini-3.5-flash";
+  return model.replace(/^models\//, '');
+}
+
 function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   useEffect(() => {
     console.log("Popup Mounted");
     return () => {
@@ -29,11 +36,12 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
 
   const intent = debugInfo?.intent || "GEMINI";
   const apiUsed = debugInfo?.apiUsed !== false;
-  const primaryModel = debugInfo?.primaryModel || "gemini-3.5-flash";
-  const fallbackLevel = debugInfo?.fallbackLevel || "Primary";
-  const currentModel = debugInfo?.currentModel || debugInfo?.modelName || "gemini-3.5-flash";
+  const primaryModel = debugInfo?.primaryModel ? cleanModelName(debugInfo.primaryModel) : "";
+  const fallbackLevel = debugInfo?.fallbackLevel;
+  const rawModel = debugInfo?.currentModel || debugInfo?.modelName || "gemini-3.5-flash";
+  const currentModel = cleanModelName(rawModel);
   const retryCount = debugInfo?.retryCount !== undefined ? debugInfo.retryCount : 0;
-  const verificationStatus = debugInfo?.verificationStatus || "PASS";
+  const verificationStatus = debugInfo?.verificationStatus;
   const isCached = !!debugInfo?.isCached;
   const responseTimeMs = debugInfo?.responseTimeMs !== undefined ? debugInfo.responseTimeMs : 0;
   const status = debugInfo?.status || "Success";
@@ -52,19 +60,51 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
   const overallConfidence = debugInfo?.overallConfidence ?? (intent === "LOCAL" ? 96 : 94);
   const reasoningTimeMs = debugInfo?.reasoningTimeMs ?? routingMs;
 
+  const renderStatusBadge = () => {
+    const statusStr = (status || "") as string;
+    if (statusStr === "Error" || statusStr.toLowerCase().includes("err")) {
+      return (
+        <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+          <span>🔴</span> Error
+        </span>
+      );
+    }
+    if (statusStr === "Retry" || retryCount > 0) {
+      return (
+        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+          <span>🟡</span> Retry
+        </span>
+      );
+    }
+    if (statusStr === "Warning" || statusStr.toLowerCase().includes("warn")) {
+      return (
+        <span className="bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+          <span>🟠</span> Warning
+        </span>
+      );
+    }
+    return (
+      <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+        <span>🟢</span> Success
+      </span>
+    );
+  };
+
+  const isFallbackUsed = !!fallbackLevel && (fallbackLevel as string) !== "Primary" && (fallbackLevel as string) !== "None";
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.92, y: 8 }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
-      className="absolute bottom-full left-0 mb-2 p-3.5 rounded-2xl bg-black/90 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] min-w-[270px] shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none pointer-events-auto"
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className="absolute bottom-full left-0 mb-2 p-3 rounded-2xl bg-black/95 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] w-[280px] max-w-[90vw] max-h-[320px] shadow-[0_12px_40px_rgba(0,0,0,0.7)] select-none pointer-events-auto flex flex-col overflow-hidden"
       onClick={(e) => {
         e.stopPropagation();
-        onClose();
       }}
     >
-      <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-2">
+      {/* Sticky Header */}
+      <div className="sticky top-0 bg-black/95 backdrop-blur-xl z-10 flex justify-between items-center border-b border-white/10 pb-2 mb-2 shrink-0">
         <div className="flex items-center gap-1.5 font-semibold text-white/90 text-[12px] tracking-wide">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           Developer Debug Panel
@@ -81,133 +121,178 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
         </button>
       </div>
 
-      <div className="flex flex-col gap-1.5 font-mono text-[11px] leading-relaxed">
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Decision:</span>
-          <span className="text-purple-300 font-bold">{decision}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Tool Selected:</span>
-          <span className="text-sky-300 font-medium">{toolSelected}</span>
-        </div>
-
-        <div className="my-1 border-t border-white/10" />
-
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Intent Confidence:</span>
-          <span className="text-emerald-400 font-medium">{intentConfidence}%</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Context Confidence:</span>
-          <span className="text-emerald-400 font-medium">{contextConfidence}%</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Memory Confidence:</span>
-          <span className="text-emerald-400 font-medium">{memoryConfidence}%</span>
-        </div>
-        <div className="flex justify-between gap-4 border-t border-white/10 pt-1 mt-0.5">
-          <span className="text-white/50 font-bold">Overall Confidence:</span>
-          <span className={overallConfidence >= 90 ? "text-emerald-400 font-bold" : overallConfidence >= 60 ? "text-amber-300 font-bold" : "text-rose-400 font-bold"}>
-            {overallConfidence}%
-          </span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Reasoning Time:</span>
-          <span className="text-white/90 font-medium">{formatResponseTime(reasoningTimeMs)}</span>
-        </div>
-
-        <div className="my-1 border-t border-white/10" />
-
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Primary Model:</span>
-          <span className="text-white/90 font-medium">{primaryModel}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Fallback Level:</span>
-          <span className="text-white/90 font-medium">{fallbackLevel}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Current Model:</span>
-          <span className="text-white/90 font-medium">{currentModel}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Retry Count:</span>
-          <span className="text-white/90 font-medium">{retryCount}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Verification Status:</span>
-          <span className={verificationStatus === "PASS" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-            {verificationStatus}
-          </span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Intent:</span>
-          <span className={intent === "LOCAL" ? "text-emerald-400 font-bold" : "text-sky-400 font-bold"}>
-            {intent}
-          </span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">API Used:</span>
-          <span className="text-white/90 font-medium">{apiUsed ? "YES" : "NO"}</span>
-        </div>
-        {debugInfo?.identityCategory && (
-          <div className="flex justify-between gap-4">
-            <span className="text-white/50">Identity Category:</span>
-            <span className="text-amber-300 font-medium">{debugInfo.identityCategory}</span>
+      {/* Scrollable Panel Content */}
+      <div className="overflow-y-auto max-h-[260px] pr-1 flex flex-col gap-2 custom-scrollbar">
+        {/* DEFAULT VIEW (Always Visible) */}
+        <div className="flex flex-col gap-1.5 font-mono text-[11px] leading-relaxed bg-white/5 p-2.5 rounded-xl border border-white/10">
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-white/50">Decision:</span>
+            <span className="text-purple-300 font-bold truncate">{decision}</span>
           </div>
-        )}
-        {debugInfo?.selectedTemplateId && (
-          <div className="flex justify-between gap-4">
-            <span className="text-white/50">Selected Template ID:</span>
-            <span className="text-amber-300 font-medium">{debugInfo.selectedTemplateId}</span>
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-white/50">Current Model:</span>
+            <span className="text-white/90 font-medium truncate">{currentModel}</span>
           </div>
-        )}
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Cache:</span>
-          <span className="text-white/90 font-medium">{isCached ? "YES" : "NO"}</span>
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-white/50">API Used:</span>
+            <span className="text-white/90 font-medium">{apiUsed ? "YES" : "NO"}</span>
+          </div>
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-white/50">Total Time:</span>
+            <span className="text-emerald-400 font-bold">{formatResponseTime(totalMs)}</span>
+          </div>
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-white/50">Status:</span>
+            <div>{renderStatusBadge()}</div>
+          </div>
         </div>
 
-        <div className="my-1 border-t border-white/10" />
+        {/* ADVANCED DETAILS TOGGLE & CONTENT */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAdvanced(!showAdvanced);
+          }}
+          className="flex items-center justify-between w-full py-1.5 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-white/70 hover:text-white transition-colors cursor-pointer font-mono"
+        >
+          <span className="font-semibold text-white/80">Advanced Details</span>
+          {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
 
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Routing:</span>
-          <span className="text-white/90 font-medium">{formatResponseTime(routingMs)}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">API:</span>
-          <span className="text-white/90 font-medium">{formatResponseTime(apiMs)}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Streaming:</span>
-          <span className="text-white/90 font-medium">{formatResponseTime(streamingMs)}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-white/50">Rendering:</span>
-          <span className="text-white/90 font-medium">{formatResponseTime(renderingMs)}</span>
-        </div>
-        <div className="flex justify-between gap-4 border-t border-white/10 pt-1 mt-0.5">
-          <span className="text-white/50 font-bold">Total:</span>
-          <span className="text-emerald-400 font-bold">{formatResponseTime(totalMs)}</span>
-        </div>
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.15, ease: "easeInOut" }}
+              className="flex flex-col gap-1.5 font-mono text-[11px] leading-relaxed p-2.5 rounded-xl bg-white/5 border border-white/10 overflow-hidden"
+            >
+              {toolSelected && toolSelected !== "N/A" && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Tool Selected:</span>
+                  <span className="text-sky-300 font-medium truncate">{toolSelected}</span>
+                </div>
+              )}
+              {!!intent && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Intent:</span>
+                  <span className={intent === "LOCAL" ? "text-emerald-400 font-bold" : "text-sky-400 font-bold"}>
+                    {intent}
+                  </span>
+                </div>
+              )}
 
-        <div className="flex justify-between gap-4 mt-1">
-          <span className="text-white/50">Status:</span>
-          <span className={status === "Error" ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-            {status}
-          </span>
-        </div>
+              <div className="my-0.5 border-t border-white/10" />
 
-        {status === "Error" && (
-          <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-1 text-rose-300">
-            {debugInfo?.httpStatus && <div>HTTP Status: {debugInfo.httpStatus}</div>}
-            {debugInfo?.errorCode && <div>Gemini Error Code: {debugInfo.errorCode}</div>}
-            {debugInfo?.errorMessage && (
-              <div className="text-[10px] opacity-80 leading-tight line-clamp-3">
-                Error Message: {debugInfo.errorMessage}
+              {intentConfidence !== undefined && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Intent Confidence:</span>
+                  <span className="text-emerald-400 font-medium">{intentConfidence}%</span>
+                </div>
+              )}
+              {contextConfidence !== undefined && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Context Confidence:</span>
+                  <span className="text-emerald-400 font-medium">{contextConfidence}%</span>
+                </div>
+              )}
+              {memoryConfidence !== undefined && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Memory Confidence:</span>
+                  <span className="text-emerald-400 font-medium">{memoryConfidence}%</span>
+                </div>
+              )}
+              {overallConfidence !== undefined && (
+                <div className="flex justify-between gap-2 border-t border-white/10 pt-1">
+                  <span className="text-white/50 font-bold">Overall Confidence:</span>
+                  <span className={overallConfidence >= 90 ? "text-emerald-400 font-bold" : overallConfidence >= 60 ? "text-amber-300 font-bold" : "text-rose-400 font-bold"}>
+                    {overallConfidence}%
+                  </span>
+                </div>
+              )}
+              {reasoningTimeMs !== undefined && reasoningTimeMs > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Reasoning Time:</span>
+                  <span className="text-white/90 font-medium">{formatResponseTime(reasoningTimeMs)}</span>
+                </div>
+              )}
+
+              <div className="my-0.5 border-t border-white/10" />
+
+              {primaryModel && primaryModel !== "N/A" && primaryModel !== currentModel && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Primary Model:</span>
+                  <span className="text-white/90 font-medium truncate">{primaryModel}</span>
+                </div>
+              )}
+              {isFallbackUsed && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Fallback Level:</span>
+                  <span className="text-amber-300 font-medium">{String(fallbackLevel)}</span>
+                </div>
+              )}
+              {retryCount > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Retry Count:</span>
+                  <span className="text-amber-300 font-medium">{retryCount}</span>
+                </div>
+              )}
+              {!!verificationStatus && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Verification Status:</span>
+                  <span className={verificationStatus === "PASS" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                    {verificationStatus}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between gap-2">
+                <span className="text-white/50">Cache:</span>
+                <span className="text-white/90 font-medium">{isCached ? "YES" : "NO"}</span>
               </div>
-            )}
-          </div>
-        )}
+
+              <div className="my-0.5 border-t border-white/10" />
+
+              {routingMs > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Routing:</span>
+                  <span className="text-white/90 font-medium">{formatResponseTime(routingMs)}</span>
+                </div>
+              )}
+              {apiMs > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">API:</span>
+                  <span className="text-white/90 font-medium">{formatResponseTime(apiMs)}</span>
+                </div>
+              )}
+              {streamingMs > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Streaming:</span>
+                  <span className="text-white/90 font-medium">{formatResponseTime(streamingMs)}</span>
+                </div>
+              )}
+              {renderingMs > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-white/50">Rendering:</span>
+                  <span className="text-white/90 font-medium">{formatResponseTime(renderingMs)}</span>
+                </div>
+              )}
+
+              {status === "Error" && (
+                <div className="mt-1 pt-1 border-t border-white/10 flex flex-col gap-1 text-rose-300">
+                  {debugInfo?.httpStatus && <div>HTTP Status: {debugInfo.httpStatus}</div>}
+                  {debugInfo?.errorCode && <div>Gemini Error Code: {debugInfo.errorCode}</div>}
+                  {debugInfo?.errorMessage && (
+                    <div className="text-[10px] opacity-80 leading-tight line-clamp-3">
+                      Error Message: {debugInfo.errorMessage}
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
