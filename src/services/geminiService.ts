@@ -193,7 +193,7 @@ export async function getZoyaResponseStream(
       }
     ];
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash"];
+    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash"];
     let lastError: any = null;
     let lastModelUsed = "gemini-3.5-flash";
 
@@ -361,7 +361,7 @@ export async function getZoyaResponse(
       }
     ];
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash"];
+    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash"];
 
     for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
       const currentModel = modelsToTry[mIdx];
