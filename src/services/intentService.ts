@@ -10,137 +10,69 @@ export interface IntentResult {
   selectedTemplateId?: string;
 }
 
-// Memory / User name lookup
-function getUserNameFromMemory(): string | null {
+// Salutation / Address lookup
+function getUserAddress(): string {
   try {
     const directName = localStorage.getItem("zoya_user_name") || localStorage.getItem("user_name");
-    if (directName) return directName.trim();
-
-    const savedMemories = localStorage.getItem("zoya_memories");
-    if (savedMemories) {
-      const parsed = JSON.parse(savedMemories);
-      if (Array.isArray(parsed)) {
-        for (const item of parsed) {
-          const text = (item.text || item.content || "").toLowerCase();
-          const match = text.match(/(?:my name is|i am|call me|name:)\s+([a-zA-Z]+)/i);
-          if (match && match[1]) {
-            const name = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
-            if (name.length > 1 && !["the", "a", "an", "user", "admin"].includes(name.toLowerCase())) {
-              localStorage.setItem("zoya_user_name", name);
-              return name;
-            }
-          }
-        }
-      }
+    if (directName && directName.trim().length > 0) {
+      return directName.trim();
+    }
+    const customAddress = localStorage.getItem("zoya_user_address") || localStorage.getItem("user_address") || localStorage.getItem("zoya_salutation");
+    if (customAddress && customAddress.trim().length > 0) {
+      return customAddress.trim();
     }
   } catch (e) {
     // Ignore error
   }
-  return "Riyajul";
+  return "Boss";
 }
 
-// Greeting Template Collections (82 total templates)
+// Greeting Template Collections
 const MORNING_TEMPLATES = [
-  "Good Morning ☀️! Hope you have an amazing day ahead!",
-  "Good Morning ☀️! Kaise ho aap? Aaj kya plan hai?",
-  "Good Morning ☀️! Ready to conquer the day?",
-  "Good Morning ☀️! Chai ya coffee peeli? How can I help you today?",
-  "Good Morning ☀️! Wishing you a super productive day ahead!",
-  "Good Morning ☀️! Fresh start to a new day. What are we working on?",
-  "Good Morning ☀️! Aaj kaunsa project build karna hai?",
-  "Good Morning ☀️! Zoya here, ready whenever you are!",
-  "Good Morning ☀️! Hope your day is filled with positivity!",
-  "Good Morning ☀️! A beautiful day to solve new challenges!",
-  "Good Morning ☀️! Sab badiya? Batao kya help chahiye!",
-  "Good Morning ☀️! Rise and shine! Let's get started."
+  "Good morning, {ADDRESS}! ☀️ Main ready hoon. Aaj kis cheez me help karun?",
+  "Good morning, {ADDRESS}! ☀️ Kaise hain aap? Aaj kya plan hai?",
+  "Good morning, {ADDRESS}! ☀️ Hope you have a productive and great day ahead!",
+  "Good morning, {ADDRESS}! ☀️ Ready whenever you are!",
+  "Good morning, {ADDRESS}! ☀️ Chai-coffee peeli? Bataiye aaj kis par kaam karna hai?"
 ];
 
 const AFTERNOON_TEMPLATES = [
-  "Good Afternoon 🌤️! Lunch ho gaya?",
-  "Good Afternoon 🌤️! How is your day going so far?",
-  "Good Afternoon 🌤️! Hope you're having a great day!",
-  "Good Afternoon 🌤️! Zoya at your service. What's on your mind?",
-  "Good Afternoon 🌤️! Ready for the afternoon push?",
-  "Good Afternoon 🌤️! Break time or coding time? Let me know how I can help!",
-  "Good Afternoon 🌤️! Sab badhiya chal raha hai? Batao!",
-  "Good Afternoon 🌤️! Half day done, let's make the rest awesome!",
-  "Good Afternoon 🌤️! Ready whenever you are.",
-  "Good Afternoon 🌤️! Kaise ho? Kya help chahiye aaj?"
+  "Good afternoon, {ADDRESS}! 🌤️ Main ready hoon. Aaj kis cheez me help karun?",
+  "Good afternoon, {ADDRESS}! 🌤️ Lunch ho gaya? How can I assist you right now?",
+  "Good afternoon, {ADDRESS}! 🌤️ Ready for the afternoon push! What are we working on?",
+  "Good afternoon, {ADDRESS}! 🌤️ Hope your day is going great. Kya help chahiye?"
 ];
 
 const EVENING_TEMPLATES = [
-  "Good Evening 🌇! How was your day?",
-  "Good Evening 🌇! Chai time! How can I assist you?",
-  "Good Evening 🌇! Winding down or starting a new project?",
-  "Good Evening 🌇! Zoya here. Ready to help you out!",
-  "Good Evening 🌇! Aaj ka din kaisa raha?",
-  "Good Evening 🌇! Relaxing evening or productive coding session?",
-  "Good Evening 🌇! Always here to assist you!",
-  "Good Evening 🌇! Hope you had a fantastic day today!",
-  "Good Evening 🌇! Sab set hai? Batao kya karna hai.",
-  "Good Evening 🌇! Ready whenever you are."
+  "Good evening, {ADDRESS}! 🌇 Main ready hoon. Aaj kis cheez me help karun?",
+  "Good evening, {ADDRESS}! 🌇 Winding down or starting something new? Main ready hoon!",
+  "Good evening, {ADDRESS}! 🌇 Hope you had a great day today. Batao kya plan hai!"
 ];
 
 const NIGHT_TEMPLATES = [
-  "Good Night 🌙! Late night coding session?",
-  "Good Night 🌙! Sweet dreams! Rest well.",
-  "Good Night 🌙! Don't stay up too late! Let me know if you need anything.",
-  "Good Night 🌙! Night owl mode activated! How can I help?",
-  "Good Night 🌙! Time to recharge. See you tomorrow!",
-  "Good Night 🌙! Aaj ke liye bas itna hi? Ya kuch aur explore karna hai?",
-  "Good Night 🌙! Sleep well and stay curious.",
-  "Good Night 🌙! Late night productivity at its finest!",
-  "Good Night 🌙! Zoya signing off whenever you're ready to sleep.",
-  "Good Night 🌙! Wishing you a peaceful night's rest."
+  "Good night, {ADDRESS}! 🌙 Late night coding ya review? Main ready hoon!",
+  "Good night, {ADDRESS}! 🌙 Rest well or let me know if you need any quick help!",
+  "Good night, {ADDRESS}! 🌙 Late night session? I am right here for you!"
 ];
 
 const GENERAL_GREETING_TEMPLATES = [
-  "Hey! 👋 Kaise ho?",
-  "Hello! 😊 Main Zoya hoon. Batao kya help chahiye?",
-  "Hi! Welcome back.",
-  "Hey! Aaj kis topic par baat karni hai?",
-  "Hello! Ready whenever you are.",
-  "Hey there! 👋 What's up?",
-  "Hi! How can I help you today?",
-  "Hello! Great to see you again!",
-  "Hey! Sab badhiya? Batao kya plan hai.",
-  "Hi! Zoya here. What are we building today?",
-  "Hello! 👋 Always ready to help!",
-  "Hey! Looking forward to assisting you today.",
-  "Namaste! 🙏 Kaise ho aap?",
-  "Hi there! What can Zoya do for you right now?",
-  "Hey! Hope you're having an awesome time.",
-  "Hello friend! What's on your mind?",
-  "Hlo! 👋 Bolie, kya chal raha hai?",
-  "Hey! I'm all ears. Tell me what you need.",
-  "Hi! Let's get straight to work or chit-chat. Your call!",
-  "Hello! Ready to brainstorm or solve problems together."
+  "Hello, {ADDRESS}! 😊 Main ready hoon. Aaj kis cheez me help karun?",
+  "Hey, {ADDRESS}! 👋 Main Zoya hoon, ready whenever you are. Bataiye kya karna hai?",
+  "Hi, {ADDRESS}! ✨ Welcome back. Aaj kis topic par baat karni hai?",
+  "Namaste, {ADDRESS}! 🙏 Main ready hoon, boliyega kya help chahiye?"
 ];
 
 const THANKS_TEMPLATES = [
-  "You're most welcome! 😊 Happy to help anytime.",
-  "Anytime! It's always my pleasure to assist you.",
-  "Welcome! 🌟 Let me know if you need anything else.",
-  "Koi baat nahi! 😊 Always here for you.",
-  "Glad I could help! Have an awesome rest of your day!",
-  "You got it! 👍 Let me know if another question pops up.",
-  "My pleasure! Happy coding and building!",
-  "Arre no problem at all! 😊 Ask me anything anytime.",
-  "Always happy to be of service! ✨",
-  "Thank YOU for chatting with me! 😊"
+  "You're most welcome, {ADDRESS}! 😊 Happy to help anytime.",
+  "Anytime, {ADDRESS}! It's always my pleasure to assist you.",
+  "Welcome, {ADDRESS}! 🌟 Let me know if you need anything else.",
+  "Koi baat nahi, {ADDRESS}! 😊 Always here for you."
 ];
 
 const BYE_TEMPLATES = [
-  "Goodbye! 👋 Take care and see you soon.",
-  "Bye bye! 👋 Have a wonderful time ahead!",
-  "See you later! 👋 Call me whenever you need help.",
-  "Phir milte hain! 👋 Take care!",
-  "Bye! Have an amazing rest of your day.",
-  "Goodbye! Stay curious and keep building! 🚀",
-  "Catch you later! 👋 Have fun!",
-  "Bye! Take rest and take care! 😊",
-  "TTYL! 👋 I'll be right here when you return.",
-  "Goodbye for now! 👋 Have a great day!"
+  "Goodbye, {ADDRESS}! 👋 Take care and see you soon.",
+  "Bye bye, {ADDRESS}! 👋 Have a wonderful time ahead!",
+  "See you later, {ADDRESS}! 👋 Call me whenever you need help."
 ];
 
 import { 
@@ -314,11 +246,8 @@ export function detectIntent(text: string): IntentResult {
   }
 
   if (selectedResponse) {
-    const userName = getUserNameFromMemory();
-    // Occasionally (~30% chance) naturally personalize with the user's name
-    if (userName && Math.random() < 0.35) {
-      selectedResponse = injectUserName(selectedResponse, userName);
-    }
+    const address = getUserAddress();
+    selectedResponse = selectedResponse.replace(/{ADDRESS}/g, address);
 
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
     const totalMs = routingMs + 2; // under 10 ms

@@ -1451,9 +1451,16 @@ In your very first response or greeting to the user, you MUST casually and natur
       
       if (intentResult.type === "LOCAL" && intentResult.response) {
         console.log(`[Intent Router] Executing locally. No Gemini API will be called.`);
+        setIsLoading(true);
+        setAppState("processing");
+
+        const delayMs = Math.floor(Math.random() * 700) + 800; // 0.8s to 1.5s natural delay
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+
         const responseMessageId = Date.now().toString() + "-z";
         const localRoutingMs = intentResult.routingMs || 2;
-        const localTotalMs = intentResult.totalMs || (localRoutingMs + 2);
+        const localTotalMs = (intentResult.totalMs || localRoutingMs) + delayMs;
+
         setMessages((prev) => [
           ...prev,
           { 
@@ -1478,6 +1485,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             } 
           }
         ]);
+        setIsLoading(false);
         setAppState("idle");
         
         if (!isMuted && !skipSpeech) {
