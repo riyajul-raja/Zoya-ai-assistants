@@ -724,7 +724,7 @@ export default function ChatPage({
             {messages.map((msg) => {
               const isLastMsg = messages[messages.length - 1]?.id === msg.id;
               const isStreamingThisMsg = isLastMsg && msg.sender !== "user" && (isTyping || isLoading);
-              const hasText = typeof msg.text === "string" && (msg.text.trim().length > 0 || isStreamingThisMsg);
+              const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
               const hasImage = !!((Array.isArray(msg.images) && msg.images.length > 0) || msg.image || (msg as any).imageUrl || msg.generatedImageUrl);
               if (!hasText && !hasImage) return null;
               

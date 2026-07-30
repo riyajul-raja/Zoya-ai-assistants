@@ -171,14 +171,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isU
   const textToRender = isStreaming ? displayedText : content;
   const processedContent = preprocessMarkdown(textToRender, isStreaming);
 
-  if (!content && isStreaming) {
-    return (
-      <div className="flex items-center gap-1.5 py-1 text-emerald-400 min-h-[24px]">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse [animation-delay:0.2s]" />
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse [animation-delay:0.4s]" />
-      </div>
-    );
+  if (!content) {
+    return null;
   }
 
   return (
