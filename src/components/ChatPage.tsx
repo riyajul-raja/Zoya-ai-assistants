@@ -799,6 +799,7 @@ export default function ChatPage({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          e.preventDefault();
                           if (onOpenSettings) {
                             onOpenSettings();
                           }
@@ -806,7 +807,7 @@ export default function ChatPage({
                         className="mt-3.5 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500/25 to-orange-500/25 hover:from-amber-500/35 hover:to-orange-500/35 active:scale-[0.98] border border-amber-400/40 text-amber-200 font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-lg cursor-pointer"
                       >
                         <Settings size={16} className="text-amber-300" />
-                        <span>⚙️ Open Settings</span>
+                        <span>Open Settings</span>
                       </button>
                     )}
                   </div>

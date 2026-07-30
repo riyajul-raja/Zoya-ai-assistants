@@ -216,8 +216,15 @@ export default function App() {
   };
 
   const handleOpenSettingsFromLockedMode = () => {
-    setIsPersonalSettingsOpen(true);
-    setAutoFocusApiKey(true);
+    if (isPersonalSettingsOpen) {
+      setAutoFocusApiKey(false);
+      setTimeout(() => {
+        setAutoFocusApiKey(true);
+      }, 50);
+    } else {
+      setIsPersonalSettingsOpen(true);
+      setAutoFocusApiKey(true);
+    }
   };
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);

@@ -31,18 +31,26 @@ export default function PersonalSettings({ onBack, autoFocusApiKey, onApiKeyVeri
 
   useEffect(() => {
     if (autoFocusApiKey) {
-      const timer = setTimeout(() => {
+      const focusAndScroll = () => {
         if (apiKeyCardRef.current) {
           apiKeyCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         if (apiKeyInputRef.current) {
-          apiKeyInputRef.current.focus();
+          apiKeyInputRef.current.focus({ preventScroll: true });
           try {
             apiKeyInputRef.current.click();
           } catch (e) {}
         }
-      }, 350);
-      return () => clearTimeout(timer);
+      };
+
+      focusAndScroll();
+      const t1 = setTimeout(focusAndScroll, 100);
+      const t2 = setTimeout(focusAndScroll, 300);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
     }
   }, [autoFocusApiKey]);
 
@@ -221,6 +229,8 @@ export default function PersonalSettings({ onBack, autoFocusApiKey, onApiKeyVeri
                 <input
                   ref={apiKeyInputRef}
                   type={showApiKey ? 'text' : 'password'}
+                  inputMode="text"
+                  enterKeyHint="done"
                   value={apiKey}
                   onChange={(e) => {
                     setApiKey(e.target.value);

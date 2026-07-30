@@ -39,7 +39,7 @@ Main abhi aapki help karna chahti hoon, lekin meri AI Brain abhi activate nahi h
 
 Bas ek chhota sa setup baaki hai.
 
-⚙️ Settings me jaakar apni Gemini API Key add kar dijiye.
+Settings me jaakar apni Gemini API Key add kar dijiye.
 
 Jaise hi aapki API Key verify ho jayegi, main turant activate ho jaungi. Uske baad aap mujhse chat kar sakenge, voice me baat kar sakenge aur mere saare AI features ka istemal kar sakenge.
 
