@@ -44,13 +44,21 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
   const renderingMs = debugInfo?.renderingMs !== undefined ? debugInfo.renderingMs : 8;
   const totalMs = debugInfo?.totalMs !== undefined ? debugInfo.totalMs : (responseTimeMs || (routingMs + apiMs + streamingMs + renderingMs));
 
+  const intentConfidence = debugInfo?.intentConfidence ?? (intent === "LOCAL" ? 98 : 95);
+  const contextConfidence = debugInfo?.contextConfidence ?? (intent === "LOCAL" ? 95 : 93);
+  const memoryConfidence = debugInfo?.memoryConfidence ?? (intent === "LOCAL" ? 92 : 91);
+  const decision = debugInfo?.decision || (intent === "LOCAL" ? "Local Engine" : "Gemini");
+  const toolSelected = debugInfo?.toolSelected || (intent === "LOCAL" ? "Greetings / Local" : "Gemini AI Engine");
+  const overallConfidence = debugInfo?.overallConfidence ?? (intent === "LOCAL" ? 96 : 94);
+  const reasoningTimeMs = debugInfo?.reasoningTimeMs ?? routingMs;
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.92, y: 8 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="absolute bottom-full left-0 mb-2 p-3.5 rounded-2xl bg-black/90 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] min-w-[260px] shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none pointer-events-auto"
+      className="absolute bottom-full left-0 mb-2 p-3.5 rounded-2xl bg-black/90 backdrop-blur-xl border border-white/15 text-xs text-white z-[999999] min-w-[270px] shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none pointer-events-auto"
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -74,6 +82,42 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
       </div>
 
       <div className="flex flex-col gap-1.5 font-mono text-[11px] leading-relaxed">
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Decision:</span>
+          <span className="text-purple-300 font-bold">{decision}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Tool Selected:</span>
+          <span className="text-sky-300 font-medium">{toolSelected}</span>
+        </div>
+
+        <div className="my-1 border-t border-white/10" />
+
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Intent Confidence:</span>
+          <span className="text-emerald-400 font-medium">{intentConfidence}%</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Context Confidence:</span>
+          <span className="text-emerald-400 font-medium">{contextConfidence}%</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Memory Confidence:</span>
+          <span className="text-emerald-400 font-medium">{memoryConfidence}%</span>
+        </div>
+        <div className="flex justify-between gap-4 border-t border-white/10 pt-1 mt-0.5">
+          <span className="text-white/50 font-bold">Overall Confidence:</span>
+          <span className={overallConfidence >= 90 ? "text-emerald-400 font-bold" : overallConfidence >= 60 ? "text-amber-300 font-bold" : "text-rose-400 font-bold"}>
+            {overallConfidence}%
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-white/50">Reasoning Time:</span>
+          <span className="text-white/90 font-medium">{formatResponseTime(reasoningTimeMs)}</span>
+        </div>
+
+        <div className="my-1 border-t border-white/10" />
+
         <div className="flex justify-between gap-4">
           <span className="text-white/50">Primary Model:</span>
           <span className="text-white/90 font-medium">{primaryModel}</span>

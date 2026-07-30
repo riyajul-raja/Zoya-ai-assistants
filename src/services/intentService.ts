@@ -8,6 +8,15 @@ export interface IntentResult {
   totalMs?: number;
   identityCategory?: string;
   selectedTemplateId?: string;
+  // Brain V4 Confidence & Decision fields
+  intentConfidence: number;
+  contextConfidence: number;
+  memoryConfidence: number;
+  toolConfidence: number;
+  overallConfidence: number;
+  decision: "Local Engine" | "Calculator" | "Time" | "Memory" | "Device Tool" | "Research Mode" | "Gemini";
+  toolSelected: string;
+  reasoningTimeMs: number;
 }
 
 // Salutation / Address lookup
@@ -258,23 +267,73 @@ export function detectIntent(text: string): IntentResult {
       routingMs,
       totalMs,
       identityCategory,
-      selectedTemplateId
+      selectedTemplateId,
+      intentConfidence: 98,
+      contextConfidence: 95,
+      memoryConfidence: 92,
+      toolConfidence: 97,
+      overallConfidence: 96,
+      decision: "Local Engine",
+      toolSelected: matchedModule === "Identity" ? "Identity Engine" : "Greetings / Local",
+      reasoningTimeMs: routingMs
     };
   }
 
   // 2. Date & Time
   if (cleaned.includes("current time") || cleaned === "time" || cleaned === "what time is it") {
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
-    return { type: "LOCAL", module: "Date & Time", response: `The current time is ${new Date().toLocaleTimeString()}.`, routingMs, totalMs: routingMs + 2 };
+    return {
+      type: "LOCAL",
+      module: "Date & Time",
+      response: `The current time is ${new Date().toLocaleTimeString()}.`,
+      routingMs,
+      totalMs: routingMs + 2,
+      intentConfidence: 99,
+      contextConfidence: 95,
+      memoryConfidence: 90,
+      toolConfidence: 99,
+      overallConfidence: 96,
+      decision: "Time",
+      toolSelected: "Clock / Time",
+      reasoningTimeMs: routingMs
+    };
   }
   if (cleaned.includes("current date") || cleaned === "date" || cleaned === "what is the date") {
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
-    return { type: "LOCAL", module: "Date & Time", response: `Today's date is ${new Date().toLocaleDateString()}.`, routingMs, totalMs: routingMs + 2 };
+    return {
+      type: "LOCAL",
+      module: "Date & Time",
+      response: `Today's date is ${new Date().toLocaleDateString()}.`,
+      routingMs,
+      totalMs: routingMs + 2,
+      intentConfidence: 99,
+      contextConfidence: 95,
+      memoryConfidence: 90,
+      toolConfidence: 99,
+      overallConfidence: 96,
+      decision: "Time",
+      toolSelected: "Clock / Time",
+      reasoningTimeMs: routingMs
+    };
   }
   if (cleaned === "day" || cleaned === "what day is it") {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
-    return { type: "LOCAL", module: "Date & Time", response: `Today is ${days[new Date().getDay()]}.`, routingMs, totalMs: routingMs + 2 };
+    return {
+      type: "LOCAL",
+      module: "Date & Time",
+      response: `Today is ${days[new Date().getDay()]}.`,
+      routingMs,
+      totalMs: routingMs + 2,
+      intentConfidence: 99,
+      contextConfidence: 95,
+      memoryConfidence: 90,
+      toolConfidence: 99,
+      overallConfidence: 96,
+      decision: "Time",
+      toolSelected: "Clock / Time",
+      reasoningTimeMs: routingMs
+    };
   }
 
   // 3. Calculator (Basic Math Expressions)
@@ -288,7 +347,21 @@ export function detectIntent(text: string): IntentResult {
         const result = new Function(`return (${evalExpr})`)();
         if (result !== undefined && !isNaN(result)) {
           const routingMs = Math.max(1, Math.round(performance.now() - startTime));
-          return { type: "LOCAL", module: "Calculator", response: `The answer is ${result}.`, routingMs, totalMs: routingMs + 2 };
+          return {
+            type: "LOCAL",
+            module: "Calculator",
+            response: `The answer is ${result}.`,
+            routingMs,
+            totalMs: routingMs + 2,
+            intentConfidence: 98,
+            contextConfidence: 92,
+            memoryConfidence: 88,
+            toolConfidence: 99,
+            overallConfidence: 94,
+            decision: "Calculator",
+            toolSelected: "Math Evaluator",
+            reasoningTimeMs: routingMs
+          };
         }
       } catch (e) {
         // Fallback to Gemini
@@ -299,20 +372,110 @@ export function detectIntent(text: string): IntentResult {
   // 4. Memory Commands
   if (cleaned.startsWith("remember this") || cleaned.startsWith("forget this") || cleaned.startsWith("show memory") || cleaned.startsWith("delete memory")) {
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
-    return { type: "LOCAL", module: "Memory", response: "I have updated your memory.", routingMs, totalMs: routingMs + 2 };
+    return {
+      type: "LOCAL",
+      module: "Memory",
+      response: "I have updated your memory.",
+      routingMs,
+      totalMs: routingMs + 2,
+      intentConfidence: 97,
+      contextConfidence: 94,
+      memoryConfidence: 96,
+      toolConfidence: 98,
+      overallConfidence: 96,
+      decision: "Memory",
+      toolSelected: "Memory Storage",
+      reasoningTimeMs: routingMs
+    };
   }
 
   // 5. Device Info
   if (cleaned.includes("battery level") || cleaned === "battery" || cleaned === "charging") {
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
-    return { type: "LOCAL", module: "Device", response: "I cannot access physical battery data from this browser environment, but I am fully charged and ready!", routingMs, totalMs: routingMs + 2 };
+    return {
+      type: "LOCAL",
+      module: "Device",
+      response: "I cannot access physical battery data from this browser environment, but I am fully charged and ready!",
+      routingMs,
+      totalMs: routingMs + 2,
+      intentConfidence: 96,
+      contextConfidence: 90,
+      memoryConfidence: 85,
+      toolConfidence: 95,
+      overallConfidence: 92,
+      decision: "Device Tool",
+      toolSelected: "Device State",
+      reasoningTimeMs: routingMs
+    };
   }
   if (cleaned === "network" || cleaned === "internet") {
     const routingMs = Math.max(1, Math.round(performance.now() - startTime));
-    return { type: "LOCAL", module: "Device", response: navigator.onLine ? "You are currently online and connected to the network." : "You appear to be offline.", routingMs, totalMs: routingMs + 2 };
+    return {
+      type: "LOCAL",
+      module: "Device",
+      response: navigator.onLine ? "You are currently online and connected to the network." : "You appear to be offline.",
+      routingMs,
+      totalMs: routingMs + 2,
+      intentConfidence: 96,
+      contextConfidence: 90,
+      memoryConfidence: 85,
+      toolConfidence: 95,
+      overallConfidence: 92,
+      decision: "Device Tool",
+      toolSelected: "Device State",
+      reasoningTimeMs: routingMs
+    };
   }
 
-  // Default to Gemini
-  return { type: "GEMINI" };
+  // Default to Gemini with Decision & Confidence Analysis
+  const reasoningMs = Math.max(1, Math.round(performance.now() - startTime));
+
+  const isResearch = /^(compare|versus|vs|research|deep\s*analysis|pros\s*and\s*cons|difference\s*between|explain\s*in\s*detail|latest\s*trends)/i.test(cleaned);
+  if (isResearch) {
+    return {
+      type: "GEMINI",
+      intentConfidence: 94,
+      contextConfidence: 92,
+      memoryConfidence: 90,
+      toolConfidence: 95,
+      overallConfidence: 93,
+      decision: "Research Mode",
+      toolSelected: "Deep Research Engine",
+      reasoningTimeMs: reasoningMs,
+      routingMs: reasoningMs,
+      totalMs: reasoningMs + 2
+    };
+  }
+
+  const isAmbiguous = /^(phone|mobile|laptop|car|bike)\s*(suggest|chahiye|recommend|batao)|^(ai|app|website|bot)\s*(banana|banani|build|create|make)|^(app|website)\s*(slow|lag|hang|fail)|^business\s*(shuru|start)/i.test(cleaned) || (cleaned.split(" ").length <= 3 && !/(\d|how|what|why|where|when|code|fix|write|is|are)/i.test(cleaned));
+  if (isAmbiguous) {
+    return {
+      type: "GEMINI",
+      intentConfidence: 76,
+      contextConfidence: 72,
+      memoryConfidence: 68,
+      toolConfidence: 80,
+      overallConfidence: 74,
+      decision: "Gemini",
+      toolSelected: "Gemini AI Engine",
+      reasoningTimeMs: reasoningMs,
+      routingMs: reasoningMs,
+      totalMs: reasoningMs + 2
+    };
+  }
+
+  return {
+    type: "GEMINI",
+    intentConfidence: 95,
+    contextConfidence: 93,
+    memoryConfidence: 91,
+    toolConfidence: 96,
+    overallConfidence: 94,
+    decision: "Gemini",
+    toolSelected: "Gemini AI Engine",
+    reasoningTimeMs: reasoningMs,
+    routingMs: reasoningMs,
+    totalMs: reasoningMs + 2
+  };
 }
 

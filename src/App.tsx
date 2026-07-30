@@ -1481,7 +1481,15 @@ In your very first response or greeting to the user, you MUST casually and natur
               renderingMs: Math.max(1, localTotalMs - localRoutingMs),
               totalMs: localTotalMs,
               identityCategory: intentResult.identityCategory,
-              selectedTemplateId: intentResult.selectedTemplateId
+              selectedTemplateId: intentResult.selectedTemplateId,
+              intentConfidence: intentResult.intentConfidence,
+              contextConfidence: intentResult.contextConfidence,
+              memoryConfidence: intentResult.memoryConfidence,
+              toolConfidence: intentResult.toolConfidence,
+              overallConfidence: intentResult.overallConfidence,
+              decision: intentResult.decision,
+              toolSelected: intentResult.toolSelected,
+              reasoningTimeMs: intentResult.reasoningTimeMs
             } 
           }
         ]);
@@ -1626,7 +1634,8 @@ In your very first response or greeting to the user, you MUST casually and natur
               }
               lastProcessedIndex = tempIndex;
             }
-          }
+          },
+          intentResult
         );
         
         responseText = responseStreamResult.text;
