@@ -1452,9 +1452,31 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (intentResult.type === "LOCAL" && intentResult.response) {
         console.log(`[Intent Router] Executing locally. No Gemini API will be called.`);
         const responseMessageId = Date.now().toString() + "-z";
+        const localRoutingMs = intentResult.routingMs || 2;
+        const localTotalMs = intentResult.totalMs || (localRoutingMs + 2);
         setMessages((prev) => [
           ...prev,
-          { id: responseMessageId, sender: "zoya", role: "model", text: intentResult.response || "", debugInfo: { intent: "LOCAL", apiUsed: false, modelName: "N/A", isCached: false, responseTimeMs: 0, status: "Success" } }
+          { 
+            id: responseMessageId, 
+            sender: "zoya", 
+            role: "model", 
+            text: intentResult.response || "", 
+            debugInfo: { 
+              intent: "LOCAL", 
+              apiUsed: false, 
+              modelName: "N/A", 
+              isCached: false, 
+              responseTimeMs: localTotalMs, 
+              status: "Success",
+              routingMs: localRoutingMs,
+              apiMs: 0,
+              streamingMs: 0,
+              renderingMs: Math.max(1, localTotalMs - localRoutingMs),
+              totalMs: localTotalMs,
+              identityCategory: intentResult.identityCategory,
+              selectedTemplateId: intentResult.selectedTemplateId
+            } 
+          }
         ]);
         setAppState("idle");
         

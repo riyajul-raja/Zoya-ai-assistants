@@ -106,6 +106,18 @@ function DebugPopup({ debugInfo, onClose }: DebugPopupProps) {
           <span className="text-white/50">API Used:</span>
           <span className="text-white/90 font-medium">{apiUsed ? "YES" : "NO"}</span>
         </div>
+        {debugInfo?.identityCategory && (
+          <div className="flex justify-between gap-4">
+            <span className="text-white/50">Identity Category:</span>
+            <span className="text-amber-300 font-medium">{debugInfo.identityCategory}</span>
+          </div>
+        )}
+        {debugInfo?.selectedTemplateId && (
+          <div className="flex justify-between gap-4">
+            <span className="text-white/50">Selected Template ID:</span>
+            <span className="text-amber-300 font-medium">{debugInfo.selectedTemplateId}</span>
+          </div>
+        )}
         <div className="flex justify-between gap-4">
           <span className="text-white/50">Cache:</span>
           <span className="text-white/90 font-medium">{isCached ? "YES" : "NO"}</span>

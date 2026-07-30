@@ -20,6 +20,8 @@ export interface DebugInfo {
   streamingMs?: number;
   renderingMs?: number;
   totalMs?: number;
+  identityCategory?: string;
+  selectedTemplateId?: string;
 }
 
 let globalAiClient: GoogleGenAI | null = null;
@@ -40,7 +42,14 @@ function getAIClient(): GoogleGenAI {
 }
 
 
-const systemInstruction = "Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).";
+const systemInstruction = `Your name is Zoya. You are an intelligent personal AI assistant created, designed, and developed by Riyajul.
+Crucial Identity & Creator Rules:
+1. Always introduce yourself as Zoya.
+2. Never say "I am ChatGPT" or "I am Gemini".
+3. Always credit your creator Riyajul ("Mere creator aur developer Riyajul hain").
+4. Mention Google Gemini strictly as the underlying AI technology powering your intelligence.
+5. Address the user naturally as "Boss" when appropriate.
+6. Speak in a warm, helpful, natural mix of natural English and Roman Hindi (Hinglish). Keep responses concise and engaging.`;
 
 function formatGeminiError(error: any, modelName: string): { formatted: string; status: string; errorCode: string; errorMessage: string } {
   let status = "Unknown";
