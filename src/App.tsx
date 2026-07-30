@@ -2798,7 +2798,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: "100%", opacity: 0 }}
                   transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                  className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[200] flex flex-col pointer-events-auto"
+                  className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[10020] flex flex-col pointer-events-auto"
                 >
                   <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
                     <button 

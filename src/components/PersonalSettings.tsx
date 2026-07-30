@@ -118,7 +118,7 @@ export default function PersonalSettings({ onBack, autoFocusApiKey, onApiKeyVeri
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[210] flex flex-col pointer-events-auto overflow-hidden text-white"
+      className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[10050] flex flex-col pointer-events-auto overflow-hidden text-white"
     >
       {/* Top Header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
