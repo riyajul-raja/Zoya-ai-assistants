@@ -112,93 +112,49 @@ export default function App() {
 
   useEffect(() => {
     const loadVoices = () => {
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
       const voices = window.speechSynthesis.getVoices();
-      if (!voices || voices.length === 0) return;
-
-      const savedUri = localStorage.getItem("zoya_voice_uri");
-      const savedName = localStorage.getItem("zoya_voice_name");
-
-      let voice: SpeechSynthesisVoice | undefined;
-
-      if (savedUri) voice = voices.find(v => v.voiceURI === savedUri);
-      if (!voice && savedName) voice = voices.find(v => v.name === savedName);
-
-      // Priority Order:
-      // 2. Google हिन्दी Female
-      if (!voice) voice = voices.find(v => v.name.includes("Google") && (v.name.includes("हिन्दी") || v.name.toLowerCase().includes("hindi")));
-      // 3. Google English India Female
-      if (!voice) voice = voices.find(v => v.name.includes("Google") && (v.name.includes("English India") || v.name.includes("en-IN") || v.name.includes("India")));
-      // 4. Microsoft Heera
-      if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("heera"));
-      // 5. Microsoft Kalpana
-      if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("kalpana"));
-      // 6. Microsoft Swara
-      if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("swara"));
-      // 7. Microsoft Neerja
-      if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("neerja"));
-      // 8. Google UK English Female
-      if (!voice) voice = voices.find(v => v.name.includes("Google") && (v.name.includes("UK English Female") || (v.name.includes("UK") && v.name.toLowerCase().includes("female"))));
-      // 9. Browser Female (Hindi/English India or General Female)
-      if (!voice) voice = voices.find(v => (v.lang.includes('hi') || v.lang.includes('en-IN') || v.lang.includes('en_IN')) && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('samantha')));
-      if (!voice) voice = voices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('karen') || v.name.toLowerCase().includes('victoria'));
-      // 10. Browser Default
-      if (!voice) voice = voices.find(v => v.lang.includes('hi') || v.lang.includes('en-IN') || v.lang.includes('en_IN'));
-      if (!voice && voices.length > 0) voice = voices[0];
-
+      let voice = voices.find(v => 
+        (v.lang.includes('hi-IN') || v.lang.includes('en-IN')) &&
+        (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('neerja'))
+      );
+      if (!voice) {
+        voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+      }
+      if (!voice && voices.length > 0) {
+        voice = voices[0];
+      }
       if (voice) {
         selectedVoiceRef.current = voice;
-        try {
-          localStorage.setItem("zoya_voice_uri", voice.voiceURI);
-          localStorage.setItem("zoya_voice_name", voice.name);
-        } catch (e) {}
       }
     };
-
     loadVoices();
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
+    window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
   const getZoyaVoice = useCallback((): SpeechSynthesisVoice | null => {
+    if (selectedVoiceRef.current) {
+      return selectedVoiceRef.current;
+    }
     if (typeof window === "undefined" || !window.speechSynthesis) return null;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
-    
-    if (selectedVoiceRef.current) {
-      const activeMatch = voices.find(v => v.voiceURI === selectedVoiceRef.current?.voiceURI || v.name === selectedVoiceRef.current?.name);
-      if (activeMatch) return activeMatch;
+    let voice = voices.find(v => 
+      (v.lang.includes('hi-IN') || v.lang.includes('en-IN')) &&
+      (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('neerja'))
+    );
+    if (!voice) {
+      voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
     }
-
-    const savedUri = localStorage.getItem("zoya_voice_uri");
-    const savedName = localStorage.getItem("zoya_voice_name");
-
-    let voice: SpeechSynthesisVoice | undefined;
-
-    if (savedUri) voice = voices.find(v => v.voiceURI === savedUri);
-    if (!voice && savedName) voice = voices.find(v => v.name === savedName);
-
-    if (!voice) voice = voices.find(v => v.name.includes("Google") && (v.name.includes("हिन्दी") || v.name.toLowerCase().includes("hindi")));
-    if (!voice) voice = voices.find(v => v.name.includes("Google") && (v.name.includes("English India") || v.name.includes("en-IN") || v.name.includes("India")));
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("heera"));
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("kalpana"));
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("swara"));
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("neerja"));
-    if (!voice) voice = voices.find(v => v.name.includes("Google") && (v.name.includes("UK English Female") || (v.name.includes("UK") && v.name.toLowerCase().includes("female"))));
-    if (!voice) voice = voices.find(v => (v.lang.includes('hi') || v.lang.includes('en-IN') || v.lang.includes('en_IN')) && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('samantha')));
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('karen') || v.name.toLowerCase().includes('victoria'));
-    if (!voice) voice = voices.find(v => v.lang.includes('hi') || v.lang.includes('en-IN') || v.lang.includes('en_IN'));
-    if (!voice && voices.length > 0) voice = voices[0];
-
+    if (!voice) {
+      voice = voices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('google'));
+    }
+    if (!voice && voices.length > 0) {
+      voice = voices[0];
+    }
     if (voice) {
       selectedVoiceRef.current = voice;
-      try {
-        localStorage.setItem("zoya_voice_uri", voice.voiceURI);
-        localStorage.setItem("zoya_voice_name", voice.name);
-      } catch (e) {}
     }
-    return voice || null;
+    return voice;
   }, []);
 
   const cleanTextForSpeech = (text: string): string => {
