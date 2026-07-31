@@ -81,6 +81,12 @@ function getTimeOfDayDescription(): { timeOfDay: string; timeStr: string } {
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>("idle");
+  const appStateRef = useRef<AppState>(appState);
+  const isSpeakingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
   const [isGhostMode, setIsGhostMode] = useState(false);
   const [messagesBeforeGhost, setMessagesBeforeGhost] = useState<ChatMessage[] | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -1263,6 +1269,10 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   const startListeningLoop = useCallback(() => {
     if (!isSessionActiveRef.current) return;
+    if (isSpeakingRef.current || appStateRef.current === "speaking" || appStateRef.current === "processing") {
+      console.log("[startListeningLoop] Currently speaking or processing, deferring STT start...");
+      return;
+    }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -1273,7 +1283,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       return;
     }
 
-    if (typeof window !== "undefined" && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+    if (typeof window !== "undefined" && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending || isSpeakingRef.current)) {
       console.log("[startListeningLoop] Speech synthesis active, deferring STT start...");
       return;
     }
@@ -1296,7 +1306,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.lang = "en-IN";
 
       recognition.onstart = () => {
-        if (isSessionActiveRef.current) {
+        if (isSessionActiveRef.current && !isSpeakingRef.current) {
           setIsListening(true);
           setAppState("listening");
         }
@@ -1331,10 +1341,10 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       recognition.onerror = (event: any) => {
         console.warn("[startListeningLoop] Speech recognition error:", event.error);
-        if (isSessionActiveRef.current) {
+        if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
           clearTimeout(listeningTimeoutRef.current);
           listeningTimeoutRef.current = setTimeout(() => {
-            if (isSessionActiveRef.current && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+            if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening" && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
               startListeningLoop();
             }
           }, 350);
@@ -1345,11 +1355,13 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsListening(false);
         if (isSessionActiveRef.current) {
           clearTimeout(listeningTimeoutRef.current);
-          listeningTimeoutRef.current = setTimeout(() => {
-            if (isSessionActiveRef.current && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
-              startListeningLoop();
-            }
-          }, 250);
+          if (!isSpeakingRef.current && appStateRef.current === "listening") {
+            listeningTimeoutRef.current = setTimeout(() => {
+              if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening" && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+                startListeningLoop();
+              }
+            }, 250);
+          }
         } else {
           setAppState("idle");
         }
@@ -1359,10 +1371,10 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.start();
     } catch (e: any) {
       console.error("[startListeningLoop] Initialization error:", e);
-      if (isSessionActiveRef.current) {
+      if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
         clearTimeout(listeningTimeoutRef.current);
         listeningTimeoutRef.current = setTimeout(() => {
-          if (isSessionActiveRef.current && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+          if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
             startListeningLoop();
           }
         }, 500);
@@ -1371,11 +1383,12 @@ In your very first response or greeting to the user, you MUST casually and natur
   }, []);
 
   const finishSpeechOrTurn = useCallback(() => {
+    isSpeakingRef.current = false;
     if (isSessionActiveRef.current) {
       setAppState("listening");
       clearTimeout(listeningTimeoutRef.current);
       listeningTimeoutRef.current = setTimeout(() => {
-        if (isSessionActiveRef.current) {
+        if (isSessionActiveRef.current && !isSpeakingRef.current) {
           startListeningLoop();
         }
       }, 300);
@@ -1389,6 +1402,19 @@ In your very first response or greeting to the user, you MUST casually and natur
       finishSpeechOrTurn();
       return;
     }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+
     try {
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
@@ -1408,6 +1434,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       return;
     }
 
+    isSpeakingRef.current = true;
     setAppState("speaking");
 
     const sentences = cleanedText.match(/[^.!?\n]+[.!?\n]*/g) || [cleanedText];
@@ -1434,12 +1461,13 @@ In your very first response or greeting to the user, you MUST casually and natur
       activeUtterancesRef.current.push(utterance);
 
       utterance.onstart = () => {
+        isSpeakingRef.current = true;
         setAppState("speaking");
       };
 
       utterance.onend = () => {
         activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
-        if (activeUtterancesRef.current.length === 0 && !window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+        if (activeUtterancesRef.current.length === 0 && (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
           finishSpeechOrTurn();
         }
       };
@@ -1458,7 +1486,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             speakSentence(sentenceText, true);
           }, 150);
         } else {
-          if (activeUtterancesRef.current.length === 0 && !window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+          if (activeUtterancesRef.current.length === 0 && (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
             finishSpeechOrTurn();
           }
         }
@@ -2273,6 +2301,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       // Stop Session clicked
       setIsSessionActive(false);
       isSessionActiveRef.current = false;
+      isSpeakingRef.current = false;
       setIsListening(false);
       setAppState("idle");
 
@@ -2300,6 +2329,7 @@ In your very first response or greeting to the user, you MUST casually and natur
     // Start Session clicked
     setIsSessionActive(true);
     isSessionActiveRef.current = true;
+    isSpeakingRef.current = false;
     startListeningLoop();
   };
 
