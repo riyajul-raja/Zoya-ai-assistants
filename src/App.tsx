@@ -1385,15 +1385,30 @@ In your very first response or greeting to the user, you MUST casually and natur
   }, [startListeningLoop]);
 
   const speakMessageText = useCallback((text: string) => {
-    if (!text || !text.trim()) return;
+    if (!text || !text.trim()) {
+      finishSpeechOrTurn();
+      return;
+    }
     try {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.resume();
+      }
     } catch (e) {}
     activeUtterancesRef.current = [];
 
     const cleanedText = cleanTextForSpeech(text);
-    if (!cleanedText) return;
+    if (!cleanedText || !cleanedText.trim()) {
+      finishSpeechOrTurn();
+      return;
+    }
+
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      finishSpeechOrTurn();
+      return;
+    }
+
+    setAppState("speaking");
 
     const sentences = cleanedText.match(/[^.!?\n]+[.!?\n]*/g) || [cleanedText];
 
@@ -1411,7 +1426,7 @@ In your very first response or greeting to the user, you MUST casually and natur
         utterance.voice = voice;
         utterance.lang = voice.lang;
       } else {
-        utterance.lang = "hi-IN";
+        utterance.lang = "en-IN";
       }
       utterance.pitch = 1.0;
       utterance.rate = 1.0;
@@ -1424,7 +1439,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       utterance.onend = () => {
         activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
-        if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+        if (activeUtterancesRef.current.length === 0 && !window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
           finishSpeechOrTurn();
         }
       };
@@ -1443,7 +1458,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             speakSentence(sentenceText, true);
           }, 150);
         } else {
-          if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+          if (activeUtterancesRef.current.length === 0 && !window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
             finishSpeechOrTurn();
           }
         }
@@ -1457,7 +1472,9 @@ In your very first response or greeting to the user, you MUST casually and natur
         if (!isRetry) {
           setTimeout(() => speakSentence(sentenceText, true), 150);
         } else {
-          finishSpeechOrTurn();
+          if (activeUtterancesRef.current.length === 0) {
+            finishSpeechOrTurn();
+          }
         }
       }
     };
@@ -1669,11 +1686,10 @@ In your very first response or greeting to the user, you MUST casually and natur
         }
       ]);
 
-      setAppState("idle");
-      setIsLoading(false);
-
       if (!isMuted && !skipSpeech) {
         speakMessageText(LOCKED_MODE_MESSAGE);
+      } else {
+        finishSpeechOrTurn();
       }
 
       isProcessingRequestRef.current = false;
@@ -1717,11 +1733,12 @@ In your very first response or greeting to the user, you MUST casually and natur
           generatedImagePrompt: promptToEncode
         }
       ]);
-      setAppState("idle");
       setIsLoading(false);
       
       if (!isMuted && !skipSpeech) {
         speakMessageText("Here is the image you requested");
+      } else {
+        finishSpeechOrTurn();
       }
       isProcessingRequestRef.current = false;
       return;
@@ -1790,10 +1807,11 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         ]);
         setIsLoading(false);
-        setAppState("idle");
         
         if (!isMuted && !skipSpeech) {
           speakMessageText(intentResult.response);
+        } else {
+          finishSpeechOrTurn();
         }
         isProcessingRequestRef.current = false;
         return; // Halt here, don't call Gemini
@@ -1807,7 +1825,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (!isMuted && !skipSpeech) {
         speakMessageText(responseText);
       } else {
-        setAppState("idle");
+        finishSpeechOrTurn();
       }
 
       setTimeout(() => {
@@ -1942,19 +1960,6 @@ In your very first response or greeting to the user, you MUST casually and natur
                 msg.id === responseMessageId ? { ...msg, text: currentText } : msg
               )
             );
-
-            if (!isMuted && !skipSpeech) {
-              const textToProcess = currentText.slice(lastProcessedIndex);
-              const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
-              let match;
-              let tempIndex = lastProcessedIndex;
-              while ((match = sentenceRegex.exec(textToProcess)) !== null) {
-                const sentence = match[0];
-                queueSentenceSpeak(sentence);
-                tempIndex = lastProcessedIndex + match.index + sentence.length;
-              }
-              lastProcessedIndex = tempIndex;
-            }
           },
           intentResult
         );
@@ -1973,21 +1978,8 @@ In your very first response or greeting to the user, you MUST casually and natur
         checkAIIntentAndAutoOpen(finalTranscript, responseText);
 
         if (!isMuted && !skipSpeech) {
-          const cleanedFull = cleanTextForSpeech(responseText);
-          if (lastProcessedIndex < responseText.length) {
-            const remainingText = responseText.slice(lastProcessedIndex);
-            if (remainingText.trim()) {
-              queueSentenceSpeak(remainingText);
-            }
-          }
-          // Safeguard: If no sentence utterances were queued or active, trigger speakMessageText directly
-          if (activeUtterancesRef.current.length === 0 && !window.speechSynthesis.speaking && cleanedFull.trim()) {
-            speakMessageText(cleanedFull);
-          }
-        }
-
-        // Wait a brief moment to ensure idle state updates if needed, though onend handles it
-        if (isMuted || skipSpeech || (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
+          speakMessageText(responseText);
+        } else {
           finishSpeechOrTurn();
         }
       } catch (error: any) {
@@ -3033,7 +3025,20 @@ In your very first response or greeting to the user, you MUST casually and natur
                   }`}
                 >
                   <Loader2 size={16} className="animate-spin" />
-                  Replying...
+                  Thinking...
+                </motion.div>
+              )}
+              {appState === "speaking" && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className={`flex items-center gap-2 text-sm md:text-base italic font-serif transition-colors duration-300 ${
+                    isGhostMode ? "text-rose-400/80" : "text-cyan-300/80"
+                  }`}
+                >
+                  <Volume2 size={16} className="animate-pulse" />
+                  Speaking...
                 </motion.div>
               )}
             </AnimatePresence>
@@ -3224,7 +3229,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             {isSessionActive ? (
                 <>
                 <MicOff size={20} />
-                <span>End Session</span>
+                <span>Stop Session</span>
                 </>
             ) : (
                 <>
