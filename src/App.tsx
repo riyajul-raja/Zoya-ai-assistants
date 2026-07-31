@@ -111,18 +111,38 @@ export default function App() {
   const speechKeepAliveRef = useRef<any>(null);
   const hasLoggedVoicesRef = useRef(false);
 
+  const getRuntimeEnvironment = useCallback(() => {
+    if (typeof window === "undefined") return "Unknown (SSR)";
+    const ua = navigator.userAgent || "";
+    const isPWA = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
+    const isWebView = /wv|Android.*Version\/[0-9.]+/i.test(ua) || (window as any).AndroidInterface !== undefined;
+    const isChrome = /Chrome/.test(ua) && !/Edge|Edg|OPR/i.test(ua);
+
+    if (isPWA) return "PWA";
+    if (isWebView) return "Android WebView";
+    if (isChrome) return "Chrome";
+    return `Browser (${ua})`;
+  }, []);
+
   const selectStrictZoyaVoice = useCallback((voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
     if (!voices || voices.length === 0) return null;
 
-    if (!hasLoggedVoicesRef.current && typeof console !== "undefined" && console.table) {
+    if (!hasLoggedVoicesRef.current && typeof console !== "undefined") {
       hasLoggedVoicesRef.current = true;
-      console.table(
-        voices.map(v => ({
-          name: v.name,
-          lang: v.lang,
-          voiceURI: v.voiceURI
-        }))
-      );
+      console.log("[DIAGNOSTICS] Runtime Environment:", getRuntimeEnvironment());
+      console.log("[DIAGNOSTICS] All Available SpeechSynthesis Voices:");
+      if (console.table) {
+        console.table(
+          voices.map(v => ({
+            name: v.name,
+            lang: v.lang,
+            voiceURI: v.voiceURI,
+            default: v.default
+          }))
+        );
+      } else {
+        console.log(voices.map(v => ({ name: v.name, lang: v.lang, voiceURI: v.voiceURI, default: v.default })));
+      }
     }
 
     // Strict priority matchers:
@@ -197,16 +217,33 @@ export default function App() {
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
 
+    let selected: SpeechSynthesisVoice | null = null;
+
     if (selectedVoiceRef.current) {
       const activeMatch = voices.find(v => v.name === selectedVoiceRef.current?.name || v.voiceURI === selectedVoiceRef.current?.voiceURI);
-      if (activeMatch) return activeMatch;
+      if (activeMatch) {
+        selected = activeMatch;
+      }
     }
 
-    const voice = selectStrictZoyaVoice(voices);
-    if (voice) {
-      selectedVoiceRef.current = voice;
+    if (!selected) {
+      const voice = selectStrictZoyaVoice(voices);
+      if (voice) {
+        selectedVoiceRef.current = voice;
+        selected = voice;
+      }
     }
-    return voice;
+
+    if (selected) {
+      console.log("[DIAGNOSTICS] EXACT Voice Selected by getZoyaVoice():", {
+        name: selected.name,
+        lang: selected.lang,
+        voiceURI: selected.voiceURI,
+        default: selected.default
+      });
+    }
+
+    return selected;
   }, [selectStrictZoyaVoice]);
 
   const cleanTextForSpeech = (text: string): string => {
