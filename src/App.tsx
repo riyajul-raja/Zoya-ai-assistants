@@ -132,12 +132,15 @@ export default function App() {
   }, []);
 
   const getZoyaVoice = useCallback((): SpeechSynthesisVoice | null => {
-    if (selectedVoiceRef.current) {
-      return selectedVoiceRef.current;
-    }
     if (typeof window === "undefined" || !window.speechSynthesis) return null;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
+
+    if (selectedVoiceRef.current) {
+      const activeMatch = voices.find(v => v.name === selectedVoiceRef.current?.name || v.voiceURI === selectedVoiceRef.current?.voiceURI);
+      if (activeMatch) return activeMatch;
+    }
+
     let voice = voices.find(v => 
       (v.lang.includes('hi-IN') || v.lang.includes('en-IN')) &&
       (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('neerja'))
@@ -1399,6 +1402,7 @@ In your very first response or greeting to the user, you MUST casually and natur
   }, [startListeningLoop]);
 
   const speakWithZoya = useCallback((text: string) => {
+    console.log("[TTS] speakWithZoya entered", { text });
     if (!text || !text.trim()) {
       finishSpeechOrTurn();
       return;
@@ -1483,6 +1487,8 @@ In your very first response or greeting to the user, you MUST casually and natur
         }
 
         const zoyaVoice = getZoyaVoice();
+        console.log("[TTS] Voice selected", zoyaVoice ? `${zoyaVoice.name} (${zoyaVoice.lang})` : "Default/Fallback Voice");
+
         const utterance = new SpeechSynthesisUtterance(sentenceText);
         if (zoyaVoice) {
           utterance.voice = zoyaVoice;
@@ -1496,17 +1502,19 @@ In your very first response or greeting to the user, you MUST casually and natur
         activeUtterancesRef.current = [utterance];
 
         utterance.onstart = () => {
+          console.log("[TTS] onstart fired for sentence:", sentenceText);
           isSpeakingRef.current = true;
           setAppState("speaking");
         };
 
         utterance.onend = () => {
+          console.log("[TTS] onend fired for sentence:", sentenceText);
           activeUtterancesRef.current = [];
           playSentenceAt(index + 1);
         };
 
         utterance.onerror = (e) => {
-          console.warn("[speakWithZoya] Sentence error at index", index, e);
+          console.warn("[TTS] onerror fired for sentence:", sentenceText, e);
           activeUtterancesRef.current = [];
           if (!isRetry) {
             setTimeout(() => {
@@ -1518,10 +1526,11 @@ In your very first response or greeting to the user, you MUST casually and natur
         };
 
         try {
+          console.log("[TTS] speechSynthesis.speak called for sentence:", sentenceText);
           window.speechSynthesis.speak(utterance);
           window.speechSynthesis.resume();
         } catch (ex) {
-          console.error("[speakWithZoya] speak exception:", ex);
+          console.error("[TTS] speak exception:", ex);
           activeUtterancesRef.current = [];
           if (!isRetry) {
             setTimeout(() => playSentenceAt(index, true), 100);
