@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Settings, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, User, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ChevronRight, ArrowLeft, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured, getZoyaAudio, getZoyaAudioPrimary } from "./services/geminiService";
-import { playPCM } from "./utils/audioUtils";
+import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured } from "./services/geminiService";
 import { detectIntent } from "./services/intentService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -82,12 +81,6 @@ function getTimeOfDayDescription(): { timeOfDay: string; timeStr: string } {
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>("idle");
-  const appStateRef = useRef<AppState>(appState);
-  const isSpeakingRef = useRef<boolean>(false);
-
-  useEffect(() => {
-    appStateRef.current = appState;
-  }, [appState]);
   const [isGhostMode, setIsGhostMode] = useState(false);
   const [messagesBeforeGhost, setMessagesBeforeGhost] = useState<ChatMessage[] | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -109,157 +102,20 @@ export default function App() {
   const activeUtterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
-  const speechKeepAliveRef = useRef<any>(null);
-  const hasLoggedVoicesRef = useRef(false);
-
-  const getRuntimeEnvironment = useCallback(() => {
-    if (typeof window === "undefined") return "Unknown (SSR)";
-    const ua = navigator.userAgent || "";
-    const isPWA = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
-    const isWebView = /wv|Android.*Version\/[0-9.]+/i.test(ua) || (window as any).AndroidInterface !== undefined;
-    const isChrome = /Chrome/.test(ua) && !/Edge|Edg|OPR/i.test(ua);
-
-    if (isPWA) return "PWA";
-    if (isWebView) return "Android WebView";
-    if (isChrome) return "Chrome";
-    return `Browser (${ua})`;
-  }, []);
-
-  const selectStrictZoyaVoice = useCallback((voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
-    if (!voices || voices.length === 0) return null;
-
-    if (!hasLoggedVoicesRef.current && typeof console !== "undefined") {
-      hasLoggedVoicesRef.current = true;
-      console.log("[DIAGNOSTICS] Runtime Environment:", getRuntimeEnvironment());
-      console.log("[DIAGNOSTICS] All Available SpeechSynthesis Voices:");
-      if (console.table) {
-        console.table(
-          voices.map(v => ({
-            name: v.name,
-            lang: v.lang,
-            voiceURI: v.voiceURI,
-            default: v.default
-          }))
-        );
-      } else {
-        console.log(voices.map(v => ({ name: v.name, lang: v.lang, voiceURI: v.voiceURI, default: v.default })));
-      }
-    }
-
-    // Strict priority matchers:
-    // 1. Google हिन्दी
-    let voice = voices.find(v => v.name.includes("Google") && v.name.includes("हिन्दी") && !v.name.includes("India"));
-    if (!voice) voice = voices.find(v => v.name.includes("Google") && v.name.includes("हिन्दी"));
-
-    // 2. Google Hindi
-    if (!voice) voice = voices.find(v => v.name.includes("Google") && v.name.toLowerCase().includes("hindi"));
-
-    // 3. Google हिन्दी (India)
-    if (!voice) voice = voices.find(v => v.name.includes("Google") && v.name.includes("हिन्दी") && v.name.includes("India"));
-
-    // 4. Google English India
-    if (!voice) voice = voices.find(v => v.name.includes("Google") && (v.name.toLowerCase().includes("english india") || (v.name.includes("English") && v.name.includes("India")) || v.lang.includes("en-IN") || v.lang.includes("en_IN")));
-
-    // 5. hi-IN Female
-    if (!voice) voice = voices.find(v => (v.lang.includes("hi-IN") || v.lang.includes("hi_IN") || v.lang.includes("hi")) && (v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira") || v.name.toLowerCase().includes("swara") || v.name.toLowerCase().includes("neerja")));
-
-    // 6. en-IN Female
-    if (!voice) voice = voices.find(v => (v.lang.includes("en-IN") || v.lang.includes("en_IN")) && (v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira") || v.name.toLowerCase().includes("swara") || v.name.toLowerCase().includes("neerja") || v.name.toLowerCase().includes("heera") || v.name.toLowerCase().includes("kalpana")));
-
-    // 7. Microsoft Swara
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("swara"));
-
-    // 8. Microsoft Neerja
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("neerja"));
-
-    // 9. Microsoft Heera
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("heera"));
-
-    // 10. Microsoft Kalpana
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("kalpana"));
-
-    // 11. Samantha
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("samantha"));
-
-    // 12. Victoria
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("victoria"));
-
-    // 13. Karen
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("karen"));
-
-    // Fallback: Never select a US voice if an Indian female voice exists
-    if (!voice) voice = voices.find(v => v.lang.includes("hi-IN") || v.lang.includes("hi_IN") || v.lang.includes("hi"));
-    if (!voice) voice = voices.find(v => v.lang.includes("en-IN") || v.lang.includes("en_IN"));
-    if (!voice) voice = voices.find(v => v.name.toLowerCase().includes("female"));
-    if (!voice && voices.length > 0) voice = voices[0];
-
-    return voice || null;
-  }, []);
-
   useEffect(() => {
     const loadVoices = () => {
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
       const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length > 0) {
-        const voice = selectStrictZoyaVoice(voices);
-        if (voice) {
-          selectedVoiceRef.current = voice;
-        }
+      let voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+      if (!voice && voices.length > 0) {
+        voice = voices[0];
+      }
+      if (voice) {
+        selectedVoiceRef.current = voice;
       }
     };
     loadVoices();
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-  }, [selectStrictZoyaVoice]);
-
-  const getZoyaVoice = useCallback((): SpeechSynthesisVoice | null => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return null;
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices || voices.length === 0) return null;
-
-    let selected: SpeechSynthesisVoice | null = null;
-
-    if (selectedVoiceRef.current) {
-      const activeMatch = voices.find(v => v.name === selectedVoiceRef.current?.name || v.voiceURI === selectedVoiceRef.current?.voiceURI);
-      if (activeMatch) {
-        selected = activeMatch;
-      }
-    }
-
-    if (!selected) {
-      const voice = selectStrictZoyaVoice(voices);
-      if (voice) {
-        selectedVoiceRef.current = voice;
-        selected = voice;
-      }
-    }
-
-    if (selected) {
-      console.log("[DIAGNOSTICS] EXACT Voice Selected by getZoyaVoice():", {
-        name: selected.name,
-        lang: selected.lang,
-        voiceURI: selected.voiceURI,
-        default: selected.default
-      });
-    }
-
-    return selected;
-  }, [selectStrictZoyaVoice]);
-
-  const cleanTextForSpeech = (text: string): string => {
-    if (!text) return "";
-    return text
-      .replace(/```[\s\S]*?```/g, " code block. ")
-      .replace(/`([^`]+)`/g, "$1")
-      .replace(/\*\*([^*]+)\*\*/g, "$1")
-      .replace(/\*([^*]+)\*/g, "$1")
-      .replace(/#+\s*/g, "")
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  };
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -360,15 +216,8 @@ export default function App() {
   };
 
   const handleOpenSettingsFromLockedMode = () => {
-    if (isPersonalSettingsOpen) {
-      setAutoFocusApiKey(false);
-      setTimeout(() => {
-        setAutoFocusApiKey(true);
-      }, 50);
-    } else {
-      setIsPersonalSettingsOpen(true);
-      setAutoFocusApiKey(true);
-    }
+    setIsPersonalSettingsOpen(true);
+    setAutoFocusApiKey(true);
   };
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
@@ -423,8 +272,6 @@ export default function App() {
 
   const isSessionActiveRef = useRef(isSessionActive);
   const isListeningRef = useRef(isListening);
-  const listeningTimeoutRef = useRef<any>(null);
-  const handleTextCommandRef = useRef<any>(null);
 
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
@@ -1193,9 +1040,9 @@ In your very first response or greeting to the user, you MUST casually and natur
     return () => clearInterval(intervalId);
   }, [isCameraActive, cameraStream]);
 
-  // Synchronize Live Session Lifecycle with isCameraActive and isMuted
+  // Synchronize Live Session Lifecycle with isCameraActive, isSessionActive, and isMuted
   useEffect(() => {
-    const shouldBeRunning = isCameraActive;
+    const shouldBeRunning = isCameraActive || isSessionActive;
     const requiredMic = !!isSessionActive;
 
     const manageSession = async () => {
@@ -1358,312 +1205,51 @@ In your very first response or greeting to the user, you MUST casually and natur
     scrollToBottom();
   }, [messages, showChat]);
 
-  const startListeningLoop = useCallback(() => {
-    if (!isSessionActiveRef.current) return;
-    if (isSpeakingRef.current || appStateRef.current === "speaking" || appStateRef.current === "processing") {
-      console.log("[startListeningLoop] Currently speaking or processing, deferring STT start...");
-      return;
-    }
+  const speakMessageText = useCallback((text: string) => {
+    window.speechSynthesis.cancel();
+    activeUtterancesRef.current = [];
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
-      setIsSessionActive(false);
-      isSessionActiveRef.current = false;
-      setAppState("idle");
-      return;
-    }
-
-    if (typeof window !== "undefined" && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending || isSpeakingRef.current)) {
-      console.log("[startListeningLoop] Speech synthesis active, deferring STT start...");
-      return;
-    }
-
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onstart = null;
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
-      } catch (e) {}
-      recognitionRef.current = null;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.lang = "en-IN";
-
-      recognition.onstart = () => {
-        if (isSessionActiveRef.current && !isSpeakingRef.current) {
-          setIsListening(true);
-          setAppState("listening");
-        }
-      };
-
-      recognition.onresult = (event: any) => {
-        let transcript = "";
-        if (event.results) {
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i] && event.results[i][0]) {
-              transcript += event.results[i][0].transcript;
-            }
-          }
-          if (!transcript && event.results[0] && event.results[0][0]) {
-            transcript = event.results[0][0].transcript;
-          }
-        }
-
-        if (transcript && transcript.trim()) {
-          console.log("[startListeningLoop] Voice Transcript:", transcript);
-          try {
-            recognition.stop();
-          } catch (e) {}
-          setIsListening(false);
-          setAppState("processing");
-
-          if (handleTextCommandRef.current) {
-            handleTextCommandRef.current(transcript.trim(), false, []);
-          }
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn("[startListeningLoop] Speech recognition error:", event.error);
-        if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
-          clearTimeout(listeningTimeoutRef.current);
-          listeningTimeoutRef.current = setTimeout(() => {
-            if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening" && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
-              startListeningLoop();
-            }
-          }, 350);
-        }
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        if (isSessionActiveRef.current) {
-          clearTimeout(listeningTimeoutRef.current);
-          if (!isSpeakingRef.current && appStateRef.current === "listening") {
-            listeningTimeoutRef.current = setTimeout(() => {
-              if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening" && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
-                startListeningLoop();
-              }
-            }, 250);
-          }
+    const sentences = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
+    sentences.forEach((sentence) => {
+      const trimmed = sentence.trim();
+      if (trimmed !== "") {
+        const utterance = new SpeechSynthesisUtterance(trimmed);
+        if (selectedVoiceRef.current) {
+          utterance.voice = selectedVoiceRef.current;
+          utterance.lang = selectedVoiceRef.current.lang;
         } else {
-          setAppState("idle");
+          utterance.lang = "hi-IN";
         }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e: any) {
-      console.error("[startListeningLoop] Initialization error:", e);
-      if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
-        clearTimeout(listeningTimeoutRef.current);
-        listeningTimeoutRef.current = setTimeout(() => {
-          if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
-            startListeningLoop();
+        utterance.pitch = 1.0;
+        utterance.rate = 1.0;
+        
+        activeUtterancesRef.current.push(utterance);
+        
+        utterance.onstart = () => {
+          setAppState("speaking");
+        };
+        
+        utterance.onend = () => {
+          activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
+          if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+            setAppState("idle");
           }
-        }, 500);
-      }
-    }
-  }, []);
+        };
 
-  const finishSpeechOrTurn = useCallback(() => {
-    isSpeakingRef.current = false;
-    if (isSessionActiveRef.current) {
-      setAppState("listening");
-      clearTimeout(listeningTimeoutRef.current);
-      listeningTimeoutRef.current = setTimeout(() => {
-        if (isSessionActiveRef.current && !isSpeakingRef.current) {
-          startListeningLoop();
+        utterance.onerror = (e) => {
+          activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
+          console.error("Speech error", e);
+          if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+            setAppState("idle");
+          }
+        };
+
+        if (trimmed !== "") {
+          window.speechSynthesis.speak(utterance);
         }
-      }, 300);
-    } else {
-      setAppState("idle");
-    }
-  }, [startListeningLoop]);
-
-  // Streaming Audio Queue State & Ref System
-  const speechQueueRef = useRef<string[]>([]);
-  const audioBufferQueueRef = useRef<Array<{ sentence: string; base64Audio: string | null }>>([]);
-  const isFetchingAudioRef = useRef<boolean>(false);
-  const isPlayingAudioRef = useRef<boolean>(false);
-  const isStreamCompletedRef = useRef<boolean>(false);
-
-  const cancelCurrentSpeech = useCallback(() => {
-    speechQueueRef.current = [];
-    audioBufferQueueRef.current = [];
-    isFetchingAudioRef.current = false;
-    isPlayingAudioRef.current = false;
-    isSpeakingRef.current = false;
-    isStreamCompletedRef.current = false;
-
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onstart = null;
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
-      } catch (e) {}
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-
-    try {
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    } catch (e) {}
-  }, []);
-
-  const playSpeechSynthesisFallback = useCallback((sentenceText: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) {
-        resolve();
-        return;
-      }
-
-      try {
-        window.speechSynthesis.cancel();
-      } catch (e) {}
-
-      const zoyaVoice = getZoyaVoice();
-      const utterance = new SpeechSynthesisUtterance(sentenceText);
-      if (zoyaVoice) {
-        utterance.voice = zoyaVoice;
-        utterance.lang = zoyaVoice.lang;
-      } else {
-        utterance.lang = "en-IN";
-      }
-      utterance.pitch = 1.0;
-      utterance.rate = 1.0;
-
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-
-      try {
-        window.speechSynthesis.speak(utterance);
-        window.speechSynthesis.resume();
-      } catch (e) {
-        resolve();
       }
     });
-  }, [getZoyaVoice]);
-
-  const processAudioQueue = useCallback(async () => {
-    if (isPlayingAudioRef.current) return;
-
-    if (audioBufferQueueRef.current.length === 0) {
-      if (speechQueueRef.current.length === 0 && !isFetchingAudioRef.current && isStreamCompletedRef.current) {
-        isSpeakingRef.current = false;
-        finishSpeechOrTurn();
-      }
-      return;
-    }
-
-    const item = audioBufferQueueRef.current.shift();
-    if (!item) return;
-
-    isPlayingAudioRef.current = true;
-    isSpeakingRef.current = true;
-    setAppState("speaking");
-
-    const cleaned = cleanTextForSpeech(item.sentence);
-    if (!cleaned) {
-      isPlayingAudioRef.current = false;
-      processAudioQueue();
-      return;
-    }
-
-    if (item.base64Audio) {
-      try {
-        console.log("[Streaming TTS] Playing Gemini PCM Audio for sentence:", cleaned);
-        await playPCM(item.base64Audio);
-      } catch (err) {
-        console.log("[LIVE] Falling back to Browser TTS");
-        await playSpeechSynthesisFallback(cleaned);
-      }
-    } else {
-      console.log("[LIVE] Falling back to Browser TTS");
-      await playSpeechSynthesisFallback(cleaned);
-    }
-
-    isPlayingAudioRef.current = false;
-    processAudioQueue();
-  }, [finishSpeechOrTurn, cleanTextForSpeech, playSpeechSynthesisFallback]);
-
-  const fetchNextAudio = useCallback(async () => {
-    if (isFetchingAudioRef.current) return;
-    if (speechQueueRef.current.length === 0) return;
-
-    isFetchingAudioRef.current = true;
-    const sentence = speechQueueRef.current.shift()!;
-
-    try {
-      let chunksPushed = 0;
-      await getZoyaAudioPrimary(sentence, (base64Audio) => {
-        chunksPushed++;
-        audioBufferQueueRef.current.push({ sentence, base64Audio });
-        processAudioQueue();
-      });
-
-      if (chunksPushed === 0) {
-        audioBufferQueueRef.current.push({ sentence, base64Audio: null });
-      }
-    } catch (e) {
-      console.warn("[Streaming TTS] Audio fetch error for sentence:", e);
-      audioBufferQueueRef.current.push({ sentence, base64Audio: null });
-    } finally {
-      isFetchingAudioRef.current = false;
-      processAudioQueue();
-      if (speechQueueRef.current.length > 0) {
-        fetchNextAudio();
-      }
-    }
-  }, [processAudioQueue]);
-
-  const enqueueSentenceForSpeech = useCallback((sentence: string) => {
-    const cleaned = cleanTextForSpeech(sentence);
-    if (!cleaned || !cleaned.trim()) return;
-
-    speechQueueRef.current.push(cleaned);
-    fetchNextAudio();
-  }, [cleanTextForSpeech, fetchNextAudio]);
-
-  const markStreamCompleted = useCallback(() => {
-    isStreamCompletedRef.current = true;
-    processAudioQueue();
-  }, [processAudioQueue]);
-
-  const speakWithZoya = useCallback((text: string) => {
-    console.log("[TTS] speakWithZoya entered", { text });
-    if (!text || !text.trim()) {
-      finishSpeechOrTurn();
-      return;
-    }
-
-    cancelCurrentSpeech();
-
-    const cleanedText = cleanTextForSpeech(text);
-    if (!cleanedText) {
-      finishSpeechOrTurn();
-      return;
-    }
-
-    const sentences = cleanedText.match(/[^.!?\n]+[.!?\n]*/g) || [cleanedText];
-    for (const s of sentences) {
-      enqueueSentenceForSpeech(s);
-    }
-    markStreamCompleted();
-  }, [cancelCurrentSpeech, cleanTextForSpeech, enqueueSentenceForSpeech, markStreamCompleted, finishSpeechOrTurn]);
-
-  const speakMessageText = speakWithZoya;
+  }, []);
 
   const autoTriggerUIFromText = useCallback((text: string) => {
     if (!text) return;
@@ -1867,10 +1453,11 @@ In your very first response or greeting to the user, you MUST casually and natur
         }
       ]);
 
+      setAppState("idle");
+      setIsLoading(false);
+
       if (!isMuted && !skipSpeech) {
         speakMessageText(LOCKED_MODE_MESSAGE);
-      } else {
-        finishSpeechOrTurn();
       }
 
       isProcessingRequestRef.current = false;
@@ -1914,12 +1501,11 @@ In your very first response or greeting to the user, you MUST casually and natur
           generatedImagePrompt: promptToEncode
         }
       ]);
+      setAppState("idle");
       setIsLoading(false);
       
       if (!isMuted && !skipSpeech) {
         speakMessageText("Here is the image you requested");
-      } else {
-        finishSpeechOrTurn();
       }
       isProcessingRequestRef.current = false;
       return;
@@ -1948,7 +1534,8 @@ In your very first response or greeting to the user, you MUST casually and natur
         setIsLoading(true);
         setAppState("processing");
 
-        const delayMs = 0;
+        const delayMs = Math.floor(Math.random() * 700) + 800; // 0.8s to 1.5s natural delay
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
 
         const responseMessageId = Date.now().toString() + "-z";
         const localRoutingMs = intentResult.routingMs || 2;
@@ -1987,11 +1574,10 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         ]);
         setIsLoading(false);
+        setAppState("idle");
         
         if (!isMuted && !skipSpeech) {
           speakMessageText(intentResult.response);
-        } else {
-          finishSpeechOrTurn();
         }
         isProcessingRequestRef.current = false;
         return; // Halt here, don't call Gemini
@@ -2005,7 +1591,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (!isMuted && !skipSpeech) {
         speakMessageText(responseText);
       } else {
-        finishSpeechOrTurn();
+        setAppState("idle");
       }
 
       setTimeout(() => {
@@ -2029,6 +1615,54 @@ In your very first response or greeting to the user, you MUST casually and natur
       ]);
 
       try {
+        let lastProcessedIndex = 0;
+        
+        if (!isMuted && !skipSpeech) {
+          window.speechSynthesis.cancel(); // Clear any ongoing speech
+          activeUtterancesRef.current = [];
+        }
+
+        const queueSentenceSpeak = (sentence: string) => {
+          if (isMuted || skipSpeech) return;
+          const trimmed = sentence.trim();
+          if (trimmed === "") return;
+
+          const utterance = new SpeechSynthesisUtterance(trimmed);
+          if (selectedVoiceRef.current) {
+            utterance.voice = selectedVoiceRef.current;
+            utterance.lang = selectedVoiceRef.current.lang;
+          } else {
+            utterance.lang = "hi-IN";
+          }
+          utterance.pitch = 1.0;
+          utterance.rate = 1.0;
+          
+          activeUtterancesRef.current.push(utterance);
+          
+          utterance.onstart = () => {
+            setAppState("speaking");
+          };
+          
+          utterance.onend = () => {
+            activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
+            if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+              setAppState("idle");
+            }
+          };
+
+          utterance.onerror = (e) => {
+            activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
+            console.error("Speech error", e);
+            if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+              setAppState("idle");
+            }
+          };
+
+          if (trimmed !== "") {
+            window.speechSynthesis.speak(utterance);
+          }
+        };
+
         let memoryContext = "";
         try {
           const topMemories = await searchMemories({
@@ -2053,9 +1687,6 @@ In your very first response or greeting to the user, you MUST casually and natur
           promptToSend = `${promptToSend}${memoryContext}`;
         }
 
-        cancelCurrentSpeech();
-        let streamLastProcessedIndex = 0;
-
         const responseStreamResult = await getZoyaResponseStream(
           promptToSend,
           currentHistory,
@@ -2072,37 +1703,16 @@ In your very first response or greeting to the user, you MUST casually and natur
             );
 
             if (!isMuted && !skipSpeech) {
-              const unparsed = currentText.slice(streamLastProcessedIndex);
-              const sentenceRegex = /([^.!?\n|।]+[.!?\n|।]+)/g;
+              const textToProcess = currentText.slice(lastProcessedIndex);
+              const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
               let match;
-              while ((match = sentenceRegex.exec(unparsed)) !== null) {
-                const sentenceToSpeak = match[1].trim();
-                if (sentenceToSpeak) {
-                  enqueueSentenceForSpeech(sentenceToSpeak);
-                }
-                streamLastProcessedIndex += match[0].length;
+              let tempIndex = lastProcessedIndex;
+              while ((match = sentenceRegex.exec(textToProcess)) !== null) {
+                const sentence = match[0];
+                queueSentenceSpeak(sentence);
+                tempIndex = lastProcessedIndex + match.index + sentence.length;
               }
-
-              const remaining = currentText.slice(streamLastProcessedIndex);
-              if (remaining.length > 50) {
-                const commaIdx = remaining.lastIndexOf(",");
-                if (commaIdx > 20) {
-                  const clause = remaining.slice(0, commaIdx + 1).trim();
-                  if (clause) {
-                    enqueueSentenceForSpeech(clause);
-                    streamLastProcessedIndex += commaIdx + 1;
-                  }
-                } else {
-                  const spaceIdx = remaining.lastIndexOf(" ");
-                  if (spaceIdx > 30) {
-                    const clause = remaining.slice(0, spaceIdx).trim();
-                    if (clause) {
-                      enqueueSentenceForSpeech(clause);
-                      streamLastProcessedIndex += spaceIdx + 1;
-                    }
-                  }
-                }
-              }
+              lastProcessedIndex = tempIndex;
             }
           },
           intentResult
@@ -2121,14 +1731,16 @@ In your very first response or greeting to the user, you MUST casually and natur
         // Check Zoya AI Intent and Auto-Open Panel overlays in real-time
         checkAIIntentAndAutoOpen(finalTranscript, responseText);
 
-        if (!isMuted && !skipSpeech) {
-          const remainingText = responseText.slice(streamLastProcessedIndex).trim();
-          if (remainingText) {
-            enqueueSentenceForSpeech(remainingText);
+        if (!isMuted && !skipSpeech && lastProcessedIndex < responseText.length) {
+          const remainingText = responseText.slice(lastProcessedIndex);
+          if (remainingText.trim()) {
+            queueSentenceSpeak(remainingText);
           }
-          markStreamCompleted();
-        } else {
-          finishSpeechOrTurn();
+        }
+
+        // Wait a brief moment to ensure idle state updates if needed, though onend handles it
+        if (isMuted || skipSpeech || (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
+          setAppState("idle");
         }
       } catch (error: any) {
         setIsTyping(false);
@@ -2215,14 +1827,10 @@ In your very first response or greeting to the user, you MUST casually and natur
           },
         ]);
       }
-      finishSpeechOrTurn();
+      setAppState("idle");
     }
     isProcessingRequestRef.current = false;
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking, finishSpeechOrTurn]);
-
-  useEffect(() => {
-    handleTextCommandRef.current = handleTextCommand;
-  }, [handleTextCommand]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
 
   useEffect(() => {
     return () => {
@@ -2416,41 +2024,72 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (e) {
       e.preventDefault();
     }
-
-    if (isSessionActiveRef.current) {
-      // Stop Session clicked
-      setIsSessionActive(false);
-      isSessionActiveRef.current = false;
-      isSpeakingRef.current = false;
-      setIsListening(false);
-      setAppState("idle");
-
-      clearTimeout(listeningTimeoutRef.current);
-
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.onstart = null;
-          recognitionRef.current.onresult = null;
-          recognitionRef.current.onerror = null;
-          recognitionRef.current.onend = null;
-          recognitionRef.current.stop();
-        } catch (err) {}
-        recognitionRef.current = null;
-      }
-
-      try {
-        if (typeof window !== "undefined" && window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-        }
-      } catch (err) {}
+    
+    // Instead of using Live API (which is continuous and expensive), we use one-shot STT
+    // and pipe it to our Smart Intent Router.
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
       return;
     }
 
-    // Start Session clicked
-    setIsSessionActive(true);
-    isSessionActiveRef.current = true;
-    isSpeakingRef.current = false;
-    startListeningLoop();
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (err) {}
+      }
+      setIsListening(false);
+      setAppState("idle");
+      return;
+    }
+
+    let speechDetected = false;
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setAppState("listening");
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results && event.results[0] && event.results[0][0]
+          ? event.results[0][0].transcript
+          : "";
+          
+        if (transcript && transcript.trim()) {
+          speechDetected = true;
+          console.log("[toggleListening] Voice Transcript:", transcript);
+          // Pass to the intent router via handleTextCommand directly
+          handleTextCommand(transcript, false, []);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+        setAppState("idle");
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        if (appState === "listening") {
+            setAppState("idle");
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e: any) {
+      console.error("Speech recognition initialization error:", e);
+      setIsListening(false);
+      setAppState("idle");
+    }
   };
 
 
@@ -3145,6 +2784,70 @@ In your very first response or greeting to the user, you MUST casually and natur
                     </div>
                   </motion.div>
               </>)}
+              
+              {isSettingsPageOpen && (
+                <motion.div
+                  initial={{ x: "100%", opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: "100%", opacity: 0 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                  className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[200] flex flex-col pointer-events-auto"
+                >
+                  <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
+                    <button 
+                      onClick={() => {
+                        setIsSettingsPageOpen(false);
+                        setIsToolMenuOpen(true);
+                      }}
+                      className="flex items-center gap-2 text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer group px-4 py-2.5 hyper-glass rounded-xl hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.96]"
+                    >
+                      <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                      <span className="text-sm font-medium tracking-wide">Back</span>
+                    </button>
+                    <span className="text-base font-serif font-medium text-white tracking-widest uppercase">Settings</span>
+                    <div className="w-[88px]"></div> {/* Spacer for centering (matches button width) */}
+                  </div>
+                  
+                  <motion.div 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.1, duration: 0.4 }}
+                    className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center"
+                  >
+                    <div className="w-full max-w-2xl flex flex-col gap-4">
+                      
+                      <button 
+                        onClick={() => setIsPersonalSettingsOpen(true)}
+                        className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left"
+                      >
+                        <div className="flex items-center gap-5">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                            <User size={22} />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[16px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Personal</span>
+                            <span className="text-[12px] text-neutral-400 tracking-wide">Your Name • Gemini • Music • YouTube</span>
+                          </div>
+                        </div>
+                        <ChevronRight size={22} className="text-neutral-500 group-hover:text-white transition-colors" />
+                      </button>
+
+
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+
+              {isPersonalSettingsOpen && (
+                <PersonalSettings 
+                  onBack={() => {
+                    setIsPersonalSettingsOpen(false);
+                    setAutoFocusApiKey(false);
+                  }}
+                  autoFocusApiKey={autoFocusApiKey}
+                  onApiKeyVerified={handleApiKeyVerified}
+                />
+              )}
             </AnimatePresence>
 
             <ActivationSuccessModal
@@ -3175,20 +2878,7 @@ In your very first response or greeting to the user, you MUST casually and natur
                   }`}
                 >
                   <Loader2 size={16} className="animate-spin" />
-                  Thinking...
-                </motion.div>
-              )}
-              {appState === "speaking" && (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className={`flex items-center gap-2 text-sm md:text-base italic font-serif transition-colors duration-300 ${
-                    isGhostMode ? "text-rose-400/80" : "text-cyan-300/80"
-                  }`}
-                >
-                  <Volume2 size={16} className="animate-pulse" />
-                  Speaking...
+                  Replying...
                 </motion.div>
               )}
             </AnimatePresence>
@@ -3268,73 +2958,6 @@ In your very first response or greeting to the user, you MUST casually and natur
             chatContainerRef={chatContainerRef}
             recognitionRef={recognitionRef}
             onOpenSettings={handleOpenSettingsFromLockedMode}
-            speakWithZoya={speakWithZoya}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Global Settings & Personal Settings Overlays (outside header so z-index is higher than ChatPage z-9999) */}
-      <AnimatePresence>
-        {isSettingsPageOpen && (
-          <motion.div
-            initial={{ x: "100%", opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: "100%", opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[10020] flex flex-col pointer-events-auto"
-          >
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
-              <button 
-                onClick={() => {
-                  setIsSettingsPageOpen(false);
-                  setIsToolMenuOpen(true);
-                }}
-                className="flex items-center gap-2 text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer group px-4 py-2.5 hyper-glass rounded-xl hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.96]"
-              >
-                <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                <span className="text-sm font-medium tracking-wide">Back</span>
-              </button>
-              <span className="text-base font-serif font-medium text-white tracking-widest uppercase">Settings</span>
-              <div className="w-[88px]"></div> {/* Spacer for centering (matches button width) */}
-            </div>
-            
-            <motion.div 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center"
-            >
-              <div className="w-full max-w-2xl flex flex-col gap-4">
-                
-                <button 
-                  onClick={() => setIsPersonalSettingsOpen(true)}
-                  className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left"
-                >
-                  <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                      <User size={22} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[16px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Personal</span>
-                      <span className="text-[12px] text-neutral-400 tracking-wide">Your Name • Gemini • Music • YouTube</span>
-                    </div>
-                  </div>
-                  <ChevronRight size={22} className="text-neutral-500 group-hover:text-white transition-colors" />
-                </button>
-
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {isPersonalSettingsOpen && (
-          <PersonalSettings 
-            onBack={() => {
-              setIsPersonalSettingsOpen(false);
-              setAutoFocusApiKey(false);
-            }}
-            autoFocusApiKey={autoFocusApiKey}
-            onApiKeyVerified={handleApiKeyVerified}
           />
         )}
       </AnimatePresence>
@@ -3380,7 +3003,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             {isSessionActive ? (
                 <>
                 <MicOff size={20} />
-                <span>Stop Session</span>
+                <span>End Session</span>
                 </>
             ) : (
                 <>

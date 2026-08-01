@@ -31,26 +31,18 @@ export default function PersonalSettings({ onBack, autoFocusApiKey, onApiKeyVeri
 
   useEffect(() => {
     if (autoFocusApiKey) {
-      const focusAndScroll = () => {
+      const timer = setTimeout(() => {
         if (apiKeyCardRef.current) {
           apiKeyCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         if (apiKeyInputRef.current) {
-          apiKeyInputRef.current.focus({ preventScroll: true });
+          apiKeyInputRef.current.focus();
           try {
             apiKeyInputRef.current.click();
           } catch (e) {}
         }
-      };
-
-      focusAndScroll();
-      const t1 = setTimeout(focusAndScroll, 100);
-      const t2 = setTimeout(focusAndScroll, 300);
-
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-      };
+      }, 350);
+      return () => clearTimeout(timer);
     }
   }, [autoFocusApiKey]);
 
@@ -118,7 +110,7 @@ export default function PersonalSettings({ onBack, autoFocusApiKey, onApiKeyVeri
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[10050] flex flex-col pointer-events-auto overflow-hidden text-white"
+      className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[210] flex flex-col pointer-events-auto overflow-hidden text-white"
     >
       {/* Top Header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
@@ -229,8 +221,6 @@ export default function PersonalSettings({ onBack, autoFocusApiKey, onApiKeyVeri
                 <input
                   ref={apiKeyInputRef}
                   type={showApiKey ? 'text' : 'password'}
-                  inputMode="text"
-                  enterKeyHint="done"
                   value={apiKey}
                   onChange={(e) => {
                     setApiKey(e.target.value);
