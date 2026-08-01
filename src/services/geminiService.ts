@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 
 export interface DebugInfo {
   intent: "LOCAL" | "GEMINI";
@@ -366,7 +366,7 @@ export async function getZoyaResponseStream(
 
     const routingMs = Math.max(2, Math.round(performance.now() - startTime));
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite"];
+    const modelsToTry = ["gemini-3.5-flash", "gemini-2.0-flash"];
     let lastError: any = null;
     let lastModelUsed = "gemini-3.5-flash";
 
@@ -579,7 +579,7 @@ export async function getZoyaResponse(
       }
     ];
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite"];
+    const modelsToTry = ["gemini-3.5-flash", "gemini-2.0-flash"];
 
     for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
       const currentModel = modelsToTry[mIdx];
@@ -633,17 +633,159 @@ export async function getZoyaResponse(
   }
 }
 
+export async function getZoyaAudioLiveWebSocket(
+  text: string,
+  onChunk: (base64Audio: string) => void
+): Promise<boolean> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    console.warn("[LIVE] WebSocket Failed: No API Key");
+    return false;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    let resolved = false;
+    let receivedAnyAudio = false;
+    let firstChunkLogged = false;
+    const ai = new GoogleGenAI({ apiKey });
+
+    let sessionRef: any = null;
+    const timeoutTimer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        if (!receivedAnyAudio) {
+          console.warn("[LIVE] WebSocket Failed: Timeout waiting for audio");
+        }
+        if (sessionRef) {
+          try { sessionRef.close(); } catch (e) {}
+        }
+        resolve(receivedAnyAudio);
+      }
+    }, 6000);
+
+    ai.live.connect({
+      model: "gemini-3.1-flash-live-preview",
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
+        },
+        systemInstruction: "You are Zoya, a female AI assistant. Speak the exact provided text naturally.",
+      },
+      callbacks: {
+        onopen: () => {
+          console.log("[LIVE] WebSocket Connected");
+          if (sessionRef) {
+            sessionRef.sendRealtimeInput({ text: `Speak this text: "${text}"` });
+          }
+        },
+        onmessage: (message: LiveServerMessage) => {
+          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            if (!firstChunkLogged) {
+              firstChunkLogged = true;
+              console.log("[LIVE] First Audio Chunk Received");
+            }
+            receivedAnyAudio = true;
+            onChunk(base64Audio);
+          }
+          if (message.serverContent?.turnComplete) {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeoutTimer);
+              setTimeout(() => {
+                try { sessionRef?.close(); } catch (e) {}
+              }, 500);
+              resolve(true);
+            }
+          }
+        },
+        onerror: (err) => {
+          console.warn("[LIVE] WebSocket Failed", err);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutTimer);
+            resolve(receivedAnyAudio);
+          }
+        },
+        onclose: () => {
+          if (!resolved) {
+            resolved = true;
+            if (!receivedAnyAudio) {
+              console.warn("[LIVE] WebSocket Failed: Connection closed before audio received");
+            }
+            clearTimeout(timeoutTimer);
+            resolve(receivedAnyAudio);
+          }
+        }
+      }
+    }).then(s => {
+      sessionRef = s;
+    }).catch(err => {
+      console.warn("[LIVE] WebSocket Failed", err);
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeoutTimer);
+        resolve(false);
+      }
+    });
+  });
+}
+
+export async function getZoyaAudioPrimary(
+  text: string,
+  onChunk: (base64Audio: string) => void
+): Promise<void> {
+  // 1. Primary path: WebSocket Gemini Live API (Real-time Audio)
+  const success = await getZoyaAudioLiveWebSocket(text, onChunk);
+  if (success) return;
+
+  // 2. Emergency Fallback path: REST Audio API
+  console.log("[LIVE] Falling back to REST");
+  const restAudio = await getZoyaAudio(text);
+  if (restAudio) {
+    onChunk(restAudio);
+  }
+}
+
 export async function getZoyaAudio(text: string): Promise<string | null> {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      console.warn("[getZoyaAudio] No Gemini API Key configured");
+      return null;
+    }
+    const ai = new GoogleGenAI({ apiKey });
+    
+    // Try primary audio generation model gemini-2.0-flash first
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [{ parts: [{ text }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "Aoede" },
+            },
+          },
+        },
+      });
+      const base64Data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64Data) return base64Data;
+    } catch (e) {
+      console.warn("[getZoyaAudio] gemini-2.0-flash audio generation fallback:", e);
+    }
+
+    // Secondary fallback model retry gemini-2.0-flash
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-2.0-flash",
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Kore" },
+            prebuiltVoiceConfig: { voiceName: "Aoede" },
           },
         },
       },

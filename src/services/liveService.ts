@@ -145,7 +145,7 @@ export class LiveSessionManager {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
           },
           systemInstruction: activeSystemInstruction,
           inputAudioTranscription: {},
