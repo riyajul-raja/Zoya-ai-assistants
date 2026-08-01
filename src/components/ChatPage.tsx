@@ -384,7 +384,6 @@ interface ChatPageProps {
   chatContainerRef: React.RefObject<HTMLFormElement>;
   recognitionRef: React.MutableRefObject<any>;
   onOpenSettings?: () => void;
-  speakWithZoya?: (text: string) => void;
 }
 
 export default function ChatPage({
@@ -415,8 +414,7 @@ export default function ChatPage({
   fileInputRef,
   chatContainerRef,
   recognitionRef,
-  onOpenSettings,
-  speakWithZoya
+  onOpenSettings
 }: ChatPageProps) {
   const [activeDebugMsgId, setActiveDebugMsgId] = useState<string | null>(null);
   const [activeDebugTarget, setActiveDebugTarget] = useState<HTMLElement | null>(null);
@@ -495,26 +493,15 @@ export default function ChatPage({
   };
 
   const handleReadAloud = (text: string) => {
-    if (speakWithZoya) {
-      speakWithZoya(text);
-      return;
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
     }
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch (e) {}
-      setTimeout(() => {
-        try {
-          window.speechSynthesis.resume();
-          const utterance = new SpeechSynthesisUtterance(text);
-          const voices = window.speechSynthesis.getVoices();
-          let voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
-          if (!voice && voices.length > 0) voice = voices[0];
-          if (voice) utterance.voice = voice;
-          window.speechSynthesis.speak(utterance);
-        } catch (e) {}
-      }, 80);
-    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    let voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+    if (!voice && voices.length > 0) voice = voices[0];
+    if (voice) utterance.voice = voice;
+    window.speechSynthesis.speak(utterance);
   };
 
   const handleFeedback = (id: string, feedback: 'like' | 'dislike') => {
