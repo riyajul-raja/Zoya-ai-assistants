@@ -1586,11 +1586,11 @@ In your very first response or greeting to the user, you MUST casually and natur
         console.log("[Streaming TTS] Playing Gemini PCM Audio for sentence:", cleaned);
         await playPCM(item.base64Audio);
       } catch (err) {
-        console.warn("[Streaming TTS] playPCM failed, falling back to Web Speech:", err);
+        console.log("[LIVE] Falling back to Browser TTS");
         await playSpeechSynthesisFallback(cleaned);
       }
     } else {
-      console.log("[Streaming TTS] Web Speech fallback for sentence:", cleaned);
+      console.log("[LIVE] Falling back to Browser TTS");
       await playSpeechSynthesisFallback(cleaned);
     }
 

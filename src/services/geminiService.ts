@@ -638,17 +638,24 @@ export async function getZoyaAudioLiveWebSocket(
   onChunk: (base64Audio: string) => void
 ): Promise<boolean> {
   const apiKey = getGeminiApiKey();
-  if (!apiKey) return false;
+  if (!apiKey) {
+    console.warn("[LIVE] WebSocket Failed: No API Key");
+    return false;
+  }
 
   return new Promise<boolean>((resolve) => {
     let resolved = false;
     let receivedAnyAudio = false;
+    let firstChunkLogged = false;
     const ai = new GoogleGenAI({ apiKey });
 
     let sessionRef: any = null;
     const timeoutTimer = setTimeout(() => {
       if (!resolved) {
         resolved = true;
+        if (!receivedAnyAudio) {
+          console.warn("[LIVE] WebSocket Failed: Timeout waiting for audio");
+        }
         if (sessionRef) {
           try { sessionRef.close(); } catch (e) {}
         }
@@ -667,6 +674,7 @@ export async function getZoyaAudioLiveWebSocket(
       },
       callbacks: {
         onopen: () => {
+          console.log("[LIVE] WebSocket Connected");
           if (sessionRef) {
             sessionRef.sendRealtimeInput({ text: `Speak this text: "${text}"` });
           }
@@ -674,6 +682,10 @@ export async function getZoyaAudioLiveWebSocket(
         onmessage: (message: LiveServerMessage) => {
           const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (base64Audio) {
+            if (!firstChunkLogged) {
+              firstChunkLogged = true;
+              console.log("[LIVE] First Audio Chunk Received");
+            }
             receivedAnyAudio = true;
             onChunk(base64Audio);
           }
@@ -689,7 +701,7 @@ export async function getZoyaAudioLiveWebSocket(
           }
         },
         onerror: (err) => {
-          console.warn("[Live WebSocket Audio] Error:", err);
+          console.warn("[LIVE] WebSocket Failed", err);
           if (!resolved) {
             resolved = true;
             clearTimeout(timeoutTimer);
@@ -699,6 +711,9 @@ export async function getZoyaAudioLiveWebSocket(
         onclose: () => {
           if (!resolved) {
             resolved = true;
+            if (!receivedAnyAudio) {
+              console.warn("[LIVE] WebSocket Failed: Connection closed before audio received");
+            }
             clearTimeout(timeoutTimer);
             resolve(receivedAnyAudio);
           }
@@ -707,7 +722,7 @@ export async function getZoyaAudioLiveWebSocket(
     }).then(s => {
       sessionRef = s;
     }).catch(err => {
-      console.warn("[Live WebSocket Audio] Connect error:", err);
+      console.warn("[LIVE] WebSocket Failed", err);
       if (!resolved) {
         resolved = true;
         clearTimeout(timeoutTimer);
@@ -726,7 +741,7 @@ export async function getZoyaAudioPrimary(
   if (success) return;
 
   // 2. Emergency Fallback path: REST Audio API
-  console.warn("[Audio Engine] Gemini Live WebSocket audio failed. Using REST Audio API fallback.");
+  console.log("[LIVE] Falling back to REST");
   const restAudio = await getZoyaAudio(text);
   if (restAudio) {
     onChunk(restAudio);
