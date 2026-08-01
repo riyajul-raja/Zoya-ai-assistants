@@ -81,6 +81,12 @@ function getTimeOfDayDescription(): { timeOfDay: string; timeStr: string } {
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>("idle");
+  const appStateRef = useRef<AppState>(appState);
+  const isSpeakingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
   const [isGhostMode, setIsGhostMode] = useState(false);
   const [messagesBeforeGhost, setMessagesBeforeGhost] = useState<ChatMessage[] | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -105,7 +111,13 @@ export default function App() {
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
-      let voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+      let voice = voices.find(v => 
+        (v.lang.includes('hi-IN') || v.lang.includes('en-IN') || v.lang.includes('hi_IN') || v.lang.includes('en_IN')) &&
+        (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('neerja'))
+      );
+      if (!voice) {
+        voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+      }
       if (!voice && voices.length > 0) {
         voice = voices[0];
       }
@@ -116,6 +128,47 @@ export default function App() {
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
+
+  const getZoyaVoice = useCallback((): SpeechSynthesisVoice | null => {
+    if (selectedVoiceRef.current) {
+      return selectedVoiceRef.current;
+    }
+    if (typeof window === "undefined" || !window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+    
+    let voice = voices.find(v => 
+      (v.lang.includes('hi-IN') || v.lang.includes('en-IN') || v.lang.includes('hi_IN') || v.lang.includes('en_IN')) &&
+      (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('neerja'))
+    );
+    if (!voice) {
+      voice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+    }
+    if (!voice) {
+      voice = voices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('google'));
+    }
+    if (!voice && voices.length > 0) {
+      voice = voices[0];
+    }
+    if (voice) {
+      selectedVoiceRef.current = voice;
+    }
+    return voice;
+  }, []);
+
+  const cleanTextForSpeech = (text: string): string => {
+    if (!text) return "";
+    return text
+      .replace(/```[\s\S]*?```/g, " code block. ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/#+\s*/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -279,6 +332,8 @@ export default function App() {
 
   const isSessionActiveRef = useRef(isSessionActive);
   const isListeningRef = useRef(isListening);
+  const listeningTimeoutRef = useRef<any>(null);
+  const handleTextCommandRef = useRef<any>(null);
 
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
@@ -1047,9 +1102,9 @@ In your very first response or greeting to the user, you MUST casually and natur
     return () => clearInterval(intervalId);
   }, [isCameraActive, cameraStream]);
 
-  // Synchronize Live Session Lifecycle with isCameraActive, isSessionActive, and isMuted
+  // Synchronize Live Session Lifecycle with isCameraActive and isMuted
   useEffect(() => {
-    const shouldBeRunning = isCameraActive || isSessionActive;
+    const shouldBeRunning = isCameraActive;
     const requiredMic = !!isSessionActive;
 
     const manageSession = async () => {
@@ -1212,51 +1267,296 @@ In your very first response or greeting to the user, you MUST casually and natur
     scrollToBottom();
   }, [messages, showChat]);
 
-  const speakMessageText = useCallback((text: string) => {
-    window.speechSynthesis.cancel();
-    activeUtterancesRef.current = [];
+  const startListeningLoop = useCallback(() => {
+    if (!isSessionActiveRef.current) return;
+    if (isSpeakingRef.current || appStateRef.current === "speaking" || appStateRef.current === "processing") {
+      console.log("[startListeningLoop] Currently speaking or processing, deferring STT start...");
+      return;
+    }
 
-    const sentences = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
-    sentences.forEach((sentence) => {
-      const trimmed = sentence.trim();
-      if (trimmed !== "") {
-        const utterance = new SpeechSynthesisUtterance(trimmed);
-        if (selectedVoiceRef.current) {
-          utterance.voice = selectedVoiceRef.current;
-          utterance.lang = selectedVoiceRef.current.lang;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
+      setIsSessionActive(false);
+      isSessionActiveRef.current = false;
+      setAppState("idle");
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending || isSpeakingRef.current)) {
+      console.log("[startListeningLoop] Speech synthesis active, deferring STT start...");
+      return;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN";
+
+      recognition.onstart = () => {
+        if (isSessionActiveRef.current && !isSpeakingRef.current) {
+          setIsListening(true);
+          setAppState("listening");
+        }
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        if (event.results) {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i] && event.results[i][0]) {
+              transcript += event.results[i][0].transcript;
+            }
+          }
+          if (!transcript && event.results[0] && event.results[0][0]) {
+            transcript = event.results[0][0].transcript;
+          }
+        }
+
+        if (transcript && transcript.trim()) {
+          console.log("[startListeningLoop] Voice Transcript:", transcript);
+          try {
+            recognition.stop();
+          } catch (e) {}
+          setIsListening(false);
+          setAppState("processing");
+
+          if (handleTextCommandRef.current) {
+            handleTextCommandRef.current(transcript.trim(), false, []);
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn("[startListeningLoop] Speech recognition error:", event.error);
+        if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
+          clearTimeout(listeningTimeoutRef.current);
+          listeningTimeoutRef.current = setTimeout(() => {
+            if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening" && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+              startListeningLoop();
+            }
+          }, 350);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        if (isSessionActiveRef.current) {
+          clearTimeout(listeningTimeoutRef.current);
+          if (!isSpeakingRef.current && appStateRef.current === "listening") {
+            listeningTimeoutRef.current = setTimeout(() => {
+              if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening" && (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.pending))) {
+                startListeningLoop();
+              }
+            }, 250);
+          }
         } else {
-          utterance.lang = "hi-IN";
+          setAppState("idle");
         }
-        utterance.pitch = 1.0;
-        utterance.rate = 1.0;
-        
-        activeUtterancesRef.current.push(utterance);
-        
-        utterance.onstart = () => {
-          setAppState("speaking");
-        };
-        
-        utterance.onend = () => {
-          activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
-          if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-            setAppState("idle");
-          }
-        };
+      };
 
-        utterance.onerror = (e) => {
-          activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
-          console.error("Speech error", e);
-          if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-            setAppState("idle");
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e: any) {
+      console.error("[startListeningLoop] Initialization error:", e);
+      if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
+        clearTimeout(listeningTimeoutRef.current);
+        listeningTimeoutRef.current = setTimeout(() => {
+          if (isSessionActiveRef.current && !isSpeakingRef.current && appStateRef.current === "listening") {
+            startListeningLoop();
           }
-        };
-
-        if (trimmed !== "") {
-          window.speechSynthesis.speak(utterance);
-        }
+        }, 500);
       }
-    });
+    }
   }, []);
+
+  const finishSpeechOrTurn = useCallback(() => {
+    isSpeakingRef.current = false;
+    if (isSessionActiveRef.current) {
+      setAppState("listening");
+      clearTimeout(listeningTimeoutRef.current);
+      listeningTimeoutRef.current = setTimeout(() => {
+        if (isSessionActiveRef.current && !isSpeakingRef.current) {
+          startListeningLoop();
+        }
+      }, 300);
+    } else {
+      setAppState("idle");
+    }
+  }, [startListeningLoop]);
+
+  const speakWithZoya = useCallback((text: string) => {
+    if (!text || !text.trim()) {
+      finishSpeechOrTurn();
+      return;
+    }
+
+    // Stop speech recognition immediately so mic does not interfere during TTS
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+
+    const cleanedText = cleanTextForSpeech(text);
+    if (!cleanedText || !cleanedText.trim()) {
+      finishSpeechOrTurn();
+      return;
+    }
+
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      finishSpeechOrTurn();
+      return;
+    }
+
+    isSpeakingRef.current = true;
+    setAppState("speaking");
+
+    // Cancel any previous speech synthesis safely
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {}
+
+    // Wait 80ms for browser speech synthesis queue to reset before calling speak()
+    setTimeout(() => {
+      try {
+        window.speechSynthesis.resume();
+      } catch (e) {}
+
+      activeUtterancesRef.current = [];
+
+      const sentences = cleanedText.match(/[^.!?\n]+[.!?\n]*/g) || [cleanedText];
+
+      const executeSpeech = (zoyaVoice: SpeechSynthesisVoice | null) => {
+        sentences.forEach((sentenceText) => {
+          const trimmed = sentenceText.trim();
+          if (!trimmed) return;
+
+          const utterance = new SpeechSynthesisUtterance(trimmed);
+          if (zoyaVoice) {
+            utterance.voice = zoyaVoice;
+            utterance.lang = zoyaVoice.lang;
+          } else {
+            utterance.lang = "en-IN";
+          }
+          utterance.pitch = 1.0;
+          utterance.rate = 1.0;
+
+          activeUtterancesRef.current.push(utterance);
+
+          utterance.onstart = () => {
+            isSpeakingRef.current = true;
+            setAppState("speaking");
+          };
+
+          utterance.onend = () => {
+            activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
+            if (activeUtterancesRef.current.length === 0 && (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
+              finishSpeechOrTurn();
+            }
+          };
+
+          let hasRetried = false;
+          utterance.onerror = (e) => {
+            console.warn("[speakWithZoya] Speech utterance error:", e);
+            activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
+
+            if (!hasRetried) {
+              hasRetried = true;
+              try {
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.resume();
+              } catch (err) {}
+              setTimeout(() => {
+                try {
+                  const retryUtterance = new SpeechSynthesisUtterance(trimmed);
+                  if (zoyaVoice) {
+                    retryUtterance.voice = zoyaVoice;
+                    retryUtterance.lang = zoyaVoice.lang;
+                  } else {
+                    retryUtterance.lang = "en-IN";
+                  }
+                  retryUtterance.pitch = 1.0;
+                  retryUtterance.rate = 1.0;
+
+                  retryUtterance.onend = () => {
+                    activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== retryUtterance);
+                    if (activeUtterancesRef.current.length === 0 && (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
+                      finishSpeechOrTurn();
+                    }
+                  };
+                  retryUtterance.onerror = () => {
+                    activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== retryUtterance);
+                    if (activeUtterancesRef.current.length === 0) finishSpeechOrTurn();
+                  };
+
+                  activeUtterancesRef.current.push(retryUtterance);
+                  window.speechSynthesis.speak(retryUtterance);
+                  window.speechSynthesis.resume();
+                } catch (retryEx) {
+                  if (activeUtterancesRef.current.length === 0) finishSpeechOrTurn();
+                }
+              }, 100);
+            } else {
+              if (activeUtterancesRef.current.length === 0 && (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
+                finishSpeechOrTurn();
+              }
+            }
+          };
+
+          try {
+            window.speechSynthesis.speak(utterance);
+            window.speechSynthesis.resume();
+          } catch (ex) {
+            console.error("[speakWithZoya] speak exception:", ex);
+            activeUtterancesRef.current = activeUtterancesRef.current.filter((u) => u !== utterance);
+            if (activeUtterancesRef.current.length === 0) {
+              finishSpeechOrTurn();
+            }
+          }
+        });
+
+        if (activeUtterancesRef.current.length === 0) {
+          finishSpeechOrTurn();
+        }
+      };
+
+      const currentVoices = window.speechSynthesis.getVoices();
+      if (!currentVoices || currentVoices.length === 0) {
+        const onVoices = () => {
+          window.speechSynthesis.onvoiceschanged = null;
+          executeSpeech(getZoyaVoice());
+        };
+        window.speechSynthesis.onvoiceschanged = onVoices;
+        setTimeout(() => {
+          window.speechSynthesis.onvoiceschanged = null;
+          executeSpeech(getZoyaVoice());
+        }, 300);
+      } else {
+        executeSpeech(getZoyaVoice());
+      }
+    }, 80);
+  }, [getZoyaVoice, finishSpeechOrTurn]);
+
+  const speakMessageText = speakWithZoya;
 
   const autoTriggerUIFromText = useCallback((text: string) => {
     if (!text) return;
@@ -1460,11 +1760,10 @@ In your very first response or greeting to the user, you MUST casually and natur
         }
       ]);
 
-      setAppState("idle");
-      setIsLoading(false);
-
       if (!isMuted && !skipSpeech) {
         speakMessageText(LOCKED_MODE_MESSAGE);
+      } else {
+        finishSpeechOrTurn();
       }
 
       isProcessingRequestRef.current = false;
@@ -1508,11 +1807,12 @@ In your very first response or greeting to the user, you MUST casually and natur
           generatedImagePrompt: promptToEncode
         }
       ]);
-      setAppState("idle");
       setIsLoading(false);
       
       if (!isMuted && !skipSpeech) {
         speakMessageText("Here is the image you requested");
+      } else {
+        finishSpeechOrTurn();
       }
       isProcessingRequestRef.current = false;
       return;
@@ -1581,10 +1881,11 @@ In your very first response or greeting to the user, you MUST casually and natur
           }
         ]);
         setIsLoading(false);
-        setAppState("idle");
         
         if (!isMuted && !skipSpeech) {
           speakMessageText(intentResult.response);
+        } else {
+          finishSpeechOrTurn();
         }
         isProcessingRequestRef.current = false;
         return; // Halt here, don't call Gemini
@@ -1598,7 +1899,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (!isMuted && !skipSpeech) {
         speakMessageText(responseText);
       } else {
-        setAppState("idle");
+        finishSpeechOrTurn();
       }
 
       setTimeout(() => {
@@ -1622,54 +1923,6 @@ In your very first response or greeting to the user, you MUST casually and natur
       ]);
 
       try {
-        let lastProcessedIndex = 0;
-        
-        if (!isMuted && !skipSpeech) {
-          window.speechSynthesis.cancel(); // Clear any ongoing speech
-          activeUtterancesRef.current = [];
-        }
-
-        const queueSentenceSpeak = (sentence: string) => {
-          if (isMuted || skipSpeech) return;
-          const trimmed = sentence.trim();
-          if (trimmed === "") return;
-
-          const utterance = new SpeechSynthesisUtterance(trimmed);
-          if (selectedVoiceRef.current) {
-            utterance.voice = selectedVoiceRef.current;
-            utterance.lang = selectedVoiceRef.current.lang;
-          } else {
-            utterance.lang = "hi-IN";
-          }
-          utterance.pitch = 1.0;
-          utterance.rate = 1.0;
-          
-          activeUtterancesRef.current.push(utterance);
-          
-          utterance.onstart = () => {
-            setAppState("speaking");
-          };
-          
-          utterance.onend = () => {
-            activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
-            if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-              setAppState("idle");
-            }
-          };
-
-          utterance.onerror = (e) => {
-            activeUtterancesRef.current = activeUtterancesRef.current.filter(u => u !== utterance);
-            console.error("Speech error", e);
-            if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
-              setAppState("idle");
-            }
-          };
-
-          if (trimmed !== "") {
-            window.speechSynthesis.speak(utterance);
-          }
-        };
-
         let memoryContext = "";
         try {
           const topMemories = await searchMemories({
@@ -1708,19 +1961,6 @@ In your very first response or greeting to the user, you MUST casually and natur
                 msg.id === responseMessageId ? { ...msg, text: currentText } : msg
               )
             );
-
-            if (!isMuted && !skipSpeech) {
-              const textToProcess = currentText.slice(lastProcessedIndex);
-              const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
-              let match;
-              let tempIndex = lastProcessedIndex;
-              while ((match = sentenceRegex.exec(textToProcess)) !== null) {
-                const sentence = match[0];
-                queueSentenceSpeak(sentence);
-                tempIndex = lastProcessedIndex + match.index + sentence.length;
-              }
-              lastProcessedIndex = tempIndex;
-            }
           },
           intentResult
         );
@@ -1738,16 +1978,10 @@ In your very first response or greeting to the user, you MUST casually and natur
         // Check Zoya AI Intent and Auto-Open Panel overlays in real-time
         checkAIIntentAndAutoOpen(finalTranscript, responseText);
 
-        if (!isMuted && !skipSpeech && lastProcessedIndex < responseText.length) {
-          const remainingText = responseText.slice(lastProcessedIndex);
-          if (remainingText.trim()) {
-            queueSentenceSpeak(remainingText);
-          }
-        }
-
-        // Wait a brief moment to ensure idle state updates if needed, though onend handles it
-        if (isMuted || skipSpeech || (!window.speechSynthesis.pending && !window.speechSynthesis.speaking)) {
-          setAppState("idle");
+        if (!isMuted && !skipSpeech) {
+          speakMessageText(responseText);
+        } else {
+          finishSpeechOrTurn();
         }
       } catch (error: any) {
         setIsTyping(false);
@@ -1834,10 +2068,14 @@ In your very first response or greeting to the user, you MUST casually and natur
           },
         ]);
       }
-      setAppState("idle");
+      finishSpeechOrTurn();
     }
     isProcessingRequestRef.current = false;
-  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
+  }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking, finishSpeechOrTurn]);
+
+  useEffect(() => {
+    handleTextCommandRef.current = handleTextCommand;
+  }, [handleTextCommand]);
 
   useEffect(() => {
     return () => {
@@ -2031,72 +2269,41 @@ In your very first response or greeting to the user, you MUST casually and natur
     if (e) {
       e.preventDefault();
     }
-    
-    // Instead of using Live API (which is continuous and expensive), we use one-shot STT
-    // and pipe it to our Smart Intent Router.
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
-      return;
-    }
 
-    if (isListening) {
+    if (isSessionActiveRef.current) {
+      // Stop Session clicked
+      setIsSessionActive(false);
+      isSessionActiveRef.current = false;
+      isSpeakingRef.current = false;
+      setIsListening(false);
+      setAppState("idle");
+
+      clearTimeout(listeningTimeoutRef.current);
+
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.onstart = null;
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onend = null;
           recognitionRef.current.stop();
         } catch (err) {}
+        recognitionRef.current = null;
       }
-      setIsListening(false);
-      setAppState("idle");
+
+      try {
+        if (typeof window !== "undefined" && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+      } catch (err) {}
       return;
     }
 
-    let speechDetected = false;
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-IN";
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setAppState("listening");
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results && event.results[0] && event.results[0][0]
-          ? event.results[0][0].transcript
-          : "";
-          
-        if (transcript && transcript.trim()) {
-          speechDetected = true;
-          console.log("[toggleListening] Voice Transcript:", transcript);
-          // Pass to the intent router via handleTextCommand directly
-          handleTextCommand(transcript, false, []);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        setAppState("idle");
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        if (appState === "listening") {
-            setAppState("idle");
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e: any) {
-      console.error("Speech recognition initialization error:", e);
-      setIsListening(false);
-      setAppState("idle");
-    }
+    // Start Session clicked
+    setIsSessionActive(true);
+    isSessionActiveRef.current = true;
+    isSpeakingRef.current = false;
+    startListeningLoop();
   };
 
 
@@ -2821,7 +3028,20 @@ In your very first response or greeting to the user, you MUST casually and natur
                   }`}
                 >
                   <Loader2 size={16} className="animate-spin" />
-                  Replying...
+                  Thinking...
+                </motion.div>
+              )}
+              {appState === "speaking" && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className={`flex items-center gap-2 text-sm md:text-base italic font-serif transition-colors duration-300 ${
+                    isGhostMode ? "text-rose-400/80" : "text-cyan-300/80"
+                  }`}
+                >
+                  <Volume2 size={16} className="animate-pulse" />
+                  Speaking...
                 </motion.div>
               )}
             </AnimatePresence>
@@ -2901,6 +3121,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             chatContainerRef={chatContainerRef}
             recognitionRef={recognitionRef}
             onOpenSettings={handleOpenSettingsFromLockedMode}
+            speakWithZoya={speakWithZoya}
           />
         )}
       </AnimatePresence>
@@ -3012,7 +3233,7 @@ In your very first response or greeting to the user, you MUST casually and natur
             {isSessionActive ? (
                 <>
                 <MicOff size={20} />
-                <span>End Session</span>
+                <span>Stop Session</span>
                 </>
             ) : (
                 <>
