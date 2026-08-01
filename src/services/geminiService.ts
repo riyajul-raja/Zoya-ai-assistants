@@ -662,9 +662,9 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
       console.warn("[getZoyaAudio] gemini-2.0-flash audio generation fallback:", e);
     }
 
-    // Secondary fallback model gemini-2.5-flash-preview-tts
+    // Secondary fallback model retry gemini-2.0-flash
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-2.0-flash",
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: ["AUDIO"],

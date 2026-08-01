@@ -1607,7 +1607,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
     try {
       const audioPromise = getZoyaAudio(sentence);
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 7000));
       const base64Audio = await Promise.race([audioPromise, timeoutPromise]);
 
       audioBufferQueueRef.current.push({ sentence, base64Audio });
@@ -2068,20 +2068,33 @@ In your very first response or greeting to the user, you MUST casually and natur
 
             if (!isMuted && !skipSpeech) {
               const unparsed = currentText.slice(streamLastProcessedIndex);
-              const boundaryMatch = unparsed.match(/^([\s\S]*?[.!?\n]+)(\s+[\s\S]*|$)/);
-              if (boundaryMatch) {
-                const sentenceToSpeak = boundaryMatch[1].trim();
-                streamLastProcessedIndex += boundaryMatch[1].length;
+              const sentenceRegex = /([^.!?\n|।]+[.!?\n|।]+)/g;
+              let match;
+              while ((match = sentenceRegex.exec(unparsed)) !== null) {
+                const sentenceToSpeak = match[1].trim();
                 if (sentenceToSpeak) {
                   enqueueSentenceForSpeech(sentenceToSpeak);
                 }
-              } else if (unparsed.length > 70) {
-                const spaceIdx = unparsed.lastIndexOf(" ");
-                if (spaceIdx > 25) {
-                  const sentenceToSpeak = unparsed.slice(0, spaceIdx).trim();
-                  streamLastProcessedIndex += spaceIdx + 1;
-                  if (sentenceToSpeak) {
-                    enqueueSentenceForSpeech(sentenceToSpeak);
+                streamLastProcessedIndex += match[0].length;
+              }
+
+              const remaining = currentText.slice(streamLastProcessedIndex);
+              if (remaining.length > 50) {
+                const commaIdx = remaining.lastIndexOf(",");
+                if (commaIdx > 20) {
+                  const clause = remaining.slice(0, commaIdx + 1).trim();
+                  if (clause) {
+                    enqueueSentenceForSpeech(clause);
+                    streamLastProcessedIndex += commaIdx + 1;
+                  }
+                } else {
+                  const spaceIdx = remaining.lastIndexOf(" ");
+                  if (spaceIdx > 30) {
+                    const clause = remaining.slice(0, spaceIdx).trim();
+                    if (clause) {
+                      enqueueSentenceForSpeech(clause);
+                      streamLastProcessedIndex += spaceIdx + 1;
+                    }
                   }
                 }
               }
