@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
 const systemInstruction = "Your name is Zoya. You are an Indian female AI assistant. Keep responses very short, punchy, and highly entertaining for a video audience. Speak in a mix of natural English and Roman Hindi (Hinglish).";
 
 export async function getZoyaResponseStream(
@@ -11,78 +9,49 @@ export async function getZoyaResponseStream(
   onChunk?: (text: string) => void
 ): Promise<string> {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    let formattedHistory: any[] = [];
-    let currentRole = "";
-    
-    // Convert history to Gemini format safely
-    for (const msg of history.slice(-6)) {
-      if (!msg || !msg.text) continue;
-      if ((msg as any).isError) continue;
-      
-      const role = msg.sender === "user" ? "user" : "model";
-      let parts: any[] = [{ text: msg.text }];
-      
-      if (role === currentRole && formattedHistory.length > 0) {
-        formattedHistory[formattedHistory.length - 1].parts.push(...parts);
-      } else {
-        formattedHistory.push({ role, parts });
-        currentRole = role;
-      }
-    }
-    
-    if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
-      formattedHistory.shift();
-    }
-
-    const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
-    
-    let currentMessageParts: any[] = [];
-    if (normalizedImageFrames.length > 0) {
-      currentMessageParts = normalizedImageFrames.map((frame) => ({
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: frame.includes(',') ? frame.split(',')[1] : frame,
-        }
-      }));
-      currentMessageParts.push({ text: prompt });
-    } else {
-      currentMessageParts = [{ text: prompt }];
-    }
-
-    const finalContents = [
-      ...formattedHistory,
-      {
-        role: "user",
-        parts: currentMessageParts
-      }
-    ];
-
-    const responseStream = await ai.models.generateContentStream({
-      model: "gemini-3.5-flash",
-      config: {
-        systemInstruction,
-      },
-      contents: finalContents,
+    const response = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, history, imageFrames })
     });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errText}`);
+    }
 
+    if (!response.body) throw new Error('No response body');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     let accumulatedText = "";
-    for await (const chunk of responseStream) {
-      const chunkText = chunk.text || "";
-      if (chunkText) {
-        accumulatedText += chunkText;
-        if (onChunk) {
-          onChunk(accumulatedText);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) throw new Error(data.error);
+            if (data.text) {
+              accumulatedText += data.text;
+              if (onChunk) onChunk(accumulatedText);
+            }
+          } catch (e) {
+            console.error('Error parsing stream chunk', e);
+          }
         }
       }
     }
+    
     return accumulatedText || "Ugh, fine. I have nothing to say.";
   } catch (error: any) {
     console.error("Gemini Stream Error:", error);
-    const fallback = "API Limit Reached or Error. Zoya is resting.";
-    if (onChunk) onChunk(fallback);
-    return fallback;
+    throw error;
   }
 }
 
@@ -94,81 +63,42 @@ export async function getZoyaResponse(
   environmentContext: string = ""
 ): Promise<string> {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    let formattedHistory: any[] = [];
-    let currentRole = "";
-    for (const msg of history.slice(-6)) {
-      if (!msg || !msg.text) continue;
-      if ((msg as any).isError) continue;
-      
-      const role = msg.sender === "user" ? "user" : "model";
-      let parts: any[] = [{ text: msg.text }];
-      
-      if (role === currentRole && formattedHistory.length > 0) {
-        formattedHistory[formattedHistory.length - 1].parts.push(...parts);
-      } else {
-        formattedHistory.push({ role, parts });
-        currentRole = role;
-      }
-    }
-    if (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
-      formattedHistory.shift();
-    }
-
-    const normalizedImageFrames = Array.isArray(imageFrames) ? imageFrames : (imageFrames ? [imageFrames] : []);
-    
-    let currentMessageParts: any[] = [];
-    if (normalizedImageFrames.length > 0) {
-      currentMessageParts = normalizedImageFrames.map((frame) => ({
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: frame.includes(',') ? frame.split(',')[1] : frame,
-        }
-      }));
-      currentMessageParts.push({ text: prompt });
-    } else {
-      currentMessageParts = [{ text: prompt }];
-    }
-
-    const finalContents = [
-      ...formattedHistory,
-      {
-        role: "user",
-        parts: currentMessageParts
-      }
-    ];
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      config: {
-        systemInstruction,
-      },
-      contents: finalContents,
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, history, imageFrames })
     });
-    return response.text || "Ugh, fine. I have nothing to say.";
-  } catch (error) {
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errText}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    
+    return data.text || "Ugh, fine. I have nothing to say.";
+  } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "API Limit Reached or Error. Zoya is resting.";
+    throw error;
   }
 }
 
 export async function getZoyaAudio(text: string): Promise<string | null> {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Kore" },
-          },
-        },
-      },
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
     });
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errText}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    
+    return data.audioData || null;
   } catch (error) {
     console.error("TTS Error:", error);
     return null;
