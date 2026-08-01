@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Settings, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, User, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ChevronRight, ArrowLeft, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured } from "./services/geminiService";
-import { detectIntent } from "./services/intentService";
+import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
+import { getZoyaResponse, getZoyaResponseStream } from "./services/geminiService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
 import TypingIndicator from "./components/TypingIndicator";
-import ChatPage from "./components/ChatPage";
 import { motion, AnimatePresence } from "motion/react";
 import ContactsManager from "./components/ContactsManager";
 import DriveManager from "./components/DriveManager";
@@ -22,13 +20,11 @@ import FormsManager from "./components/FormsManager";
 import MeetManager from "./components/MeetManager";
 import KeepManager from "./components/KeepManager";
 import ClassroomManager from "./components/ClassroomManager";
-import PersonalSettings from "./components/PersonalSettings";
-import ActivationSuccessModal from "./components/ActivationSuccessModal";
 import { memoryOrchestrator, searchMemories } from "./modules/memory";
 
 type AppState = "idle" | "listening" | "processing" | "speaking";
 
-export interface ChatMessage {
+interface ChatMessage {
   id: string;
   sender: "user" | "zoya";
   role?: "user" | "model";
@@ -39,9 +35,6 @@ export interface ChatMessage {
   isHighThinking?: boolean;
   generatedImageUrl?: string;
   generatedImagePrompt?: string;
-  feedback?: "like" | "dislike";
-  debugInfo?: Partial<DebugInfo>;
-  showOpenSettingsButton?: boolean;
 }
 
 declare global {
@@ -191,34 +184,6 @@ export default function App() {
   const [showKeep, setShowKeep] = useState(false);
   const [showClassroom, setShowClassroom] = useState(false);
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
-  const [isSettingsPageOpen, setIsSettingsPageOpen] = useState(false);
-  const [isPersonalSettingsOpen, setIsPersonalSettingsOpen] = useState(false);
-  const [autoFocusApiKey, setAutoFocusApiKey] = useState(false);
-  const [showActivationSuccessModal, setShowActivationSuccessModal] = useState(false);
-
-  const handleApiKeyVerified = () => {
-    setShowActivationSuccessModal(true);
-    speakMessageText("Hello! Main ab poori tarah activate ho chuki hoon. Meri AI Brain safaltapoorvak activate ho gayi hai aur ab main aapki madad ke liye taiyar hoon. Chaliye, baat shuru karte hain!");
-  };
-
-  const handleStartChatFromActivationModal = () => {
-    setShowActivationSuccessModal(false);
-    setIsPersonalSettingsOpen(false);
-    setAutoFocusApiKey(false);
-    setShowChat(true);
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 100);
-  };
-
-  const handleCloseActivationSuccessModal = () => {
-    setShowActivationSuccessModal(false);
-  };
-
-  const handleOpenSettingsFromLockedMode = () => {
-    setIsPersonalSettingsOpen(true);
-    setAutoFocusApiKey(true);
-  };
   const [isChatMaximized, setIsChatMaximized] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isImageMode, setIsImageMode] = useState(false);
@@ -232,7 +197,7 @@ export default function App() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    Array.from(files).forEach((file: File) => {
+    Array.from(files).forEach((file) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
@@ -348,8 +313,8 @@ export default function App() {
             },
             user: {
               id: new Uint8Array([1, 2, 3, 4]),
-              name: localStorage.getItem("zoya_user_name") || "User",
-              displayName: localStorage.getItem("zoya_user_name") || "User"
+              name: "Boss",
+              displayName: "Boss"
             },
             pubKeyCredParams: [
               { type: "public-key", alg: -7 },
@@ -681,7 +646,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 - Current Weather: ${temp}°C, ${cond}.
 
 INSTRUCTION FOR FIRST GREETING:
-In your very first response or greeting to the user, you MUST casually and naturally mention this current time of day and the current weather temperature/conditions (e.g., "Good morning, it's 25 degrees outside..." or similar natural, sassy/professional greeting depending on your active mode). Keep it short, witty, and perfectly fitting your Zoya persona.`;
+In your very first response or greeting to the user, you MUST casually and naturally mention this current time of day and the current weather temperature/conditions (e.g., "Good morning Boss, it's 25 degrees outside..." or similar natural, sassy/professional greeting depending on your active mode). Keep it short, witty, and perfectly fitting your Zoya persona.`;
               setEnvironmentContext(fullCtx);
             } else {
               setFallbackContext();
@@ -1193,7 +1158,6 @@ In your very first response or greeting to the user, you MUST casually and natur
 
   const liveSessionRef = useRef<LiveSessionManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const isProcessingRequestRef = useRef(false);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -1335,12 +1299,10 @@ In your very first response or greeting to the user, you MUST casually and natur
   };
 
   const handleTextCommand = useCallback(async (finalTranscript: string, skipSpeech: boolean = false, attachedImageBase64s: string[] = []) => {
-    console.log("[handleTextCommand] Called with:", finalTranscript.substring(0, 30));
     const currentHistory = [...messagesRef.current];
     
     if (!finalTranscript.trim() && attachedImageBase64s.length === 0) {
       setAppState("idle");
-      isProcessingRequestRef.current = false;
       return;
     }
 
@@ -1397,8 +1359,8 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (typeof img === 'string') {
         return img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
       }
-      if ((img as any) instanceof File || (img as any) instanceof Blob) {
-        return URL.createObjectURL(img as Blob);
+      if (img instanceof File || img instanceof Blob) {
+        return URL.createObjectURL(img);
       }
       return "";
     }).filter(Boolean);
@@ -1415,60 +1377,10 @@ In your very first response or greeting to the user, you MUST casually and natur
       },
     ]);
     
-    // LOCKED MODE (NO GEMINI API KEY)
-    if (!isGeminiKeyConfigured()) {
-      setIsLoading(true);
-      setAppState("processing");
-
-      await new Promise(r => setTimeout(r, 400));
-
-      const responseMessageId = Date.now().toString() + "-z";
-      
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: responseMessageId,
-          sender: "zoya",
-          role: "model",
-          text: LOCKED_MODE_MESSAGE,
-          showOpenSettingsButton: true,
-          debugInfo: {
-            intent: "LOCAL",
-            apiUsed: false,
-            modelName: "N/A",
-            isCached: false,
-            responseTimeMs: 400,
-            status: "Success",
-            routingMs: 2,
-            apiMs: 0,
-            streamingMs: 0,
-            renderingMs: 5,
-            totalMs: 400,
-            intentConfidence: 100,
-            contextConfidence: 100,
-            memoryConfidence: 100,
-            overallConfidence: 100,
-            decision: "Locked Mode (No Gemini API Key)"
-          }
-        }
-      ]);
-
-      setAppState("idle");
-      setIsLoading(false);
-
-      if (!isMuted && !skipSpeech) {
-        speakMessageText(LOCKED_MODE_MESSAGE);
-      }
-
-      isProcessingRequestRef.current = false;
-      return;
-    }
-
     // If live session is active (either because voice is active or camera is ON), send text through it
     // But if we have an attached image, fallback to standard REST API with gemini-3.1-pro-preview
     if (liveSessionRef.current && attachedImageBase64s.length === 0) {
       liveSessionRef.current.sendText(finalTranscript);
-      isProcessingRequestRef.current = false;
       return;
     }
 
@@ -1507,82 +1419,13 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (!isMuted && !skipSpeech) {
         speakMessageText("Here is the image you requested");
       }
-      isProcessingRequestRef.current = false;
       return;
     }
 
     // 1. Check for browser commands
     const commandResult = processCommand(finalTranscript);
 
-
     let responseText = "";
-    let intentResult: any = null;
-
-    // 0. Smart Intent Router
-    if (attachedImageBase64s.length === 0) {
-      intentResult = detectIntent(finalTranscript);
-      console.log(
-        `\n==================================================\n` +
-        `Intent: ${intentResult.type}\n` +
-        `Module Used: ${intentResult.module || 'Gemini'}\n` +
-        `API Called: ${intentResult.type === 'GEMINI' ? 'YES' : 'NO'}\n` +
-        `==================================================\n`
-      );
-      
-      if (intentResult.type === "LOCAL" && intentResult.response) {
-        console.log(`[Intent Router] Executing locally. No Gemini API will be called.`);
-        setIsLoading(true);
-        setAppState("processing");
-
-        const delayMs = Math.floor(Math.random() * 700) + 800; // 0.8s to 1.5s natural delay
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-
-        const responseMessageId = Date.now().toString() + "-z";
-        const localRoutingMs = intentResult.routingMs || 2;
-        const localTotalMs = (intentResult.totalMs || localRoutingMs) + delayMs;
-
-        setMessages((prev) => [
-          ...prev,
-          { 
-            id: responseMessageId, 
-            sender: "zoya", 
-            role: "model", 
-            text: intentResult.response || "", 
-            debugInfo: { 
-              intent: "LOCAL", 
-              apiUsed: false, 
-              modelName: "N/A", 
-              isCached: false, 
-              responseTimeMs: localTotalMs, 
-              status: "Success",
-              routingMs: localRoutingMs,
-              apiMs: 0,
-              streamingMs: 0,
-              renderingMs: Math.max(1, localTotalMs - localRoutingMs),
-              totalMs: localTotalMs,
-              identityCategory: intentResult.identityCategory,
-              selectedTemplateId: intentResult.selectedTemplateId,
-              intentConfidence: intentResult.intentConfidence,
-              contextConfidence: intentResult.contextConfidence,
-              memoryConfidence: intentResult.memoryConfidence,
-              toolConfidence: intentResult.toolConfidence,
-              overallConfidence: intentResult.overallConfidence,
-              decision: intentResult.decision,
-              toolSelected: intentResult.toolSelected,
-              reasoningTimeMs: intentResult.reasoningTimeMs
-            } 
-          }
-        ]);
-        setIsLoading(false);
-        setAppState("idle");
-        
-        if (!isMuted && !skipSpeech) {
-          speakMessageText(intentResult.response);
-        }
-        isProcessingRequestRef.current = false;
-        return; // Halt here, don't call Gemini
-      }
-    }
 
     if (commandResult.isBrowserAction) {
       responseText = commandResult.action;
@@ -1687,7 +1530,7 @@ In your very first response or greeting to the user, you MUST casually and natur
           promptToSend = `${promptToSend}${memoryContext}`;
         }
 
-        const responseStreamResult = await getZoyaResponseStream(
+        responseText = await getZoyaResponseStream(
           promptToSend,
           currentHistory,
           capturedImageBase64s,
@@ -1714,17 +1557,9 @@ In your very first response or greeting to the user, you MUST casually and natur
               }
               lastProcessedIndex = tempIndex;
             }
-          },
-          intentResult
+          }
         );
         
-        responseText = responseStreamResult.text;
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === responseMessageId ? { ...msg, text: responseText, debugInfo: responseStreamResult.debugInfo } : msg
-          )
-        );
-
         setIsTyping(false);
         setIsLoading(false);
 
@@ -1829,7 +1664,6 @@ In your very first response or greeting to the user, you MUST casually and natur
       }
       setAppState("idle");
     }
-    isProcessingRequestRef.current = false;
   }, [isMuted, isSessionActive, isCameraActive, isProfessionalMode, environmentContext, isDeepThinking]);
 
   useEffect(() => {
@@ -2019,79 +1853,63 @@ In your very first response or greeting to the user, you MUST casually and natur
     }
   };
 
-  
   const toggleListening = async (e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
     }
-    
-    // Instead of using Live API (which is continuous and expensive), we use one-shot STT
-    // and pipe it to our Smart Intent Router.
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Web Speech API is not supported in this browser. Please use Chrome, Safari, or Edge.");
-      return;
-    }
-
-    if (isListening) {
-      if (recognitionRef.current) {
+    if (isSessionActive) {
+      setIsSessionActive(false);
+      
+      if (isListening && recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch (err) {}
+        setIsListening(false);
       }
-      setIsListening(false);
-      setAppState("idle");
-      return;
-    }
-
-    let speechDetected = false;
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-IN";
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setAppState("listening");
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results && event.results[0] && event.results[0][0]
-          ? event.results[0][0].transcript
-          : "";
-          
-        if (transcript && transcript.trim()) {
-          speechDetected = true;
-          console.log("[toggleListening] Voice Transcript:", transcript);
-          // Pass to the intent router via handleTextCommand directly
-          handleTextCommand(transcript, false, []);
+    } else {
+      try {
+        // Do not show "Microphone Blocked" before actually requesting microphone permission.
+        // Call navigator.mediaDevices.getUserMedia() first.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Microphone access is not supported by your browser or secure context (ensure HTTPS).");
         }
-      };
 
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          } 
+        });
+        // Release the mic track immediately, as our centralized useEffect will start the live session and request it
+        stream.getTracks().forEach(track => track.stop());
+
+        // Now that permission is granted, toggle state to trigger our centralized Live Session manager
+        setIsSessionActive(true);
+        
+      } catch (e: any) {
+        console.error("Failed to start session", e);
+        
+        // Show "Microphone Blocked" only if getUserMedia() throws NotAllowedError or PermissionDeniedError
+        const errorName = e?.name || "";
+        const errorMessage = e?.message || "";
+        const isPermissionError = 
+          errorName === "NotAllowedError" || 
+          errorName === "PermissionDeniedError" ||
+          errorMessage.toLowerCase().includes("permission denied") ||
+          errorMessage.toLowerCase().includes("notallowederror");
+
+        if (isPermissionError) {
+          setShowPermissionModal(true);
+        } else {
+          alert(`Could not start voice session: ${errorMessage || "Unknown error"}`);
+        }
+
+        setIsSessionActive(false);
         setAppState("idle");
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        if (appState === "listening") {
-            setAppState("idle");
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e: any) {
-      console.error("Speech recognition initialization error:", e);
-      setIsListening(false);
-      setAppState("idle");
+      }
     }
   };
-
 
   const toggleInputDictation = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2121,7 +1939,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       recognition.onstart = () => {
         setIsListening(true);
         setAppState("listening");
-        
+        setIsSessionActive(true);
       };
 
       recognition.onresult = (event: any) => {
@@ -2145,13 +1963,13 @@ In your very first response or greeting to the user, you MUST casually and natur
         console.error("Speech recognition error:", event.error);
         setIsListening(false);
         setAppState("idle");
-        
+        setIsSessionActive(false);
       };
 
       recognition.onend = () => {
         setIsListening(false);
         setAppState("idle");
-        
+        setIsSessionActive(false);
       };
 
       recognitionRef.current = recognition;
@@ -2161,7 +1979,7 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (!isSessionActiveRef.current) {
         setIsListening(false);
         setAppState("idle");
-        
+        setIsSessionActive(false);
         if (!speechDetected) {
           setShowChat(false);
         }
@@ -2233,9 +2051,9 @@ In your very first response or greeting to the user, you MUST casually and natur
       if (typeof img === 'string') {
         return img.startsWith('data:') || img.startsWith('blob:') || img.startsWith('http') ? img : `data:image/jpeg;base64,${img}`;
       }
-      if ((img as any) instanceof File || (img as any) instanceof Blob) {
+      if (img instanceof File || img instanceof Blob) {
         try {
-          return URL.createObjectURL(img as Blob);
+          return URL.createObjectURL(img);
         } catch (e) {
           return "";
         }
@@ -2739,122 +2557,218 @@ In your very first response or greeting to the user, you MUST casually and natur
                     onClick={() => setIsToolMenuOpen(false)}
                   />
                   <motion.div
-                    initial={{ x: "-100%" }}
+                    initial={{ x: "100%" }}
                     animate={{ x: 0 }}
-                    exit={{ x: "-100%" }}
+                    exit={{ x: "100%" }}
                     transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                    className="fixed inset-y-0 left-0 w-[82%] max-w-[320px] bg-[#0a0a0a]/95 backdrop-blur-3xl border-r border-white/10 z-[100] flex flex-col shadow-2xl pointer-events-auto overflow-y-auto"
+                    className="fixed inset-y-0 right-0 w-80 bg-black/95 backdrop-blur-xl border-l border-white/10 p-6 z-[100] flex flex-col shadow-2xl pointer-events-auto overflow-y-auto"
                   >
-                    {/* Top Row */}
-                    <div className="flex items-center justify-between px-6 py-5 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-[15px] text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] border border-white/20">
-                          Z
-                        </div>
-                        <span className="text-[17px] font-serif font-medium text-white/95 tracking-wide">Zoya</span>
-                      </div>
-                      <button onClick={() => setIsToolMenuOpen(false)} className="text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer p-2 hover:bg-white/10 rounded-xl hyper-glass hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                        <X size={20} />
+                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
+                      <span className="text-sm font-mono text-white/70 uppercase tracking-widest font-semibold">Settings</span>
+                      <button onClick={() => setIsToolMenuOpen(false)} className="text-white/50 hover:text-white transition-colors cursor-pointer p-1">
+                        <X size={18} />
                       </button>
                     </div>
-
-                    {/* Menu Items */}
-                    <div className="flex flex-col p-4 gap-3 overflow-y-auto mt-2">
-                      <motion.button 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        onClick={() => {
-                          setIsSettingsPageOpen(true);
-                          setIsToolMenuOpen(false);
-                        }}
-                        className="flex items-center justify-between p-4 rounded-[18px] hyper-glass transition-all duration-300 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer text-left w-full group"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                            <Settings size={20} />
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[15px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Settings</span>
-                            <span className="text-[11px] text-neutral-400 tracking-wide">Manage preferences</span>
-                          </div>
+                    
+                    <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">App Settings</span>
+                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                          <span className="text-xs text-white/70 font-medium tracking-wide">Voice</span>
+                          <span className="text-xs font-mono text-white/40">Zoya (Default)</span>
                         </div>
-                        <ChevronRight size={20} className="text-neutral-500 group-hover:text-white transition-colors" />
-                      </motion.button>
+                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                          <span className="text-xs text-white/70 font-medium tracking-wide">Theme</span>
+                          <span className="text-xs font-mono text-white/40">Dark Glass</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest font-semibold px-1">Integrations & Tools</span>
+                        <div className="flex flex-col gap-1.5">
+                          {[
+                            {
+                              id: "gmail",
+                              name: "Google Gmail",
+                              icon: <Mail size={16} />,
+                              active: showGmail,
+                              toggle: () => setShowGmail(!showGmail),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "calendar",
+                              name: "Google Calendar",
+                              icon: <Calendar size={16} />,
+                              active: showCalendar,
+                              toggle: () => setShowCalendar(!showCalendar),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "tasks",
+                              name: "Google Tasks",
+                              icon: <ListTodo size={16} />,
+                              active: showTasks,
+                              toggle: () => setShowTasks(!showTasks),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "slides",
+                              name: "Google Slides",
+                              icon: <Presentation size={16} />,
+                              active: showSlides,
+                              toggle: () => setShowSlides(!showSlides),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "contacts",
+                              name: "Google Contacts",
+                              icon: <Users size={16} />,
+                              active: showContacts,
+                              toggle: () => setShowContacts(!showContacts),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "chat",
+                              name: "Google Chat",
+                              icon: <MessageSquare size={16} />,
+                              active: showGoogleChat,
+                              toggle: () => setShowGoogleChat(!showGoogleChat),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "docs",
+                              name: "Google Docs",
+                              icon: <FileText size={16} />,
+                              active: showDocs,
+                              toggle: () => setShowDocs(!showDocs),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "forms",
+                              name: "Google Forms",
+                              icon: <ClipboardList size={16} />,
+                              active: showForms,
+                              toggle: () => setShowForms(!showForms),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "meet",
+                              name: "Google Meet",
+                              icon: <Video size={16} />,
+                              active: showMeet,
+                              toggle: () => setShowMeet(!showMeet),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "keep",
+                              name: "Google Keep",
+                              icon: <StickyNote size={16} />,
+                              active: showKeep,
+                              toggle: () => setShowKeep(!showKeep),
+                              colorClass: "from-amber-600 to-yellow-600",
+                              accentColor: "text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
+                            },
+                            {
+                              id: "classroom",
+                              name: "Google Classroom",
+                              icon: <GraduationCap size={16} />,
+                              active: showClassroom,
+                              toggle: () => setShowClassroom(!showClassroom),
+                              colorClass: "from-emerald-600 to-teal-600",
+                              accentColor: "text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
+                            },
+                            {
+                              id: "drive",
+                              name: "Drive Explorer",
+                              icon: <HardDrive size={16} />,
+                              active: showDrive,
+                              toggle: () => setShowDrive(!showDrive),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "memories",
+                              name: "Memory Core",
+                              icon: <Brain size={16} />,
+                              active: showMemories,
+                              toggle: () => setShowMemories(!showMemories),
+                              colorClass: "from-red-600 to-rose-600",
+                              accentColor: "text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                            },
+                            {
+                              id: "ar-hologram",
+                              name: "AR Hologram Mode",
+                              icon: (
+                                <Box 
+                                  size={16} 
+                                  className={`transition-all duration-300 ${
+                                    isARMode && isCameraActive ? "animate-spin text-cyan-100" : ""
+                                  }`} 
+                                  style={{ animationDuration: isARMode && isCameraActive ? "8s" : undefined }} 
+                                />
+                              ),
+                              active: isARMode,
+                              toggle: toggleAR,
+                              colorClass: "from-cyan-500 to-teal-500",
+                              accentColor: "text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
+                            },
+                            {
+                              id: "floating-core",
+                              name: "Floating Core Mode",
+                              icon: (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M19 11H11V17H19V11Z" fill="currentColor" fillOpacity="0.3" />
+                                  <rect width="20" height="14" x="2" y="3" rx="2" />
+                                </svg>
+                              ),
+                              active: isGlobePiPActive,
+                              toggle: handlePiP,
+                              colorClass: "from-violet-600 to-pink-600",
+                              accentColor: "text-violet-400 border-violet-500/30 shadow-[0_0_10px_rgba(139,92,246,0.4)]",
+                            },
+                          ].map((tool) => (
+                            <button
+                              key={tool.id}
+                              onClick={() => {
+                                tool.toggle();
+                                setIsToolMenuOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left font-sans text-xs cursor-pointer transition-all duration-200 ${
+                                tool.active
+                                  ? `bg-gradient-to-r ${tool.colorClass} border-transparent text-white font-medium ${tool.accentColor}`
+                                  : "bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className={tool.active ? "text-white" : "text-white/40"}>
+                                  {tool.icon}
+                                </span>
+                                <span className="font-medium tracking-wide">{tool.name}</span>
+                              </div>
+                              
+                              {/* Active indicator dot */}
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                tool.active 
+                                  ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
+                                  : "bg-white/10"
+                              }`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
               </>)}
-              
-              {isSettingsPageOpen && (
-                <motion.div
-                  initial={{ x: "100%", opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: "100%", opacity: 0 }}
-                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                  className="fixed inset-0 bg-[#0a0a0a]/95 backdrop-blur-3xl z-[200] flex flex-col pointer-events-auto"
-                >
-                  <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0 hyper-glass rounded-b-[2rem] -mt-2">
-                    <button 
-                      onClick={() => {
-                        setIsSettingsPageOpen(false);
-                        setIsToolMenuOpen(true);
-                      }}
-                      className="flex items-center gap-2 text-neutral-400 hover:text-white transition-all duration-300 cursor-pointer group px-4 py-2.5 hyper-glass rounded-xl hover:bg-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.96]"
-                    >
-                      <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                      <span className="text-sm font-medium tracking-wide">Back</span>
-                    </button>
-                    <span className="text-base font-serif font-medium text-white tracking-widest uppercase">Settings</span>
-                    <div className="w-[88px]"></div> {/* Spacer for centering (matches button width) */}
-                  </div>
-                  
-                  <motion.div 
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1, duration: 0.4 }}
-                    className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center"
-                  >
-                    <div className="w-full max-w-2xl flex flex-col gap-4">
-                      
-                      <button 
-                        onClick={() => setIsPersonalSettingsOpen(true)}
-                        className="flex items-center justify-between p-5 rounded-[20px] hyper-glass transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.08)] hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] hover:-translate-y-0.5 cursor-pointer w-full group text-left"
-                      >
-                        <div className="flex items-center gap-5">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center hyper-glass border-white/10 text-neutral-400 group-hover:text-white transition-colors shrink-0 group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                            <User size={22} />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[16px] font-medium text-white/95 tracking-wide group-hover:text-white transition-colors">Personal</span>
-                            <span className="text-[12px] text-neutral-400 tracking-wide">Your Name • Gemini • Music • YouTube</span>
-                          </div>
-                        </div>
-                        <ChevronRight size={22} className="text-neutral-500 group-hover:text-white transition-colors" />
-                      </button>
-
-
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
-
-              {isPersonalSettingsOpen && (
-                <PersonalSettings 
-                  onBack={() => {
-                    setIsPersonalSettingsOpen(false);
-                    setAutoFocusApiKey(false);
-                  }}
-                  autoFocusApiKey={autoFocusApiKey}
-                  onApiKeyVerified={handleApiKeyVerified}
-                />
-              )}
             </AnimatePresence>
-
-            <ActivationSuccessModal
-              isOpen={showActivationSuccessModal}
-              onClose={handleCloseActivationSuccessModal}
-              onStartChat={handleStartChatFromActivationModal}
-            />
           </div>
 
           
@@ -2926,42 +2840,375 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       </>)}
 
-            {/* Integrated Chat History & Input Panel */}
+      {/* Integrated Chat History & Input Panel */}
       <AnimatePresence>
         {showChat && (
-          <ChatPage 
-            messages={messages as any}
-            textInput={textInput}
-            setTextInput={setTextInput}
-            handleTextSubmit={handleTextSubmit}
-            isLoading={isLoading}
-            isTyping={isTyping}
-            isGhostMode={isGhostMode}
-            isARMode={isARMode}
-            isListening={isListening}
-            toggleInputDictation={toggleInputDictation}
-            selectedImages={selectedImages}
-            setSelectedImages={setSelectedImages}
-            isImageMode={isImageMode}
-            setIsImageMode={setIsImageMode}
-            isDeepThinking={isDeepThinking}
-            setIsDeepThinking={setIsDeepThinking}
-            setShowChat={setShowChat}
-            isInputReadOnly={isInputReadOnly}
-            setIsInputReadOnly={setIsInputReadOnly}
-            handleImageUpload={handleImageUpload}
-            setIsPlusMenuOpen={setIsPlusMenuOpen}
-            handleRegenerateMessage={handleRegenerateMessage}
-            setMessages={setMessages}
-            textareaRef={textareaRef}
-            fileInputRef={fileInputRef}
-            chatContainerRef={chatContainerRef}
-            recognitionRef={recognitionRef}
-            onOpenSettings={handleOpenSettingsFromLockedMode}
-          />
+          <motion.form 
+            ref={chatContainerRef}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            onSubmit={handleTextSubmit}
+            style={{
+              zIndex: 9999,
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100vh",
+            }}
+            className="flex flex-col pointer-events-auto p-6 md:p-8 transition-all duration-300 ease-in-out"
+          >
+            <div 
+              className={`relative w-full h-full rounded-2xl backdrop-blur-md shadow-2xl transition-all duration-300 flex flex-col min-h-0 pt-3 ${
+                isChatMaximized ? "px-4 pb-4" : "px-2.5 pb-2.5"
+              } ${
+                isGhostMode
+                  ? "bg-black/90 border border-red-500/90 shadow-[0_0_25px_rgba(239,68,68,0.45)]"
+                  : isARMode 
+                     ? "bg-black/80 border border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                     : "bg-neutral-950/90 border border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+              }`}
+            >
+              {/* Header section with toggle full-screen and close buttons */}
+              <div className="flex items-center justify-between pb-1 mb-1 border-b border-white/10 shrink-0">
+                <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
+                  <span className="w-1 h-1 rounded-full bg-red-500 inline-block animate-ping"></span>
+                  {isChatMaximized ? "Zoya Console - Maximized" : "Zoya Console"}
+                </span>
+                
+                <div className="flex items-center gap-2">
+                  {/* Trash Icon Button to Clear Chat History */}
+                  {messages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to clear all chat history?")) {
+                          setMessages([]);
+                          localStorage.removeItem("zoya_chat_history");
+                          
+                        }
+                      }}
+                      className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10 animate-fade-in"
+                      title="Delete all history"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+
+                  {/* Full Screen Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsChatMaximized(!isChatMaximized)}
+                    className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
+                    title={isChatMaximized ? "Restore Size" : "Maximize Chat"}
+                  >
+                    {isChatMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                  </button>
+                  
+                  {/* Close button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isListening && recognitionRef.current) {
+                        try {
+                          recognitionRef.current.stop();
+                        } catch (err) {}
+                        setIsListening(false);
+                      }
+                      setShowChat(false);
+                      setIsChatMaximized(false);
+                    }}
+                    className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
+                    title="Close Chat"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat History Display Area */}
+              <div className="flex-1 overflow-y-auto scrollbar-hide pr-1 pb-1 flex flex-col min-h-0">
+                <div className="flex flex-col gap-2 mt-auto w-full">
+                  <AnimatePresence initial={false}>
+                    {messages.map((msg) => {
+                      const hasText = typeof msg.text === "string" && msg.text.trim().length > 0;
+                      const hasImage = !!((Array.isArray(msg.images) && msg.images.length > 0) || msg.image || (msg as any).imageUrl || msg.generatedImageUrl);
+                      if (!hasText && !hasImage) return null;
+                      return (
+                        <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.15, ease: "easeOut" }}
+                          className={`flex flex-col max-w-[85%] min-h-0 ${
+                            msg.sender === "user" ? "self-end items-end" : "self-start items-start"
+                          }`}
+                        >
+                          <div className={`relative px-3.5 py-2 md:px-4 md:py-2.5 rounded-xl text-xs md:text-[13px] border backdrop-blur-md transition-all duration-300 shadow-lg h-fit w-fit min-h-0 leading-relaxed max-w-full overflow-hidden break-words ${
+                            msg.isError
+                              ? "bg-red-950/85 border-red-500/50 text-red-200 font-sans shadow-[0_0_12px_rgba(239,68,68,0.25)]"
+                              : msg.sender === "user" 
+                                ? isGhostMode
+                                  ? "bg-red-950/45 border-red-500/40 text-red-100 rounded-br-none font-sans shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                                  : "bg-red-950/40 border-red-500/40 text-red-100 rounded-br-none font-sans" 
+                                : isGhostMode
+                                  ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none font-mono tracking-wide shadow-[0_0_12px_rgba(244,63,94,0.15)] pb-8"
+                                  : "bg-pink-950/30 border-pink-500/30 text-pink-100 rounded-bl-none font-mono tracking-wide pb-8"
+                          }`}>
+                            {Array.isArray(msg.images) && msg.images.length > 0 ? (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {msg.images.map((img, i) => (
+                                  typeof img === 'string' ? (
+                                    <img
+                                      key={i}
+                                      src={img}
+                                      alt={`Attached ${i + 1}`}
+                                      className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity shadow-md"
+                                      referrerPolicy="no-referrer"
+                                      onClick={() => setLightboxImage(img)}
+                                    />
+                                  ) : null
+                                ))}
+                              </div>
+                            ) : (typeof msg.image === 'string' || typeof (msg as any).imageUrl === 'string') ? (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                <img
+                                  src={typeof msg.image === 'string' ? msg.image : (msg as any).imageUrl}
+                                  alt="Attached"
+                                  className="w-20 h-20 rounded-2xl object-cover cursor-pointer hover:opacity-80 transition-opacity shadow-md"
+                                  referrerPolicy="no-referrer"
+                                  onClick={() => setLightboxImage(typeof msg.image === 'string' ? msg.image : (msg as any).imageUrl)}
+                                />
+                              </div>
+                            ) : null}
+                            {msg.generatedImageUrl && (
+                              <div className="relative group mt-2 mb-2 w-full max-w-sm">
+                                <img
+                                  src={msg.generatedImageUrl}
+                                  alt={msg.generatedImagePrompt || "Generated image"}
+                                  className="w-full h-auto rounded-2xl object-cover cursor-pointer shadow-lg border border-white/10"
+                                  referrerPolicy="no-referrer"
+                                  onClick={() => setLightboxImage(msg.generatedImageUrl!)}
+                                />
+                                <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDownloadImage(msg.generatedImageUrl!, msg.generatedImagePrompt || "zoya_image");
+                                    }}
+                                    className="p-2 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:text-cyan-300 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] cursor-pointer"
+                                    title="Download Image"
+                                  >
+                                    <Download size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRegenerateImage(msg.id, msg.generatedImagePrompt || "");
+                                    }}
+                                    className="p-2 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:text-purple-400 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] cursor-pointer"
+                                    title="Regenerate Image"
+                                  >
+                                    <RefreshCw size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {msg.sender === "zoya" && msg.isHighThinking && (
+                              <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-white/5 border border-white/10 w-fit backdrop-blur-md shadow-sm">
+                                <Brain size={12} className="text-pink-400 animate-pulse" />
+                                <span className="text-[9px] font-mono uppercase tracking-wider text-pink-300">Deep Thinking</span>
+                              </div>
+                            )}
+                            <div className="whitespace-pre-wrap break-words overflow-hidden max-w-full">{msg.text}</div>
+                            {msg.sender === "zoya" && !msg.isError && msg.text && (
+                              <div className="absolute bottom-1.5 right-1.5 flex gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyMessage(msg.text, msg.id)}
+                                  className="p-1 rounded bg-white/5 hover:bg-white/15 text-white/50 hover:text-white transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
+                                  title="Copy message"
+                                >
+                                  {copiedMessageId === msg.id ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => speakMessageText(msg.text)}
+                                  className="p-1 rounded bg-white/5 hover:bg-white/15 text-pink-300/70 hover:text-pink-100 transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
+                                  title="Speak message"
+                                >
+                                  <Volume2 size={11} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRegenerateMessage(msg.id)}
+                                  className="p-1 rounded bg-white/5 hover:bg-white/15 text-purple-300/70 hover:text-purple-100 transition-all cursor-pointer flex items-center justify-center border border-white/5 active:scale-95"
+                                  title="Regenerate message"
+                                >
+                                  <RefreshCw size={11} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <span className={`text-[8px] opacity-40 mt-0.5 px-1.5 font-mono uppercase tracking-widest ${
+                            isGhostMode ? "text-rose-400" : ""
+                          }`}>
+                            {msg.sender === "user" ? "Riyajul" : "Zoya"}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                  <AnimatePresence>
+                    {(isTyping || isLoading) && (
+                      <TypingIndicator isGhostMode={isGhostMode} />
+                    )}
+                  </AnimatePresence>
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+
+              {/* Image Preview */}
+              {selectedImages.length > 0 && (
+                <div className="flex flex-wrap gap-3 mt-2 p-2 border border-white/10 rounded-lg bg-black/20 w-fit max-w-full overflow-x-auto">
+                  {selectedImages.map((base64, index) => (
+                    <div key={index} className="relative shrink-0">
+                      <img src={`data:image/jpeg;base64,${base64}`} className="h-16 w-16 object-cover rounded-md border border-white/20" alt={`Attached ${index + 1}`} />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedImages((prev) => prev.filter((_, i) => i !== index))}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:scale-110 transition-transform shadow-lg"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Compact Input Bar */}
+              {isImageMode ? (
+                <div className="flex flex-col mt-1 pt-1.5 border-t border-white/10 shrink-0 bg-[#1a1a1a]/95 rounded-2xl p-2 gap-2 shadow-lg">
+                  <div className="flex items-center justify-between px-1">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsImageMode(false)}
+                      className="bg-purple-900/40 text-purple-200 px-3 py-1.5 rounded-full flex items-center gap-2 text-sm font-semibold hover:bg-purple-900/60 transition-colors cursor-pointer"
+                    >
+                      <ImageIcon size={14} />
+                      IMAGES
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="flex items-end gap-1.5">
+                    <textarea
+                      ref={textareaRef}
+                      autoFocus={false}
+                      readOnly={isInputReadOnly}
+                      onClick={() => setIsInputReadOnly(false)}
+                      onTouchStart={() => setIsInputReadOnly(false)}
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleTextSubmit(e);
+                        }
+                      }}
+                      placeholder="Describe your image..."
+                      className="flex-1 bg-transparent border-none px-2 py-1 text-sm text-white placeholder:text-white/40 focus:outline-none resize-none min-h-[36px] max-h-[120px] overflow-y-auto leading-normal scrollbar-hide"
+                      rows={1}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleTextSubmit}
+                      disabled={!textInput.trim()}
+                      className="p-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-white transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                      title="Generate Image"
+                    >
+                      <Sparkles size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+              <div className="flex flex-col mt-1 pt-1.5 border-t border-white/10 shrink-0 gap-1.5">
+                {isDeepThinking && (
+                  <div className="px-1">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsDeepThinking(false)}
+                      className="bg-purple-900/40 text-purple-200 px-3 py-1.5 rounded-full flex items-center w-fit gap-2 text-sm font-semibold hover:bg-purple-900/60 transition-colors cursor-pointer"
+                    >
+                      <Brain size={14} />
+                      Deep Thinking
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 w-full">
+                  <textarea
+                  ref={textareaRef}
+                  autoFocus={false}
+                  readOnly={isInputReadOnly}
+                  onClick={() => setIsInputReadOnly(false)}
+                  onTouchStart={() => setIsInputReadOnly(false)}
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleTextSubmit(e);
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-[11px] text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50 resize-none min-h-[28px] max-h-[120px] overflow-y-auto leading-normal"
+                  rows={1}
+                />
+                
+                <div className="flex items-center gap-2 shrink-0">
+                  <input type="file" multiple accept="image/*" className="hidden"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsPlusMenuOpen(true)}
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                    title="Media Options"
+                  >
+                    <PlusCircle size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleInputDictation}
+                    className={`p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer flex items-center justify-center ${
+                      isListening
+                        ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] border border-red-500/30 scale-105 animate-pulse"
+                        : ""
+                    }`}
+                    title="Dictate message (Speech to Text)"
+                  >
+                    <Mic size={18} />
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={(!textInput.trim() && selectedImages.length === 0) || isLoading}
+                    className="p-2 rounded-full backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:hover:bg-white/5 disabled:hover:text-gray-400"
+                  >
+                    {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                  </button>
+                </div>
+                </div>
+              </div>
+              )}
+            </div>
+          </motion.form>
         )}
       </AnimatePresence>
-
 
       {/* Controls */}
       {!showChat && (
@@ -3213,7 +3460,7 @@ In your very first response or greeting to the user, you MUST casually and natur
 
       {/* Plus Menu Bottom Sheet Overlay */}
       <AnimatePresence>
-        {false && ( <>
+        {isPlusMenuOpen && ( <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

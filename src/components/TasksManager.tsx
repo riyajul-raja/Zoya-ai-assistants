@@ -307,7 +307,7 @@ export default function TasksManager({ onClose, isGhostMode = false, onToast }: 
   // Toggle task completed status
   const handleToggleTaskStatus = async (task: TaskItem) => {
     if (!token || apiMode === "fallback") {
-      const newStatus: "completed" | "needsAction" = task.status === "completed" ? "needsAction" : "completed";
+      const newStatus = task.status === "completed" ? "needsAction" : "completed";
       const updated = tasks.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t));
       saveFallbackTasksToStore(updated);
       if (selectedTask?.id === task.id) {

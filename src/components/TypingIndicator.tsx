@@ -15,25 +15,21 @@ export default function TypingIndicator({ isGhostMode = false }: TypingIndicator
       className="flex flex-col max-w-[85%] self-start items-start"
     >
       <div
-        className={`w-fit px-5 py-3 rounded-[20px] backdrop-blur-2xl flex items-center gap-3 ${
+        className={`w-fit px-4 py-2 rounded-2xl border backdrop-blur-md shadow-lg flex items-center gap-2 ${
           isGhostMode
-            ? "bg-rose-950/45 border border-rose-500/45 text-rose-100 rounded-bl-[4px] shadow-[0_8px_32px_rgba(244,63,94,0.15)]"
-            : "bg-white/[0.04] border border-white/10 text-neutral-100 rounded-bl-[4px] shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
+            ? "bg-rose-950/45 border-rose-500/45 text-rose-100 rounded-bl-none shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+            : "bg-pink-600/15 border-pink-500/30 text-pink-100 rounded-bl-none shadow-[0_0_12px_rgba(236,72,153,0.15)]"
         }`}
       >
-        <div className="relative flex items-center justify-center">
-          <div className="absolute inset-[-4px] rounded-full border-t-[1.5px] border-white/50 animate-spin"></div>
-          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-[10px] text-white shadow-[0_0_10px_rgba(139,92,246,0.3)]">
+        <div className="relative flex items-center justify-center p-[2px]">
+          <div className="absolute inset-0 rounded-full border-t-2 border-white/50 animate-spin"></div>
+          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-violet-500 to-pink-500 flex items-center justify-center font-bold text-xs text-white">
             Z
           </div>
         </div>
-        <div className="text-[14px] font-medium opacity-90 flex items-center tracking-wide">
-          Zoya is typing
-          <span className="flex gap-0.5 ml-1.5">
-            <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.4, repeat: Infinity, delay: 0 }} className="w-1 h-1 rounded-full bg-white/70" />
-            <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.4, repeat: Infinity, delay: 0.2 }} className="w-1 h-1 rounded-full bg-white/70" />
-            <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.4, repeat: Infinity, delay: 0.4 }} className="w-1 h-1 rounded-full bg-white/70" />
-          </span>
+        <div className="text-xs font-medium opacity-90 flex items-center">
+          Zoya is Thinking
+          <span className="animate-pulse tracking-widest ml-0.5">...</span>
         </div>
       </div>
     </motion.div>

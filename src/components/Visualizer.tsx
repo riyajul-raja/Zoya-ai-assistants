@@ -46,7 +46,7 @@ export default function Visualizer({
     const baseSpeed = state === "listening" ? 3 : state === "processing" ? 1.5 : state === "speaking" ? 2 : 15;
     return {
       rotate: reverse ? [-360, 0] : [0, 360],
-      transition: { duration: baseSpeed + index * 2, repeat: Infinity, ease: "linear" as any }
+      transition: { duration: baseSpeed + index * 2, repeat: Infinity, ease: "linear" }
     };
   };
 
@@ -55,27 +55,27 @@ export default function Visualizer({
       return {
         scale: [1, 1.05, 0.98, 1.02, 1],
         opacity: [0.8, 1, 0.8, 1, 0.8],
-        transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" as any }
+        transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" }
       };
     }
     if (state === "listening") {
       return {
         scale: [1, 1.02, 1],
         opacity: [0.7, 1, 0.7],
-        transition: { duration: 1, repeat: Infinity, ease: "easeInOut" as any }
+        transition: { duration: 1, repeat: Infinity, ease: "easeInOut" }
       };
     }
     if (state === "processing") {
       return {
         scale: [0.98, 1.02, 0.98],
         opacity: [0.6, 0.9, 0.6],
-        transition: { duration: 0.8, repeat: Infinity, ease: "linear" as any }
+        transition: { duration: 0.8, repeat: Infinity, ease: "linear" }
       };
     }
     return {
       scale: [1, 1.01, 1],
       opacity: [0.4, 0.6, 0.4],
-      transition: { duration: 4, repeat: Infinity, ease: "easeInOut" as any }
+      transition: { duration: 4, repeat: Infinity, ease: "easeInOut" }
     };
   };
 
