@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 
 export interface DebugInfo {
   intent: "LOCAL" | "GEMINI";
@@ -630,6 +630,106 @@ export async function getZoyaResponse(
   } catch (error) {
     console.error("Gemini Error:", error);
     return formatGeminiError(error, "gemini-3.5-flash").formatted;
+  }
+}
+
+export async function getZoyaAudioLiveWebSocket(
+  text: string,
+  onChunk: (base64Audio: string) => void
+): Promise<boolean> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) return false;
+
+  return new Promise<boolean>((resolve) => {
+    let resolved = false;
+    let receivedAnyAudio = false;
+    const ai = new GoogleGenAI({ apiKey });
+
+    let sessionRef: any = null;
+    const timeoutTimer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        if (sessionRef) {
+          try { sessionRef.close(); } catch (e) {}
+        }
+        resolve(receivedAnyAudio);
+      }
+    }, 6000);
+
+    ai.live.connect({
+      model: "gemini-3.1-flash-live-preview",
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
+        },
+        systemInstruction: "You are Zoya, a female AI assistant. Speak the exact provided text naturally.",
+      },
+      callbacks: {
+        onopen: () => {
+          if (sessionRef) {
+            sessionRef.sendRealtimeInput({ text: `Speak this text: "${text}"` });
+          }
+        },
+        onmessage: (message: LiveServerMessage) => {
+          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            receivedAnyAudio = true;
+            onChunk(base64Audio);
+          }
+          if (message.serverContent?.turnComplete) {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeoutTimer);
+              setTimeout(() => {
+                try { sessionRef?.close(); } catch (e) {}
+              }, 500);
+              resolve(true);
+            }
+          }
+        },
+        onerror: (err) => {
+          console.warn("[Live WebSocket Audio] Error:", err);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutTimer);
+            resolve(receivedAnyAudio);
+          }
+        },
+        onclose: () => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutTimer);
+            resolve(receivedAnyAudio);
+          }
+        }
+      }
+    }).then(s => {
+      sessionRef = s;
+    }).catch(err => {
+      console.warn("[Live WebSocket Audio] Connect error:", err);
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeoutTimer);
+        resolve(false);
+      }
+    });
+  });
+}
+
+export async function getZoyaAudioPrimary(
+  text: string,
+  onChunk: (base64Audio: string) => void
+): Promise<void> {
+  // 1. Primary path: WebSocket Gemini Live API (Real-time Audio)
+  const success = await getZoyaAudioLiveWebSocket(text, onChunk);
+  if (success) return;
+
+  // 2. Emergency Fallback path: REST Audio API
+  console.warn("[Audio Engine] Gemini Live WebSocket audio failed. Using REST Audio API fallback.");
+  const restAudio = await getZoyaAudio(text);
+  if (restAudio) {
+    onChunk(restAudio);
   }
 }
 

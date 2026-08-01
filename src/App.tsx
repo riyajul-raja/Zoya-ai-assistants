@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Settings, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, User, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ChevronRight, ArrowLeft, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured, getZoyaAudio } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured, getZoyaAudio, getZoyaAudioPrimary } from "./services/geminiService";
 import { playPCM } from "./utils/audioUtils";
 import { detectIntent } from "./services/intentService";
 import { processCommand } from "./services/commandService";
@@ -1606,11 +1606,16 @@ In your very first response or greeting to the user, you MUST casually and natur
     const sentence = speechQueueRef.current.shift()!;
 
     try {
-      const audioPromise = getZoyaAudio(sentence);
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 7000));
-      const base64Audio = await Promise.race([audioPromise, timeoutPromise]);
+      let chunksPushed = 0;
+      await getZoyaAudioPrimary(sentence, (base64Audio) => {
+        chunksPushed++;
+        audioBufferQueueRef.current.push({ sentence, base64Audio });
+        processAudioQueue();
+      });
 
-      audioBufferQueueRef.current.push({ sentence, base64Audio });
+      if (chunksPushed === 0) {
+        audioBufferQueueRef.current.push({ sentence, base64Audio: null });
+      }
     } catch (e) {
       console.warn("[Streaming TTS] Audio fetch error for sentence:", e);
       audioBufferQueueRef.current.push({ sentence, base64Audio: null });
