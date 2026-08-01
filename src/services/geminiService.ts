@@ -651,7 +651,7 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
           responseModalities: ["AUDIO"],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: "Kore" },
+              prebuiltVoiceConfig: { voiceName: "Aoede" },
             },
           },
         },
@@ -670,7 +670,7 @@ export async function getZoyaAudio(text: string): Promise<string | null> {
         responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Kore" },
+            prebuiltVoiceConfig: { voiceName: "Aoede" },
           },
         },
       },
