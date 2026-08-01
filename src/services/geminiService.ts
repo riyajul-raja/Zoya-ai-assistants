@@ -635,7 +635,34 @@ export async function getZoyaResponse(
 
 export async function getZoyaAudio(text: string): Promise<string | null> {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      console.warn("[getZoyaAudio] No Gemini API Key configured");
+      return null;
+    }
+    const ai = new GoogleGenAI({ apiKey });
+    
+    // Try primary audio generation model gemini-2.0-flash first
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [{ parts: [{ text }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "Kore" },
+            },
+          },
+        },
+      });
+      const base64Data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64Data) return base64Data;
+    } catch (e) {
+      console.warn("[getZoyaAudio] gemini-2.0-flash audio generation fallback:", e);
+    }
+
+    // Secondary fallback model gemini-2.5-flash-preview-tts
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, Volume2, VolumeX, Keyboard, Send, Trash2, X, Settings, Camera, CameraOff, RefreshCw, Maximize2, Minimize2, Tv, Download, PictureInPicture, Shield, Fingerprint, Lock, Unlock, Box, Layers, Ghost, Users, User, HardDrive, Brain, Mail, Calendar, ListTodo, Presentation, MessageSquare, FileText, ClipboardList, Video, StickyNote, GraduationCap, Menu, ArrowRight, ChevronRight, ArrowLeft, ImagePlus, Paperclip, PlusCircle, Sparkles, Image as ImageIcon , Copy, Check } from "lucide-react";
-import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured } from "./services/geminiService";
+import { getZoyaResponse, getZoyaResponseStream, DebugInfo, LOCKED_MODE_MESSAGE, isGeminiKeyConfigured, getZoyaAudio } from "./services/geminiService";
+import { playPCM } from "./utils/audioUtils";
 import { detectIntent } from "./services/intentService";
 import { processCommand } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
@@ -1513,134 +1514,161 @@ In your very first response or greeting to the user, you MUST casually and natur
       return;
     }
 
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      finishSpeechOrTurn();
-      return;
-    }
-
-    if (speechKeepAliveRef.current) {
-      clearInterval(speechKeepAliveRef.current);
-      speechKeepAliveRef.current = null;
-    }
-
     isSpeakingRef.current = true;
     setAppState("speaking");
 
-    // Cancel any previous speech synthesis safely
-    try {
-      window.speechSynthesis.cancel();
-    } catch (e) {}
+    // Primary: Call original external audio generation pipeline (getZoyaAudio -> playPCM)
+    getZoyaAudio(cleanedText)
+      .then((base64Audio) => {
+        if (base64Audio) {
+          console.log("[TTS] Original Gemini Audio generated, playing via Web Audio PCM");
+          playPCM(base64Audio)
+            .then(() => {
+              console.log("[TTS] Audio playback completed");
+              isSpeakingRef.current = false;
+              finishSpeechOrTurn();
+            })
+            .catch((playErr) => {
+              console.warn("[TTS] playPCM failed, falling back to browser SpeechSynthesis:", playErr);
+              fallbackToSpeechSynthesis(cleanedText);
+            });
+        } else {
+          console.log("[TTS] getZoyaAudio returned null, using browser SpeechSynthesis fallback");
+          fallbackToSpeechSynthesis(cleanedText);
+        }
+      })
+      .catch((err) => {
+        console.warn("[TTS] getZoyaAudio error, using browser SpeechSynthesis fallback:", err);
+        fallbackToSpeechSynthesis(cleanedText);
+      });
 
-    // Wait 150ms for browser speech synthesis buffer to reset before calling speak()
-    setTimeout(() => {
+    function fallbackToSpeechSynthesis(textToSpeak: string) {
+      if (typeof window === "undefined" || !window.speechSynthesis) {
+        finishSpeechOrTurn();
+        return;
+      }
+
+      if (speechKeepAliveRef.current) {
+        clearInterval(speechKeepAliveRef.current);
+        speechKeepAliveRef.current = null;
+      }
+
+      // Cancel any previous speech synthesis safely
       try {
-        window.speechSynthesis.resume();
+        window.speechSynthesis.cancel();
       } catch (e) {}
 
-      activeUtterancesRef.current = [];
-
-      const sentences = cleanedText.match(/[^.!?\n]+[.!?\n]*/g) || [cleanedText];
-
-      const stopKeepAlive = () => {
-        if (speechKeepAliveRef.current) {
-          clearInterval(speechKeepAliveRef.current);
-          speechKeepAliveRef.current = null;
-        }
-      };
-
-      // Keepalive interval every 3s to prevent Chromium speech synthesis freeze
-      speechKeepAliveRef.current = setInterval(() => {
-        if (isSpeakingRef.current && typeof window !== "undefined" && window.speechSynthesis) {
-          try {
-            window.speechSynthesis.resume();
-          } catch (e) {}
-        } else {
-          stopKeepAlive();
-        }
-      }, 3000);
-
-      const playSentenceAt = (index: number, isRetry: boolean = false) => {
-        if (!isSpeakingRef.current || index >= sentences.length) {
-          stopKeepAlive();
-          finishSpeechOrTurn();
-          return;
-        }
-
-        const sentenceText = sentences[index].trim();
-        if (!sentenceText) {
-          playSentenceAt(index + 1);
-          return;
-        }
-
-        const zoyaVoice = getZoyaVoice();
-        console.log("[TTS] Voice selected", zoyaVoice ? `${zoyaVoice.name} (${zoyaVoice.lang})` : "Default/Fallback Voice");
-
-        const utterance = new SpeechSynthesisUtterance(sentenceText);
-        if (zoyaVoice) {
-          utterance.voice = zoyaVoice;
-          utterance.lang = zoyaVoice.lang;
-        } else {
-          utterance.lang = "en-IN";
-        }
-        utterance.pitch = 1.0;
-        utterance.rate = 1.0;
-
-        activeUtterancesRef.current = [utterance];
-
-        utterance.onstart = () => {
-          console.log("[TTS] onstart fired for sentence:", sentenceText);
-          isSpeakingRef.current = true;
-          setAppState("speaking");
-        };
-
-        utterance.onend = () => {
-          console.log("[TTS] onend fired for sentence:", sentenceText);
-          activeUtterancesRef.current = [];
-          playSentenceAt(index + 1);
-        };
-
-        utterance.onerror = (e) => {
-          console.warn("[TTS] onerror fired for sentence:", sentenceText, e);
-          activeUtterancesRef.current = [];
-          if (!isRetry) {
-            setTimeout(() => {
-              playSentenceAt(index, true);
-            }, 100);
-          } else {
-            playSentenceAt(index + 1);
-          }
-        };
-
+      // Wait 150ms for browser speech synthesis buffer to reset before calling speak()
+      setTimeout(() => {
         try {
-          console.log("[TTS] speechSynthesis.speak called for sentence:", sentenceText);
-          window.speechSynthesis.speak(utterance);
           window.speechSynthesis.resume();
-        } catch (ex) {
-          console.error("[TTS] speak exception:", ex);
-          activeUtterancesRef.current = [];
-          if (!isRetry) {
-            setTimeout(() => playSentenceAt(index, true), 100);
-          } else {
-            playSentenceAt(index + 1);
-          }
-        }
-      };
+        } catch (e) {}
 
-      const voices = window.speechSynthesis.getVoices();
-      if (!voices || voices.length === 0) {
-        const handleVoicesChanged = () => {
-          window.speechSynthesis.onvoiceschanged = null;
-          playSentenceAt(0);
+        activeUtterancesRef.current = [];
+
+        const sentences = textToSpeak.match(/[^.!?\n]+[.!?\n]*/g) || [textToSpeak];
+
+        const stopKeepAlive = () => {
+          if (speechKeepAliveRef.current) {
+            clearInterval(speechKeepAliveRef.current);
+            speechKeepAliveRef.current = null;
+          }
         };
-        window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
-        setTimeout(() => {
-          window.speechSynthesis.onvoiceschanged = null;
+
+        // Keepalive interval every 3s to prevent Chromium speech synthesis freeze
+        speechKeepAliveRef.current = setInterval(() => {
+          if (isSpeakingRef.current && typeof window !== "undefined" && window.speechSynthesis) {
+            try {
+              window.speechSynthesis.resume();
+            } catch (e) {}
+          } else {
+            stopKeepAlive();
+          }
+        }, 3000);
+
+        const playSentenceAt = (index: number, isRetry: boolean = false) => {
+          if (!isSpeakingRef.current || index >= sentences.length) {
+            stopKeepAlive();
+            finishSpeechOrTurn();
+            return;
+          }
+
+          const sentenceText = sentences[index].trim();
+          if (!sentenceText) {
+            playSentenceAt(index + 1);
+            return;
+          }
+
+          const zoyaVoice = getZoyaVoice();
+          console.log("[TTS] Voice selected", zoyaVoice ? `${zoyaVoice.name} (${zoyaVoice.lang})` : "Default/Fallback Voice");
+
+          const utterance = new SpeechSynthesisUtterance(sentenceText);
+          if (zoyaVoice) {
+            utterance.voice = zoyaVoice;
+            utterance.lang = zoyaVoice.lang;
+          } else {
+            utterance.lang = "en-IN";
+          }
+          utterance.pitch = 1.0;
+          utterance.rate = 1.0;
+
+          activeUtterancesRef.current = [utterance];
+
+          utterance.onstart = () => {
+            console.log("[TTS] onstart fired for sentence:", sentenceText);
+            isSpeakingRef.current = true;
+            setAppState("speaking");
+          };
+
+          utterance.onend = () => {
+            console.log("[TTS] onend fired for sentence:", sentenceText);
+            activeUtterancesRef.current = [];
+            playSentenceAt(index + 1);
+          };
+
+          utterance.onerror = (e) => {
+            console.warn("[TTS] onerror fired for sentence:", sentenceText, e);
+            activeUtterancesRef.current = [];
+            if (!isRetry) {
+              setTimeout(() => {
+                playSentenceAt(index, true);
+              }, 100);
+            } else {
+              playSentenceAt(index + 1);
+            }
+          };
+
+          try {
+            console.log("[TTS] speechSynthesis.speak called for sentence:", sentenceText);
+            window.speechSynthesis.speak(utterance);
+            window.speechSynthesis.resume();
+          } catch (ex) {
+            console.error("[TTS] speak exception:", ex);
+            activeUtterancesRef.current = [];
+            if (!isRetry) {
+              setTimeout(() => playSentenceAt(index, true), 100);
+            } else {
+              playSentenceAt(index + 1);
+            }
+          }
+        };
+
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices || voices.length === 0) {
+          const handleVoicesChanged = () => {
+            window.speechSynthesis.onvoiceschanged = null;
+            playSentenceAt(0);
+          };
+          window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
+          setTimeout(() => {
+            window.speechSynthesis.onvoiceschanged = null;
+            playSentenceAt(0);
+          }, 300);
+        } else {
           playSentenceAt(0);
-        }, 300);
-      } else {
-        playSentenceAt(0);
-      }
-    }, 150);
+        }
+      }, 150);
+    }
   }, [getZoyaVoice, finishSpeechOrTurn]);
 
   const speakMessageText = speakWithZoya;
