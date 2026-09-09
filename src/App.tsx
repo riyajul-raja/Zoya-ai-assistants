@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2, Keyboard, Send, Menu, X, Settings, ArrowLeft, User, ChevronRight, Lock, Lightbulb, Check } from "lucide-react";
+import { Mic, MicOff, Loader2, Keyboard, Send, Menu, X, Settings, ArrowLeft, User, ChevronRight, Lock, Lightbulb, Check, Heart } from "lucide-react";
 import { getZoyaResponse, getZoyaAudio, resetZoyaSession } from "./services/geminiService";
-import { processCommand } from "./services/commandService";
+import { processCommand, isDirectTimeQuery, getDirectTimeResponse } from "./services/commandService";
 import { LiveSessionManager } from "./services/liveService";
 import Visualizer from "./components/Visualizer";
 import PermissionModal from "./components/PermissionModal";
@@ -90,6 +90,40 @@ function setIsolatedUserName(userId: string, name: string) {
   }
 }
 
+function getIsolatedAssistantName(userId: string): string {
+  if (typeof window === "undefined") return "Zoya";
+  const name = localStorage.getItem(`zoya_user_${userId}_assistant_name`);
+  if (name !== null && name.trim()) return name.trim();
+  const legacy = localStorage.getItem("zoya_assistant_name");
+  if (legacy && legacy.trim()) return legacy.trim();
+  return "Zoya";
+}
+
+function setIsolatedAssistantName(userId: string, name: string) {
+  if (typeof window === "undefined") return;
+  const trimmed = name.trim();
+  if (trimmed) {
+    localStorage.setItem(`zoya_user_${userId}_assistant_name`, trimmed);
+    localStorage.setItem("zoya_assistant_name", trimmed);
+  } else {
+    localStorage.removeItem(`zoya_user_${userId}_assistant_name`);
+    localStorage.removeItem("zoya_assistant_name");
+  }
+}
+
+function getIsolatedGirlfriendMode(userId: string): boolean {
+  if (typeof window === "undefined") return false;
+  const val = localStorage.getItem(`zoya_user_${userId}_girlfriend_mode`);
+  if (val !== null) return val === "true";
+  return localStorage.getItem("zoya_girlfriend_mode") === "true";
+}
+
+function setIsolatedGirlfriendMode(userId: string, enabled: boolean) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`zoya_user_${userId}_girlfriend_mode`, enabled ? "true" : "false");
+  localStorage.setItem("zoya_girlfriend_mode", enabled ? "true" : "false");
+}
+
 function extractNameFromText(text: string, wasAskedForName: boolean): string | null {
   const clean = text.trim();
   if (!clean) return null;
@@ -136,7 +170,7 @@ function extractNameFromText(text: string, wasAskedForName: boolean): string | n
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"home" | "settings" | "personal">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "settings" | "personal" | "zoya">("home");
   const [appState, setAppState] = useState<AppState>("idle");
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -174,6 +208,17 @@ export default function App() {
   const [geminiKeyInput, setGeminiKeyInput] = useState<string>(geminiKey);
   const [isKeySaved, setIsKeySaved] = useState<boolean>(false);
 
+  // Zoya Persona Settings: Assistant Name & Girlfriend Mode (isolated per user)
+  const [assistantName, setAssistantName] = useState<string>(() => {
+    return getIsolatedAssistantName(activeUserId);
+  });
+  const [assistantNameInput, setAssistantNameInput] = useState<string>(assistantName);
+  const [isAssistantNameSaved, setIsAssistantNameSaved] = useState<boolean>(false);
+
+  const [girlfriendMode, setGirlfriendMode] = useState<boolean>(() => {
+    return getIsolatedGirlfriendMode(activeUserId);
+  });
+
   // Gemini API Key Notice Popup state
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const askedForNameRef = useRef<boolean>(false);
@@ -184,6 +229,24 @@ export default function App() {
       setShowApiKeyModal(true);
     }
   }, []);
+
+  const handleSaveAssistantName = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = assistantNameInput.trim() || "Zoya";
+    setAssistantName(trimmed);
+    setAssistantNameInput(trimmed);
+    setIsolatedAssistantName(activeUserId, trimmed);
+    resetZoyaSession();
+    setIsAssistantNameSaved(true);
+    setTimeout(() => setIsAssistantNameSaved(false), 2500);
+  };
+
+  const handleToggleGirlfriendMode = () => {
+    const next = !girlfriendMode;
+    setGirlfriendMode(next);
+    setIsolatedGirlfriendMode(activeUserId, next);
+    resetZoyaSession();
+  };
 
   const updateUserName = useCallback((newName: string) => {
     const trimmed = newName.trim();
@@ -273,6 +336,22 @@ export default function App() {
       }
     }
 
+    // 0. Real-time Device Clock Check
+    // If the user asks for the current time ("abhi kitne baje hain?", "what time is it?", etc.),
+    // immediately obtain the system clock at this exact moment in the user's local timezone (Asia/Kolkata IST) and speak it.
+    if (isDirectTimeQuery(finalTranscript)) {
+      const replyText = getDirectTimeResponse(girlfriendMode, userName);
+      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), sender: "zoya", text: replyText }]);
+
+      const audioBase64 = await getZoyaAudio(replyText, geminiKey);
+      if (audioBase64) {
+        setAppState("speaking");
+        await playPCM(audioBase64);
+      }
+      setAppState("idle");
+      return;
+    }
+
     // If live session is active, send text through it
     if (isSessionActive && liveSessionRef.current) {
       liveSessionRef.current.sendText(finalTranscript);
@@ -309,7 +388,9 @@ export default function App() {
       (detectedName) => {
         updateUserName(detectedName);
         askedForNameRef.current = false;
-      }
+      },
+      assistantName,
+      girlfriendMode
     );
 
     if (!replyText) {
@@ -331,7 +412,7 @@ export default function App() {
       await playPCM(audioBase64);
     }
     setAppState("idle");
-  }, [isSessionActive, geminiKey, userName, updateUserName]);
+  }, [isSessionActive, geminiKey, userName, updateUserName, assistantName, girlfriendMode]);
 
   const toggleListening = async () => {
     if (isSessionActive) {
@@ -352,7 +433,7 @@ export default function App() {
 
     try {
       setAppState("listening");
-      const manager = new LiveSessionManager(geminiKey, userName);
+      const manager = new LiveSessionManager(geminiKey, userName, assistantName, girlfriendMode);
       manager.onStateChange = (state) => {
         setAppState(state);
       };
@@ -579,22 +660,43 @@ export default function App() {
             </header>
 
             {/* Settings Page Content */}
-            <main className="flex-1 w-full max-w-2xl mx-auto p-6 md:p-8 z-10 overflow-y-auto">
-              <div className="space-y-3">
-                <button
-                  onClick={() => setCurrentPage("personal")}
-                  className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white/90 hover:text-white transition-all text-base font-medium border border-white/5 cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <User size={20} className="text-zinc-400 group-hover:text-white transition-colors" />
-                    <span>Personal</span>
+            <main className="flex-1 w-full max-w-2xl mx-auto p-6 md:p-8 z-10 overflow-y-auto space-y-3">
+              {/* Personal Card */}
+              <button
+                onClick={() => setCurrentPage("personal")}
+                className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white/90 hover:text-white transition-all text-base font-medium border border-white/5 hover:border-amber-500/30 cursor-pointer group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
+                    <User size={18} />
                   </div>
-                  <ChevronRight size={18} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
-                </button>
-              </div>
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-white group-hover:text-white">Personal</div>
+                    <div className="text-xs text-zinc-400">Your name &amp; Gemini API key</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+              </button>
+
+              {/* Zoya Card */}
+              <button
+                onClick={() => setCurrentPage("zoya")}
+                className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white/90 hover:text-white transition-all text-base font-medium border border-white/5 hover:border-amber-500/30 cursor-pointer group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
+                    <Heart size={18} />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-white group-hover:text-white">{assistantName || "Zoya"}</div>
+                    <div className="text-xs text-zinc-400">Assistant name &amp; girlfriend mode</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+              </button>
             </main>
           </motion.div>
-        ) : (
+        ) : currentPage === "personal" ? (
           <motion.div
             key="personal-page"
             initial={{ opacity: 0, x: 25 }}
@@ -739,7 +841,133 @@ export default function App() {
               </div>
             </main>
           </motion.div>
-        )}
+        ) : currentPage === "zoya" ? (
+          <motion.div
+            key="zoya-page"
+            initial={{ opacity: 0, x: 25 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 25 }}
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            className="h-full w-full flex flex-col relative overflow-hidden"
+          >
+            {/* Cinematic Background Gradients */}
+            <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
+              <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-violet-900/15 blur-[120px] rounded-full" />
+              <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-900/15 blur-[120px] rounded-full" />
+            </div>
+
+            {/* Header with Back Arrow in Top-Left Corner returning to Settings */}
+            <header className="w-full flex items-center gap-4 px-6 py-5 md:px-12 md:py-6 border-b border-white/5 z-20 shrink-0">
+              <button
+                onClick={() => setCurrentPage("settings")}
+                className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors border border-white/10 flex items-center justify-center cursor-pointer"
+                title="Back to Settings"
+                aria-label="Back to Settings"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <h1 className="text-xl font-medium tracking-wide text-white">Zoya</h1>
+            </header>
+
+            {/* Zoya Page Content: ONLY Assistant name and Girlfriend mode */}
+            <main className="flex-1 w-full max-w-2xl mx-auto p-5 md:p-8 z-10 overflow-y-auto space-y-6">
+              {/* 1. ASSISTANT NAME */}
+              <div className="rounded-3xl bg-[#141418] border border-white/5 p-6 shadow-xl space-y-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
+                    <User size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-white tracking-wide">Assistant name</h2>
+                    <p className="text-xs text-zinc-400">What you call her</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveAssistantName} className="space-y-4 pt-1">
+                  <div className="w-full bg-[#1b1b22] border border-white/10 focus-within:border-amber-400/60 rounded-2xl p-3.5 transition-all">
+                    <input
+                      type="text"
+                      value={assistantNameInput}
+                      onChange={(e) => setAssistantNameInput(e.target.value)}
+                      onBlur={() => handleSaveAssistantName()}
+                      placeholder="e.g. Maya, Aria, Jarvis..."
+                      className="w-full bg-transparent text-white placeholder:text-zinc-500 text-sm focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-medium text-sm transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center gap-2"
+                    >
+                      {isAssistantNameSaved ? (
+                        <>
+                          <Check size={16} />
+                          <span>Saved</span>
+                        </>
+                      ) : (
+                        <span>Save</span>
+                      )}
+                    </button>
+                    {isAssistantNameSaved && (
+                      <span className="text-xs text-amber-400 font-medium">
+                        Assistant name saved!
+                      </span>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              {/* 2. GIRLFRIEND MODE */}
+              <div className="rounded-3xl bg-[#141418] border border-white/5 p-6 shadow-xl space-y-5">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
+                    <Heart size={20} className={girlfriendMode ? "fill-amber-500" : ""} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-white tracking-wide">Girlfriend mode</h2>
+                    <p className="text-xs text-zinc-400">Zoya's romantic side</p>
+                  </div>
+                </div>
+
+                {/* Enable girlfriend mode toggle row */}
+                <div className="flex items-center justify-between gap-4 pt-1">
+                  <div className="space-y-1 pr-2">
+                    <span className="text-sm font-medium text-white block">
+                      Enable girlfriend mode
+                    </span>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Zoya talks like a close friend — warm and caring, no romance.
+                    </p>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={girlfriendMode}
+                    onClick={handleToggleGirlfriendMode}
+                    className={`w-13 h-7 rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer flex items-center shrink-0 ${
+                      girlfriendMode ? "bg-amber-500" : "bg-zinc-700/70"
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${
+                        girlfriendMode ? "translate-x-6" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Lightbulb callout note */}
+                <div className="rounded-2xl bg-[#1a1815] border border-amber-500/20 p-3.5 flex items-start gap-3 text-xs text-amber-200/90 leading-relaxed">
+                  <Lightbulb size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                  <span>Takes effect the next time Zoya starts. Can't be switched by voice.</span>
+                </div>
+              </div>
+            </main>
+          </motion.div>
+        ) : null}
       </AnimatePresence>
 
       {/* Gemini API Key Notice Popup */}
@@ -818,7 +1046,7 @@ export default function App() {
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="relative w-72 sm:w-80 max-w-[85vw] h-full bg-[#131317] border-r border-white/10 shadow-2xl flex flex-col z-10 rounded-r-3xl overflow-hidden"
             >
-              {/* Header inside Panel (Maya-like style) */}
+              {/* Header inside Panel */}
               <div className="p-6 pb-4 flex items-center justify-between border-b border-white/5">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 via-pink-600 to-indigo-600 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-violet-900/40 border border-white/10">

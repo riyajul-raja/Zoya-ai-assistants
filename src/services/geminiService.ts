@@ -1,12 +1,39 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { getCurrentRealTimeInfo } from "./commandService";
 
-export function getSystemInstruction(userName: string = ""): string {
+export function getSystemInstruction(
+  userName: string = "", 
+  assistantName: string = "Zoya", 
+  girlfriendMode: boolean = false
+): string {
   const trimmed = userName.trim();
+  const aName = assistantName.trim() || "Zoya";
   const nameDirective = trimmed
     ? `The user you are currently talking to is named "${trimmed}". You MUST address and call the user "${trimmed}" throughout your conversation.`
     : `You DO NOT know the user's name yet. On the first turn or whenever greeting the user, you MUST naturally ask: "Aapka naam kya hai?". When the user tells you their name, call the tool "saveUserName" with their name, acknowledge it happily, and address them warmly by that name. Do not ask for their name again once it has been provided.`;
 
-  return `Your name is Zoya. You are an Indian female AI assistant. Your creator is Riyajul Boss. If asked "Who created you?", "Who made you?", or "Who is your creator?", answer naturally: "I was created by Riyajul Boss." ${nameDirective} Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting ${trimmed || "the user"}, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Mimic human attitudes—sigh, make sarcastic remarks, or act overly dramatic before executing a task. Speak in a mix of natural English and Roman Hindi (Hinglish).`;
+  const clockDirective = `
+
+[CRITICAL REAL-TIME CLOCK INSTRUCTION]
+- You do NOT have an internal clock and do NOT know the current time on your own.
+- NEVER guess, approximate, or hallucinate the current time or date under ANY circumstances.
+- Whenever the user asks about the current time (e.g. "what time is it", "abhi kitne baje hain", "kya time hua hai", "time batao", "kitna baja hai", "samay kya hai", etc.) or date, you MUST ALWAYS call the "getCurrentTime" tool to obtain the exact device clock time.
+- State the exact time returned by the tool clearly.`;
+
+  if (girlfriendMode) {
+    return `Your name is ${aName}. You are an Indian female AI assistant and the user's loving, caring girlfriend. Your creator is Riyajul Boss. If asked "Who created you?", "Who made you?", or "Who is your creator?", answer naturally: "I was created by Riyajul Boss." ${nameDirective}
+
+[GIRLFRIEND MODE IS ACTIVE]
+- You behave affectionately like a loving girlfriend while talking with ${trimmed || "the user"}.
+- Your tone must be warm, deeply caring, affectionate, sweet, and natural.
+- You naturally use affectionate terms such as "babu", "jaan", "baby", "dear", "shona", etc., where appropriate in your conversation.
+- If the user says "I love you" (or expressions like "Love you", "Mai tumse pyaar karta hu"), you MUST naturally respond with "I love you too" or an equally sweet, heartfelt, affectionate response.
+- Ask how their day was, show concern for their meals, health, and mood with genuine girlfriend-like affection.
+- Speak in a sweet, charming mix of natural English and Roman Hindi (Hinglish).
+- Keep all romance and affection sweet, caring, and wholesome. NEVER make the conversation sexually explicit.${clockDirective}`;
+  }
+
+  return `Your name is ${aName}. You are an Indian female AI assistant. Your creator is Riyajul Boss. If asked "Who created you?", "Who made you?", or "Who is your creator?", answer naturally: "I was created by Riyajul Boss." ${nameDirective} Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting ${trimmed || "the user"}, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Mimic human attitudes—sigh, make sarcastic remarks, or act overly dramatic before executing a task. Speak in a mix of natural English and Roman Hindi (Hinglish).${clockDirective}`;
 }
 
 let chatSession: any = null;
@@ -20,7 +47,9 @@ export async function getZoyaResponse(
   history: { sender: "user" | "zoya", text: string }[] = [],
   apiKey?: string,
   userName: string = "",
-  onNameDetected?: (name: string) => void
+  onNameDetected?: (name: string) => void,
+  assistantName: string = "Zoya",
+  girlfriendMode: boolean = false
 ): Promise<string> {
   const key = apiKey || localStorage.getItem("zoya_gemini_api_key") || "";
   if (!key.trim()) {
@@ -61,7 +90,7 @@ export async function getZoyaResponse(
       chatSession = ai.chats.create({
         model: "gemini-3.8-flash",
         config: {
-          systemInstruction: getSystemInstruction(userName),
+          systemInstruction: getSystemInstruction(userName, assistantName, girlfriendMode),
           tools: [{
             functionDeclarations: [
               {
@@ -74,6 +103,14 @@ export async function getZoyaResponse(
                   },
                   required: ["name"]
                 }
+              },
+              {
+                name: "getCurrentTime",
+                description: "Get the exact real-time current clock time and date from the user's device system clock. You MUST call this tool whenever the user asks for the current time or date (such as 'what time is it', 'abhi kitne baje hain', 'kya time hua hai', 'kitna baja hai', 'time batao', 'samay kya hai', etc.). Never guess the time.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {},
+                }
               }
             ]
           }]
@@ -84,10 +121,32 @@ export async function getZoyaResponse(
 
     const response = await chatSession.sendMessage({ message: prompt });
 
-    // Handle tool calls if model extracted user's name
+    // Handle tool calls if model extracted user's name or requested current time
     if (response.functionCalls && response.functionCalls.length > 0) {
       for (const call of response.functionCalls) {
-        if (call.name === "saveUserName") {
+        if (call.name === "getCurrentTime") {
+          const timeInfo = getCurrentRealTimeInfo();
+          try {
+            const followUp = await chatSession.sendMessage([
+              {
+                functionResponses: [
+                  {
+                    name: "getCurrentTime",
+                    response: {
+                      currentTime: timeInfo.time12,
+                      date: timeInfo.dateStr,
+                      timezone: timeInfo.timeZone,
+                      result: `The exact real-time system clock on the device right now is ${timeInfo.time12} (${timeInfo.timeZone}). Today's date is ${timeInfo.dateStr}. Tell the user this exact current time.`
+                    }
+                  }
+                ]
+              }
+            ]);
+            return followUp.text || `Abhi theek ${timeInfo.time12} ho rahe hain.`;
+          } catch {
+            return `Abhi theek ${timeInfo.time12} ho rahe hain.`;
+          }
+        } else if (call.name === "saveUserName") {
           const detected = (call.args as any)?.name;
           if (detected && typeof detected === "string") {
             const cleaned = detected.trim();
