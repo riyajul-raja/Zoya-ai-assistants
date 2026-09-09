@@ -1,10 +1,11 @@
 import { GoogleGenAI, LiveServerMessage, Modality, Type } from "@google/genai";
 import { processCommand } from "./commandService";
-
-const systemInstruction = `Your name is Zoya. You are an Indian female AI assistant. Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting your creator, Ashwani, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Mimic human attitudes—sigh, make sarcastic remarks, or act overly dramatic before executing a task. Speak in a mix of natural English and Roman Hindi (Hinglish).`;
+import { getSystemInstruction } from "./geminiService";
 
 export class LiveSessionManager {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
+  private apiKey: string = "";
+  private userName: string = "Boss";
   private sessionPromise: Promise<any> | null = null;
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -21,11 +22,19 @@ export class LiveSessionManager {
   public onMessage: (sender: "user" | "zoya", text: string) => void = () => {};
   public onCommand: (url: string) => void = () => {};
 
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  constructor(apiKey?: string, userName: string = "Boss") {
+    this.apiKey = apiKey || localStorage.getItem("zoya_gemini_api_key") || "";
+    this.userName = userName;
+    if (this.apiKey.trim()) {
+      this.ai = new GoogleGenAI({ apiKey: this.apiKey.trim() });
+    }
   }
 
   async start() {
+    if (!this.apiKey.trim() || !this.ai) {
+      throw new Error("NO_API_KEY");
+    }
+
     try {
       this.onStateChange("processing");
       
@@ -89,7 +98,7 @@ export class LiveSessionManager {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
           },
-          systemInstruction,
+          systemInstruction: getSystemInstruction(this.userName),
           inputAudioTranscription: {},
           outputAudioTranscription: {},
           tools: [{
