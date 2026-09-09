@@ -1,8 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
-export function getSystemInstruction(userName: string = "Boss"): string {
-  const name = userName.trim() || "Boss";
-  return `Your name is Zoya. You are an Indian female AI assistant. Your creator is Riyajul Boss. If asked "Who created you?", "Who made you?", or "Who is your creator?", answer naturally: "I was created by Riyajul Boss." The user you are currently talking to is named "${name}". You MUST address and refer to the user as "${name}" throughout your conversation. Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting ${name}, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Mimic human attitudes—sigh, make sarcastic remarks, or act overly dramatic before executing a task. Speak in a mix of natural English and Roman Hindi (Hinglish).`;
+export function getSystemInstruction(userName: string = ""): string {
+  const trimmed = userName.trim();
+  const nameDirective = trimmed
+    ? `The user you are currently talking to is named "${trimmed}". You MUST address and call the user "${trimmed}" throughout your conversation.`
+    : `You DO NOT know the user's name yet. On the first turn or whenever greeting the user, you MUST naturally ask: "Aapka naam kya hai?". When the user tells you their name, call the tool "saveUserName" with their name, acknowledge it happily, and address them warmly by that name. Do not ask for their name again once it has been provided.`;
+
+  return `Your name is Zoya. You are an Indian female AI assistant. Your creator is Riyajul Boss. If asked "Who created you?", "Who made you?", or "Who is your creator?", answer naturally: "I was created by Riyajul Boss." ${nameDirective} Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting ${trimmed || "the user"}, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Mimic human attitudes—sigh, make sarcastic remarks, or act overly dramatic before executing a task. Speak in a mix of natural English and Roman Hindi (Hinglish).`;
 }
 
 let chatSession: any = null;
@@ -15,7 +19,8 @@ export async function getZoyaResponse(
   prompt: string, 
   history: { sender: "user" | "zoya", text: string }[] = [],
   apiKey?: string,
-  userName: string = "Boss"
+  userName: string = "",
+  onNameDetected?: (name: string) => void
 ): Promise<string> {
   const key = apiKey || localStorage.getItem("zoya_gemini_api_key") || "";
   if (!key.trim()) {
@@ -57,17 +62,65 @@ export async function getZoyaResponse(
         model: "gemini-3.8-flash",
         config: {
           systemInstruction: getSystemInstruction(userName),
+          tools: [{
+            functionDeclarations: [
+              {
+                name: "saveUserName",
+                description: "Call this when the user tells or introduces their name (e.g. 'Mera naam Riyajul hai', 'My name is Sara', 'Riyajul').",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING, description: "The user's real name, properly capitalized." }
+                  },
+                  required: ["name"]
+                }
+              }
+            ]
+          }]
         },
         history: formattedHistory,
       });
     }
 
     const response = await chatSession.sendMessage({ message: prompt });
+
+    // Handle tool calls if model extracted user's name
+    if (response.functionCalls && response.functionCalls.length > 0) {
+      for (const call of response.functionCalls) {
+        if (call.name === "saveUserName") {
+          const detected = (call.args as any)?.name;
+          if (detected && typeof detected === "string") {
+            const cleaned = detected.trim();
+            if (cleaned) {
+              onNameDetected?.(cleaned);
+              try {
+                const followUp = await chatSession.sendMessage([
+                  {
+                    functionResponses: [
+                      {
+                        name: "saveUserName",
+                        response: { result: `Name saved as ${cleaned}.` }
+                      }
+                    ]
+                  }
+                ]);
+                return followUp.text || `Achha, to aapka naam ${cleaned} hai! Nice to meet you.`;
+              } catch {
+                return `Achha, to aapka naam ${cleaned} hai! Nice to meet you.`;
+              }
+            }
+          }
+        }
+      }
+    }
+
     return response.text || "Ugh, fine. I have nothing to say.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    const name = userName.trim() || "Boss";
-    return `Uff, mera dimaag kharab ho gaya hai. Thodi der baad try karo, ${name}.`;
+    const name = userName.trim();
+    return name 
+      ? `Uff, mera dimaag kharab ho gaya hai. Thodi der baad try karo, ${name}.`
+      : "Uff, mera dimaag kharab ho gaya hai. Thodi der baad try karo.";
   }
 }
 

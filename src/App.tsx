@@ -23,6 +23,118 @@ declare global {
   }
 }
 
+// User Profile Isolation
+// Each user has their own separate isolated profile and Gemini API key.
+// User A's key will never be visible, accessible, or usable by User B.
+function getActiveUserId(): string {
+  if (typeof window === "undefined") return "default_profile";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const u = params.get("user") || params.get("u") || params.get("profile");
+    if (u && u.trim()) {
+      return u.trim();
+    }
+  } catch {}
+  let id = localStorage.getItem("zoya_active_user_profile_id");
+  if (!id) {
+    id = "user_" + Math.random().toString(36).substring(2, 10);
+    localStorage.setItem("zoya_active_user_profile_id", id);
+  }
+  return id;
+}
+
+function getIsolatedUserKey(userId: string): string {
+  if (typeof window === "undefined") return "";
+  const userKey = localStorage.getItem(`zoya_user_${userId}_gemini_key`);
+  if (userKey !== null) return userKey;
+
+  const isUrlScoped = typeof window !== "undefined" && (window.location.search.includes("user=") || window.location.search.includes("u="));
+  if (!isUrlScoped) {
+    return localStorage.getItem("zoya_gemini_api_key") || "";
+  }
+  return "";
+}
+
+function setIsolatedUserKey(userId: string, key: string) {
+  if (typeof window === "undefined") return;
+  const trimmed = key.trim();
+  if (trimmed) {
+    localStorage.setItem(`zoya_user_${userId}_gemini_key`, trimmed);
+    localStorage.setItem("zoya_gemini_api_key", trimmed);
+  } else {
+    localStorage.removeItem(`zoya_user_${userId}_gemini_key`);
+    localStorage.removeItem("zoya_gemini_api_key");
+  }
+}
+
+function getIsolatedUserName(userId: string): string {
+  if (typeof window === "undefined") return "";
+  const name = localStorage.getItem(`zoya_user_${userId}_name`);
+  if (name !== null) return name;
+  const isUrlScoped = typeof window !== "undefined" && (window.location.search.includes("user=") || window.location.search.includes("u="));
+  if (!isUrlScoped) {
+    return localStorage.getItem("zoya_user_name") || "";
+  }
+  return "";
+}
+
+function setIsolatedUserName(userId: string, name: string) {
+  if (typeof window === "undefined") return;
+  const trimmed = name.trim();
+  if (trimmed) {
+    localStorage.setItem(`zoya_user_${userId}_name`, trimmed);
+    localStorage.setItem("zoya_user_name", trimmed);
+  } else {
+    localStorage.removeItem(`zoya_user_${userId}_name`);
+    localStorage.removeItem("zoya_user_name");
+  }
+}
+
+function extractNameFromText(text: string, wasAskedForName: boolean): string | null {
+  const clean = text.trim();
+  if (!clean) return null;
+
+  // Patterns like "Mera naam Rahul hai", "My name is John", "I am Priya", "I'm Alex", "Call me Vikram"
+  const patterns = [
+    /(?:mera naam|my name is|call me|i am|iam|i'm|im|naam hai)\s+([A-Za-z]+)/i,
+    /([A-Za-z]+)\s+(?:naam hai mera|mera naam hai)/i,
+  ];
+
+  for (const p of patterns) {
+    const match = clean.match(p);
+    if (match && match[1]) {
+      const candidate = match[1].trim();
+      const lower = candidate.toLowerCase();
+      const forbidden = ["zoya", "maya", "boss", "user", "guest", "naam", "name", "kya", "hai", "what", "hello", "hi", "hey", "the", "a", "an", "is"];
+      if (!forbidden.includes(lower) && candidate.length >= 2) {
+        return candidate.charAt(0).toUpperCase() + candidate.slice(1).toLowerCase();
+      }
+    }
+  }
+
+  // If Zoya explicitly asked for name ("Aapka naam kya hai?"), and user replies with 1 or 2 words (e.g. "Riyajul" or "Riyajul Ansari")
+  if (wasAskedForName) {
+    const words = clean.split(/\s+/);
+    if (words.length >= 1 && words.length <= 2) {
+      const firstWord = words[0].replace(/[^a-zA-Z]/g, "");
+      const lower = firstWord.toLowerCase();
+      const forbidden = [
+        "zoya", "maya", "boss", "user", "guest", "naam", "name", "kya", "hai", 
+        "what", "hello", "hi", "hey", "no", "nahi", "why", "kyun", "yes", "haan",
+        "ok", "okay", "hmmm", "hmm", "open", "play", "search", "stop", "cancel"
+      ];
+      if (firstWord.length >= 2 && !forbidden.includes(lower)) {
+        return words.map(w => {
+          const cleanWord = w.replace(/[^a-zA-Z]/g, "");
+          return cleanWord ? cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1).toLowerCase() : "";
+        }).filter(Boolean).join(" ");
+      }
+    }
+  }
+
+  return null;
+}
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<"home" | "settings" | "personal">("home");
   const [appState, setAppState] = useState<AppState>("idle");
@@ -45,25 +157,49 @@ export default function App() {
     localStorage.setItem("zoya_chat_history", JSON.stringify(messages));
   }, [messages]);
 
+  // Active user profile identifier
+  const activeUserId = useRef(getActiveUserId()).current;
+
   // Personal Settings: Name & Gemini Key
+  // Field must be empty by default (no Boss, Riyajul, User, Guest)
   const [userName, setUserName] = useState<string>(() => {
-    return localStorage.getItem("zoya_user_name") || "Riyajul";
+    return getIsolatedUserName(activeUserId);
   });
   const [userNameInput, setUserNameInput] = useState<string>(userName);
   const [isNameSaved, setIsNameSaved] = useState<boolean>(false);
 
   const [geminiKey, setGeminiKey] = useState<string>(() => {
-    return localStorage.getItem("zoya_gemini_api_key") || "";
+    return getIsolatedUserKey(activeUserId);
   });
   const [geminiKeyInput, setGeminiKeyInput] = useState<string>(geminiKey);
   const [isKeySaved, setIsKeySaved] = useState<boolean>(false);
 
-  const handleSaveName = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const trimmed = userNameInput.trim() || "Riyajul";
+  // Gemini API Key Notice Popup state
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const askedForNameRef = useRef<boolean>(false);
+
+  // When a user opens Zoya and that user's own Gemini API key is not configured, show the notice popup.
+  useEffect(() => {
+    if (!geminiKey.trim()) {
+      setShowApiKeyModal(true);
+    }
+  }, []);
+
+  const updateUserName = useCallback((newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
     setUserName(trimmed);
     setUserNameInput(trimmed);
-    localStorage.setItem("zoya_user_name", trimmed);
+    setIsolatedUserName(activeUserId, trimmed);
+    resetZoyaSession();
+  }, [activeUserId]);
+
+  const handleSaveName = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = userNameInput.trim();
+    setUserName(trimmed);
+    setUserNameInput(trimmed);
+    setIsolatedUserName(activeUserId, trimmed);
     resetZoyaSession();
     setIsNameSaved(true);
     setTimeout(() => setIsNameSaved(false), 2500);
@@ -74,10 +210,18 @@ export default function App() {
     const trimmed = geminiKeyInput.trim();
     setGeminiKey(trimmed);
     setGeminiKeyInput(trimmed);
-    localStorage.setItem("zoya_gemini_api_key", trimmed);
+    setIsolatedUserKey(activeUserId, trimmed);
     resetZoyaSession();
     setIsKeySaved(true);
     setTimeout(() => setIsKeySaved(false), 2500);
+
+    // Once that user's valid Gemini API key is saved: stop showing the notice popup.
+    // If the user later deletes their Gemini API key: the notice popup must become active again.
+    if (trimmed) {
+      setShowApiKeyModal(false);
+    } else {
+      setShowApiKeyModal(true);
+    }
   };
 
   const [isMuted, setIsMuted] = useState(false);
@@ -110,8 +254,25 @@ export default function App() {
       return;
     }
 
+    // If no Gemini API key is saved, and the user tries to use Zoya's AI/Gemini functionality, show a clear popup.
+    // Do NOT generate a fake response. Do NOT silently use another API key.
+    if (!geminiKey.trim()) {
+      setShowApiKeyModal(true);
+      setAppState("idle");
+      return;
+    }
+
     setMessages((prev) => [...prev, { id: Date.now().toString(), sender: "user", text: finalTranscript }]);
     
+    // Check if user is sharing their name when Zoya doesn't have it yet
+    if (!userName) {
+      const extracted = extractNameFromText(finalTranscript, askedForNameRef.current);
+      if (extracted) {
+        updateUserName(extracted);
+        askedForNameRef.current = false;
+      }
+    }
+
     // If live session is active, send text through it
     if (isSessionActive && liveSessionRef.current) {
       liveSessionRef.current.sendText(finalTranscript);
@@ -122,16 +283,12 @@ export default function App() {
     const commandResult = processCommand(finalTranscript);
 
     if (commandResult.isBrowserAction) {
-      if (geminiKey.trim()) {
-        const audioBase64 = await getZoyaAudio(commandResult.action, geminiKey);
-        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), sender: "zoya", text: commandResult.action }]);
+      const audioBase64 = await getZoyaAudio(commandResult.action, geminiKey);
+      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), sender: "zoya", text: commandResult.action }]);
 
-        if (audioBase64) {
-          setAppState("speaking");
-          await playPCM(audioBase64);
-        }
-      } else {
-        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), sender: "zoya", text: commandResult.action }]);
+      if (audioBase64) {
+        setAppState("speaking");
+        await playPCM(audioBase64);
       }
 
       if (commandResult.url) {
@@ -141,28 +298,30 @@ export default function App() {
       return;
     }
 
-    // If the user has NOT saved a Gemini API key, Zoya must not generate or speak a Gemini AI response.
-    if (!geminiKey.trim()) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          sender: "zoya",
-          text: "Please add and save your Gemini API key in Settings > Personal to chat with me.",
-        },
-      ]);
-      setAppState("idle");
-      return;
-    }
-
     setAppState("processing");
 
     // 2. Chat with Gemini
-    const replyText = await getZoyaResponse(finalTranscript, messagesRef.current, geminiKey, userName);
+    const replyText = await getZoyaResponse(
+      finalTranscript,
+      messagesRef.current,
+      geminiKey,
+      userName,
+      (detectedName) => {
+        updateUserName(detectedName);
+        askedForNameRef.current = false;
+      }
+    );
+
     if (!replyText) {
       setAppState("idle");
       return;
     }
+
+    // If Zoya asked for user's name, note it so next user message can be auto-saved as name
+    if (!userName && (/naam\s+kya/i.test(replyText) || /aapka\s+naam/i.test(replyText))) {
+      askedForNameRef.current = true;
+    }
+
     setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), sender: "zoya", text: replyText }]);
 
     // 3. Speak using TTS
@@ -172,7 +331,7 @@ export default function App() {
       await playPCM(audioBase64);
     }
     setAppState("idle");
-  }, [isSessionActive, geminiKey, userName]);
+  }, [isSessionActive, geminiKey, userName, updateUserName]);
 
   const toggleListening = async () => {
     if (isSessionActive) {
@@ -185,15 +344,9 @@ export default function App() {
       return;
     }
 
+    // If no Gemini key, show missing key popup modal directly
     if (!geminiKey.trim()) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          sender: "zoya",
-          text: "Please add and save your Gemini API key in Settings > Personal to start voice chat.",
-        },
-      ]);
+      setShowApiKeyModal(true);
       return;
     }
 
@@ -205,6 +358,13 @@ export default function App() {
       };
       manager.onMessage = (sender, text) => {
         setMessages((prev) => [...prev, { id: Date.now().toString(), sender, text }]);
+        if (!userName && sender === "zoya" && (/naam\s+kya/i.test(text) || /aapka\s+naam/i.test(text))) {
+          askedForNameRef.current = true;
+        }
+      };
+      manager.onNameDetected = (detectedName) => {
+        updateUserName(detectedName);
+        askedForNameRef.current = false;
       };
       manager.onCommand = (url) => {
         window.open(url, "_blank");
@@ -481,7 +641,7 @@ export default function App() {
                     type="text"
                     value={userNameInput}
                     onChange={(e) => setUserNameInput(e.target.value)}
-                    placeholder="e.g. Riyajul or Boss"
+                    placeholder="Enter your name"
                     className="w-full bg-[#1b1b20] border border-white/10 rounded-2xl px-4 py-3.5 text-white placeholder:text-zinc-600 text-base focus:outline-none focus:border-amber-500/60 transition-all font-medium"
                   />
 
@@ -501,7 +661,7 @@ export default function App() {
                     </button>
                     {isNameSaved && (
                       <span className="text-xs text-emerald-400 font-medium">
-                        Name saved! Zoya will now call you {userName}.
+                        {userName ? `Name saved! Zoya will now call you ${userName}.` : "Name updated."}
                       </span>
                     )}
                   </div>
@@ -509,7 +669,7 @@ export default function App() {
               </div>
 
               {/* 2. GEMINI API KEY */}
-              <div className="rounded-3xl bg-[#141418] border border-white/5 p-6 shadow-xl space-y-4">
+              <div id="gemini-key-section" className="rounded-3xl bg-[#141418] border border-white/5 p-6 shadow-xl space-y-4">
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
                     <Lock size={20} />
@@ -578,6 +738,60 @@ export default function App() {
                 </form>
               </div>
             </main>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Gemini API Key Notice Popup */}
+      <AnimatePresence>
+        {showApiKeyModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowApiKeyModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              transition={{ type: "spring", damping: 26, stiffness: 320 }}
+              className="w-full max-w-md rounded-3xl bg-[#141419] border border-white/10 p-6 sm:p-7 shadow-2xl space-y-4 relative overflow-hidden text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Top Row: Lock Icon & Close Button */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+                  <Lock size={20} />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyModal(false)}
+                  className="text-zinc-400 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Title & Message */}
+              <div className="space-y-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Gemini API Key Required
+                </h2>
+                <p className="text-sm text-zinc-300 leading-relaxed">
+                  To use Zoya's AI features, you need to add your own Gemini API key.
+                </p>
+              </div>
+
+              {/* Clear Instruction */}
+              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3.5 sm:p-4 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Go to <span className="text-amber-400 font-medium">Settings → Personal → Gemini API Key</span> to add your key.
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

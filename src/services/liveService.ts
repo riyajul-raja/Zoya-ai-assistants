@@ -5,7 +5,7 @@ import { getSystemInstruction } from "./geminiService";
 export class LiveSessionManager {
   private ai: GoogleGenAI | null = null;
   private apiKey: string = "";
-  private userName: string = "Boss";
+  private userName: string = "";
   private sessionPromise: Promise<any> | null = null;
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -21,8 +21,9 @@ export class LiveSessionManager {
   public onStateChange: (state: "idle" | "listening" | "processing" | "speaking") => void = () => {};
   public onMessage: (sender: "user" | "zoya", text: string) => void = () => {};
   public onCommand: (url: string) => void = () => {};
+  public onNameDetected: (name: string) => void = () => {};
 
-  constructor(apiKey?: string, userName: string = "Boss") {
+  constructor(apiKey?: string, userName: string = "") {
     this.apiKey = apiKey || localStorage.getItem("zoya_gemini_api_key") || "";
     this.userName = userName;
     if (this.apiKey.trim()) {
@@ -115,6 +116,17 @@ export class LiveSessionManager {
                   },
                   required: ["actionType", "query"]
                 }
+              },
+              {
+                name: "saveUserName",
+                description: "Call this immediately when the user tells you their name.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING, description: "The user's real name, properly capitalized." }
+                  },
+                  required: ["name"]
+                }
               }
             ]
           }]
@@ -175,6 +187,26 @@ export class LiveSessionManager {
                          response: { result: "Action executed successfully in the browser." }
                        }]
                      });
+                  });
+                } else if (call.name === "saveUserName") {
+                  const args = call.args as any;
+                  if (args?.name && typeof args.name === "string") {
+                    const cleanName = args.name.trim();
+                    if (cleanName) {
+                      this.userName = cleanName;
+                      this.onNameDetected(cleanName);
+                    }
+                  }
+
+                  // Send tool response
+                  this.sessionPromise?.then(session => {
+                    session.sendToolResponse({
+                      functionResponses: [{
+                        name: call.name,
+                        id: call.id,
+                        response: { result: "User name saved successfully." }
+                      }]
+                    });
                   });
                 }
               }
