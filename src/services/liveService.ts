@@ -28,22 +28,50 @@ export class LiveSessionManager {
   private nextPlayTime: number = 0;
   private isPlaying: boolean = false;
   public isMuted: boolean = false;
+  private initialHistory: { sender: "user" | "zoya"; text: string }[] = [];
+  private accumulatedUserText: string = "";
+  private accumulatedModelText: string = "";
+  private currentState: "idle" | "listening" | "processing" | "speaking" = "idle";
+  private isSessionRunning: boolean = false;
+  private visibilityHandler: (() => void) | null = null;
   
   public onStateChange: (state: "idle" | "listening" | "processing" | "speaking") => void = () => {};
+  public onActiveChange: (active: boolean) => void = () => {};
   public onMessage: (sender: "user" | "zoya", text: string) => void = () => {};
   public onCommand: (url: string) => void = () => {};
   public onNameDetected: (name: string) => void = () => {};
+  public onMemoryDetected: (memory: string) => void = () => {};
+
+  public getState(): "idle" | "listening" | "processing" | "speaking" {
+    return this.currentState;
+  }
+
+  public isRunning(): boolean {
+    return this.isSessionRunning;
+  }
+
+  private setState(state: "idle" | "listening" | "processing" | "speaking") {
+    if (this.currentState === state) return;
+    this.currentState = state;
+    this.onStateChange(state);
+  }
+
+  private savedMemories: string = "";
 
   constructor(
     apiKey?: string, 
     userName: string = "", 
     assistantName: string = "Zoya", 
-    girlfriendMode: boolean = false
+    girlfriendMode: boolean = false,
+    initialHistory: { sender: "user" | "zoya"; text: string }[] = [],
+    savedMemories: string = ""
   ) {
     this.apiKey = apiKey || localStorage.getItem("zoya_gemini_api_key") || "";
     this.userName = userName;
     this.assistantName = assistantName;
     this.girlfriendMode = girlfriendMode;
+    this.initialHistory = initialHistory;
+    this.savedMemories = savedMemories;
     if (this.apiKey.trim()) {
       this.ai = new GoogleGenAI({ apiKey: this.apiKey.trim() });
     }
@@ -55,13 +83,48 @@ export class LiveSessionManager {
     }
 
     try {
-      this.onStateChange("processing");
+      this.isSessionRunning = true;
+      this.onActiveChange(true);
+      this.setState("processing");
       
       // Initialize Audio Contexts
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioContextClass({ sampleRate: 16000 });
       this.playbackContext = new AudioContextClass({ sampleRate: 24000 });
       this.nextPlayTime = this.playbackContext.currentTime;
+
+      // Handle AudioContext state changes (e.g., background throttling or platform suspension)
+      this.audioContext.onstatechange = () => {
+        if (!this.isSessionRunning) return;
+        if (this.audioContext?.state === "suspended") {
+          this.audioContext.resume().then(() => {
+            if (this.isSessionRunning && this.currentState === "idle") {
+              this.setState("listening");
+            }
+          }).catch(() => {
+            if (this.isSessionRunning && !this.isPlaying) {
+              this.setState("idle");
+            }
+          });
+        } else if (this.audioContext?.state === "running") {
+          if (this.isSessionRunning && this.currentState === "idle" && !this.isPlaying) {
+            this.setState("listening");
+          }
+        }
+      };
+
+      // Auto-resume audio contexts when user returns or unlocks screen
+      this.visibilityHandler = () => {
+        if (document.visibilityState === "visible" && this.isSessionRunning) {
+          if (this.audioContext?.state === "suspended") {
+            this.audioContext.resume().catch(() => {});
+          }
+          if (this.playbackContext?.state === "suspended") {
+            this.playbackContext.resume().catch(() => {});
+          }
+        }
+      };
+      document.addEventListener("visibilitychange", this.visibilityHandler);
 
       // Get Microphone with full hardware/browser noise suppression, AGC & AEC
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -73,6 +136,25 @@ export class LiveSessionManager {
           autoGainControl: true,
         } 
       });
+
+      const audioTrack = this.mediaStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.onmute = () => {
+          if (this.isSessionRunning && !this.isPlaying) {
+            this.setState("idle");
+          }
+        };
+        audioTrack.onunmute = () => {
+          if (this.isSessionRunning && !this.isPlaying) {
+            this.setState("listening");
+          }
+        };
+        audioTrack.onended = () => {
+          if (this.isSessionRunning) {
+            this.stop();
+          }
+        };
+      }
 
       this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -150,6 +232,10 @@ export class LiveSessionManager {
           // Reset hangover hold-time (~450ms = ~4 frames at 128ms/frame)
           this.speechHoldFrames = 4;
           this.sendAudioFrame(pcm16);
+
+          if (!this.isPlaying && this.currentState !== "listening") {
+            this.setState("listening");
+          }
         } else if (this.speechHoldFrames > 0) {
           // Still in hangover window: user is pausing between words or finishing syllable
           this.speechHoldFrames--;
@@ -183,7 +269,7 @@ export class LiveSessionManager {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
           },
-          systemInstruction: getSystemInstruction(this.userName, this.assistantName, this.girlfriendMode),
+          systemInstruction: getSystemInstruction(this.userName, this.assistantName, this.girlfriendMode, this.initialHistory, this.savedMemories),
           inputAudioTranscription: {},
           outputAudioTranscription: {},
           tools: [{
@@ -213,6 +299,17 @@ export class LiveSessionManager {
                 }
               },
               {
+                name: "saveMemory",
+                description: "Call this tool whenever the user asks you to remember something (e.g. 'ye yaad rakho', 'remember this', 'isko memory me save karo', 'yaad rakhna ki...', 'please remember that...'), or shares an important personal fact or preference to remember. Do NOT call this tool for passwords or API keys.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    memory: { type: Type.STRING, description: "The concise, clear statement of what the user asked you to remember." }
+                  },
+                  required: ["memory"]
+                }
+              },
+              {
                 name: "getCurrentTime",
                 description: "Get the exact real-time current clock time and date from the user's device. You MUST call this tool whenever the user asks for the current time or date (such as 'what time is it', 'abhi kitne baje hain', 'kya time hua hai', 'kitna baja hai', 'time batao', 'samay kya hai', etc.). Never guess or estimate the time.",
                 parameters: {
@@ -226,32 +323,70 @@ export class LiveSessionManager {
         callbacks: {
           onopen: () => {
             console.log("Live API Connected");
-            this.onStateChange("listening");
+            this.setState("listening");
           },
           onmessage: async (message: LiveServerMessage) => {
             // Handle Audio Output
             const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (base64Audio) {
-              this.onStateChange("speaking");
+              this.setState("speaking");
               this.playAudioChunk(base64Audio);
             }
 
             // Handle Interruption
             if (message.serverContent?.interrupted) {
               this.stopPlayback();
-              this.onStateChange("listening");
+              this.setState("listening");
             }
 
-            // Handle Transcriptions
-            const userText = message.serverContent?.modelTurn?.parts?.[0]?.text;
-            if (userText) {
-               // Output transcription
-               this.onMessage("zoya", userText);
+            // Handle User Input Speech Transcription
+            const inputChunk = message.serverContent?.inputTranscription?.text;
+            if (inputChunk) {
+              this.accumulatedUserText += inputChunk;
+            }
+            if (message.serverContent?.inputTranscription?.finished) {
+              const trimmedUser = this.accumulatedUserText.trim();
+              if (trimmedUser) {
+                this.onMessage("user", trimmedUser);
+              }
+              this.accumulatedUserText = "";
+              if (!this.isPlaying) {
+                this.setState("processing");
+              }
+            }
+
+            // Handle Model Text Transcriptions
+            const modelPartText = message.serverContent?.modelTurn?.parts?.[0]?.text;
+            const outputTransText = message.serverContent?.outputTranscription?.text;
+            const modelChunk = modelPartText || outputTransText;
+            if (modelChunk) {
+              // Flush any pending user text BEFORE Zoya's reply so ordering is preserved
+              if (this.accumulatedUserText.trim()) {
+                this.onMessage("user", this.accumulatedUserText.trim());
+                this.accumulatedUserText = "";
+              }
+              this.accumulatedModelText += modelChunk;
+            }
+
+            // Handle Turn Completion
+            if (message.serverContent?.turnComplete) {
+              if (this.accumulatedUserText.trim()) {
+                this.onMessage("user", this.accumulatedUserText.trim());
+                this.accumulatedUserText = "";
+              }
+              if (this.accumulatedModelText.trim()) {
+                this.onMessage("zoya", this.accumulatedModelText.trim());
+                this.accumulatedModelText = "";
+              }
+              if (!this.isPlaying && this.isSessionRunning) {
+                this.setState("listening");
+              }
             }
 
             // Handle Function Calls
             const functionCalls = message.toolCall?.functionCalls;
             if (functionCalls && functionCalls.length > 0) {
+              this.setState("processing");
               for (const call of functionCalls) {
                 if (call.name === "executeBrowserAction") {
                   const args = call.args as any;
@@ -297,6 +432,25 @@ export class LiveSessionManager {
                         name: call.name,
                         id: call.id,
                         response: { result: "User name saved successfully." }
+                      }]
+                    });
+                  });
+                } else if (call.name === "saveMemory") {
+                  const args = call.args as any;
+                  if (args?.memory && typeof args.memory === "string") {
+                    const cleanMem = args.memory.trim();
+                    if (cleanMem) {
+                      this.onMemoryDetected(cleanMem);
+                    }
+                  }
+
+                  // Send tool response
+                  this.sessionPromise?.then(session => {
+                    session.sendToolResponse({
+                      functionResponses: [{
+                        name: call.name,
+                        id: call.id,
+                        response: { result: "Memory saved successfully in Zoya's memory." }
                       }]
                     });
                   });
@@ -372,7 +526,9 @@ export class LiveSessionManager {
       source.onended = () => {
         if (this.playbackContext && this.playbackContext.currentTime >= this.nextPlayTime - 0.1) {
           this.isPlaying = false;
-          this.onStateChange("listening");
+          if (this.isSessionRunning) {
+            this.setState("listening");
+          }
         }
       };
     } catch (e) {
@@ -414,6 +570,12 @@ export class LiveSessionManager {
   }
 
   stop() {
+    this.isSessionRunning = false;
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     if (this.processor) {
       this.processor.disconnect();
       this.processor = null;
@@ -439,11 +601,21 @@ export class LiveSessionManager {
       this.mediaStream = null;
     }
     if (this.audioContext) {
-      this.audioContext.close();
+      this.audioContext.close().catch(() => {});
       this.audioContext = null;
     }
     this.preSpeechBuffer = [];
     this.speechHoldFrames = 0;
+    
+    if (this.accumulatedUserText.trim() && this.accumulatedModelText.trim()) {
+      this.onMessage("user", this.accumulatedUserText.trim());
+      this.onMessage("zoya", this.accumulatedModelText.trim());
+    } else if (this.accumulatedModelText.trim()) {
+      this.onMessage("zoya", this.accumulatedModelText.trim());
+    }
+    this.accumulatedUserText = "";
+    this.accumulatedModelText = "";
+
     this.stopPlayback();
     
     if (this.sessionPromise) {
@@ -451,7 +623,8 @@ export class LiveSessionManager {
       this.sessionPromise = null;
     }
     
-    this.onStateChange("idle");
+    this.onActiveChange(false);
+    this.setState("idle");
   }
 
   sendText(text: string) {

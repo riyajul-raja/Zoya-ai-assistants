@@ -1,0 +1,65 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background subtle gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#18181e" />
+      <stop offset="100%" stop-color="#09090b" />
+    </radialGradient>
+
+    <!-- Gold Heart Gradient -->
+    <linearGradient id="goldGrad" x1="12" y1="3" x2="12" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="45%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Gold Stroke Gradient -->
+    <linearGradient id="goldStroke" x1="12" y1="3" x2="12" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+
+    <!-- Badge background & border -->
+    <linearGradient id="badgeBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(245, 158, 11, 0.22)" />
+      <stop offset="100%" stop-color="rgba(245, 158, 11, 0.10)" />
+    </linearGradient>
+
+    <linearGradient id="badgeBorder" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(251, 191, 36, 0.35)" />
+      <stop offset="100%" stop-color="rgba(217, 119, 6, 0.20)" />
+    </linearGradient>
+
+    <!-- Soft Glow Filter -->
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    
+    <filter id="ambientGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="30" />
+    </filter>
+  </defs>
+
+  <!-- Base background (full bleed for maskable & any) -->
+  <rect width="512" height="512" fill="url(#bgGrad)" />
+
+  <!-- Ambient warm gold glow behind badge -->
+  <circle cx="256" cy="256" r="171" fill="rgba(245, 158, 11, 0.18)" filter="url(#ambientGlow)" />
+
+  <!-- Settings Persona Card Badge Container (matches rounded-xl bg-amber-500/15 border border-amber-500/20) -->
+  <rect x="66" y="66" width="380" height="380" rx="86" fill="url(#badgeBg)" stroke="url(#badgeBorder)" stroke-width="3" />
+
+  <!-- Heart Icon (transformed Lucide Heart) -->
+  <g transform="translate(118, 124) scale(11.5)" filter="url(#goldGlow)">
+    <!-- Filled Heart Body with warm gold gradient -->
+    <path 
+      d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" 
+      fill="url(#goldGrad)" 
+      stroke="url(#goldStroke)" 
+      stroke-width="1.6" 
+      stroke-linecap="round" 
+      stroke-linejoin="round" 
+    />
+  </g>
+</svg>

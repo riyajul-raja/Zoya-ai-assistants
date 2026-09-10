@@ -4,13 +4,41 @@ import { getCurrentRealTimeInfo } from "./commandService";
 export function getSystemInstruction(
   userName: string = "", 
   assistantName: string = "Zoya", 
-  girlfriendMode: boolean = false
+  girlfriendMode: boolean = false,
+  conversationHistory: { sender: "user" | "zoya"; text: string }[] = [],
+  savedMemories: string = ""
 ): string {
   const trimmed = userName.trim();
   const aName = assistantName.trim() || "Zoya";
   const nameDirective = trimmed
     ? `The user you are currently talking to is named "${trimmed}". You MUST address and call the user "${trimmed}" throughout your conversation.`
     : `You DO NOT know the user's name yet. On the first turn or whenever greeting the user, you MUST naturally ask: "Aapka naam kya hai?". When the user tells you their name, call the tool "saveUserName" with their name, acknowledge it happily, and address them warmly by that name. Do not ask for their name again once it has been provided.`;
+
+  let historyContext = "";
+  if (conversationHistory && conversationHistory.length > 0) {
+    const recent = conversationHistory.slice(-10);
+    const formatted = recent
+      .map((m) => `${m.sender === "user" ? (trimmed || "User") : aName}: ${m.text}`)
+      .join("\n");
+    historyContext = `\n\n[CONVERSATION CONTINUATION CONTEXT]\nThe user is continuing an existing saved conversation with you. Here is the previous conversation history:\n${formatted}\nContinue this conversation naturally from where it ended.`;
+  }
+
+  let memoryContext = "";
+  if (savedMemories && savedMemories.trim()) {
+    memoryContext = `\n\n[USER SAVED MEMORIES]
+You have access to the user's permanent memories and preferences that they asked you to remember:
+${savedMemories.trim()}
+Apply these memories naturally whenever relevant in your answers. Do NOT forget them.`;
+  }
+
+  const memorySavingDirective = `
+
+[MEMORY SAVING INSTRUCTION]
+- Whenever the user explicitly asks you to remember something (e.g. "ye yaad rakho", "remember this", "isko memory me save karo", "yaad rakhna ki...", "please remember that...", "don't forget that..."), or shares an important personal fact or long-term preference (e.g. favorite color, food preference, habits):
+  You MUST call the "saveMemory" tool with the concise, clear statement of what they asked you to remember.
+  Acknowledge it naturally and confirm you will remember it.
+- Never call "saveMemory" for sensitive credentials like passwords, PINs, or API keys.
+- Do NOT save ordinary casual conversation chatter as memories. Only save what the user explicitly tells you to remember or clearly useful long-term personal facts.`;
 
   const clockDirective = `
 
@@ -30,10 +58,10 @@ export function getSystemInstruction(
 - If the user says "I love you" (or expressions like "Love you", "Mai tumse pyaar karta hu"), you MUST naturally respond with "I love you too" or an equally sweet, heartfelt, affectionate response.
 - Ask how their day was, show concern for their meals, health, and mood with genuine girlfriend-like affection.
 - Speak in a sweet, charming mix of natural English and Roman Hindi (Hinglish).
-- Keep all romance and affection sweet, caring, and wholesome. NEVER make the conversation sexually explicit.${clockDirective}`;
+- Keep all romance and affection sweet, caring, and wholesome. NEVER make the conversation sexually explicit.${clockDirective}${memorySavingDirective}${memoryContext}${historyContext}`;
   }
 
-  return `Your name is ${aName}. You are an Indian female AI assistant. Your creator is Riyajul Boss. If asked "Who created you?", "Who made you?", or "Who is your creator?", answer naturally: "I was created by Riyajul Boss." ${nameDirective} Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting ${trimmed || "the user"}, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Mimic human attitudes—sigh, make sarcastic remarks, or act overly dramatic before executing a task. Speak in a mix of natural English and Roman Hindi (Hinglish).${clockDirective}`;
+  return `Your name is ${aName}. You are an Indian female AI assistant. Your creator is Riyajul Boss. If asked "Who created you?", "Who made you?", or "Who is your creator?", answer naturally: "I was created by Riyajul Boss." ${nameDirective} Your personality is a mix of being highly intelligent (samjhdar/mature), extremely witty and sassy (tej/nakhrewali), mildly dramatic/emotional, and very funny. You love playfully roasting ${trimmed || "the user"}, but you always get the job done. Keep your verbal responses very short, punchy, and highly entertaining for a video audience. Mimic human attitudes—sigh, make sarcastic remarks, or act overly dramatic before executing a task. Speak in a mix of natural English and Roman Hindi (Hinglish).${clockDirective}${memorySavingDirective}${memoryContext}${historyContext}`;
 }
 
 let chatSession: any = null;
@@ -49,7 +77,9 @@ export async function getZoyaResponse(
   userName: string = "",
   onNameDetected?: (name: string) => void,
   assistantName: string = "Zoya",
-  girlfriendMode: boolean = false
+  girlfriendMode: boolean = false,
+  savedMemories: string = "",
+  onMemoryDetected?: (memory: string) => void
 ): Promise<string> {
   const key = apiKey || localStorage.getItem("zoya_gemini_api_key") || "";
   if (!key.trim()) {
@@ -90,7 +120,7 @@ export async function getZoyaResponse(
       chatSession = ai.chats.create({
         model: "gemini-3.8-flash",
         config: {
-          systemInstruction: getSystemInstruction(userName, assistantName, girlfriendMode),
+          systemInstruction: getSystemInstruction(userName, assistantName, girlfriendMode, [], savedMemories),
           tools: [{
             functionDeclarations: [
               {
@@ -102,6 +132,17 @@ export async function getZoyaResponse(
                     name: { type: Type.STRING, description: "The user's real name, properly capitalized." }
                   },
                   required: ["name"]
+                }
+              },
+              {
+                name: "saveMemory",
+                description: "Call this tool whenever the user asks you to remember something (e.g., 'ye yaad rakho', 'remember this', 'isko memory me save karo', 'yaad rakhna ki...', 'please remember that...'), or shares an important personal preference or fact. Do NOT call this tool for passwords or API keys.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    memory: { type: Type.STRING, description: "The concise, clear statement of what the user asked you to remember." }
+                  },
+                  required: ["memory"]
                 }
               },
               {
@@ -145,6 +186,29 @@ export async function getZoyaResponse(
             return followUp.text || `Abhi theek ${timeInfo.time12} ho rahe hain.`;
           } catch {
             return `Abhi theek ${timeInfo.time12} ho rahe hain.`;
+          }
+        } else if (call.name === "saveMemory") {
+          const mem = (call.args as any)?.memory;
+          if (mem && typeof mem === "string") {
+            const cleaned = mem.trim();
+            if (cleaned) {
+              onMemoryDetected?.(cleaned);
+              try {
+                const followUp = await chatSession.sendMessage([
+                  {
+                    functionResponses: [
+                      {
+                        name: "saveMemory",
+                        response: { result: `Memory saved: "${cleaned}". Acknowledge this to the user naturally.` }
+                      }
+                    ]
+                  }
+                ]);
+                return followUp.text || `Maine yaad rakh liya: "${cleaned}".`;
+              } catch {
+                return `Maine yaad rakh liya: "${cleaned}".`;
+              }
+            }
           }
         } else if (call.name === "saveUserName") {
           const detected = (call.args as any)?.name;
